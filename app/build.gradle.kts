@@ -9,11 +9,23 @@ android {
     namespace = "com.example.beatpulse"
     compileSdk = 36
     defaultConfig {
-        applicationId = "com.example.beatpulse"
+        applicationId = "com.polonio.duwave"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
+    }
+
+    val keystoreFile = file("../release.keystore")
+    if (keystoreFile.exists()) {
+        signingConfigs {
+            create("release") {
+                storeFile = keystoreFile
+                storePassword = "Du\"@\"_wave/341"
+                keyAlias = "duwave"
+                keyPassword = "Du\"@\"_wave/341"
+            }
+        }
     }
 
     buildTypes {
@@ -21,6 +33,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (keystoreFile.exists()) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
