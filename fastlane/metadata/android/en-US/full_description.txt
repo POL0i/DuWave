@@ -1,0 +1,7 @@
+DuWave is an open-source local music player.
+
+Main features:
+* Smooth playback and optimized support via ExoPlayer.
+* Dynamic interface with Palette API.
+* Real-time audio visualizer.
+* Comprehensive music library management.
