@@ -12,8 +12,8 @@ android {
         applicationId = "com.polonio.duwave"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.0.2"
+        versionCode = 3
+        versionName = "1.0.3"
     }
 
     val keystoreFile = file("../release.keystore")
@@ -53,6 +53,11 @@ android {
       resources {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
       }
+    }
+
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 }
 
