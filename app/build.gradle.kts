@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.example.beatpulse"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "com.polonio.duwave"
         minSdk = 24
