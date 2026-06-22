@@ -31,8 +31,8 @@ To build and run the project locally:
 4. *Note: Ensure your device grants the necessary audio and storage permissions to load local songs.*
 
 ## 📱 Screenshots
-
-*(Añade aquí las capturas de pantalla de la app en la carpeta `/screenshots/`)*
+<img width="714" height="1599" alt="WhatsApp Image 2026-06-22 at 11 17 18 AM" src="https://github.com/user-attachments/assets/63ca0070-e690-4968-b2d4-97027a25917b" />
+<img width="720" height="1612" alt="WhatsApp Image 2026-06-22 at 11 17 17 AM" src="https://github.com/user-attachments/assets/13f7bb6d-9f5b-4c2d-b2ba-a69c08ac3d17" />
 
 ## 📄 License
 
