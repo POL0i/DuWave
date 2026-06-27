@@ -38,7 +38,6 @@ fun CyberpunkBackground(
     
     // Custom loop to prevent recompositions
     LaunchedEffect(isPlayerScreen) {
-        var dynamicEnergy = 0f
         var lastTime = 0L
         while(true) {
             withFrameMillis { time ->

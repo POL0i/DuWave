@@ -40,6 +40,9 @@ object ThumbnailCache {
 
     val noArtSet = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<Long, Boolean>())
 
+    @Volatile
+    var isPriorityLoading = false
+
     fun getTrackFingerprint(track: TrackEntity): String {
         return Math.abs((track.title + track.artist + track.album + track.duration + (track.customCoverPath ?: "")).hashCode()).toString()
     }
@@ -59,6 +62,22 @@ object ThumbnailCache {
     private suspend fun extractRawBitmap(context: android.content.Context, track: TrackEntity): ByteArray? {
         return withContext(Dispatchers.IO) {
             try {
+                if (!track.customCoverPath.isNullOrEmpty()) {
+                    try {
+                        val customFile = java.io.File(track.customCoverPath)
+                        if (customFile.exists()) {
+                            return@withContext customFile.readBytes()
+                        } else {
+                            val uri = android.net.Uri.parse(track.customCoverPath)
+                            context.contentResolver.openInputStream(uri)?.use { stream ->
+                                return@withContext stream.readBytes()
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Fallback to default loading if custom cover fails
+                        e.printStackTrace()
+                    }
+                }
                 val retriever = MediaMetadataRetriever()
                 retriever.setDataSource(track.dataPath)
                 val art = retriever.embeddedPicture
@@ -93,32 +112,60 @@ object ThumbnailCache {
         }
 
         try {
+            while (isPriorityLoading) {
+                kotlinx.coroutines.delay(50)
+            }
             ioSemaphore.withPermit {
                 thumbCache.get(track.id)?.let { return@withContext it }
 
                 val art = extractRawBitmap(context, track)
                 if (art != null) {
-                    val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                    val scaled = Bitmap.createScaledBitmap(bitmap, 120, 120, true)
+                    val options = BitmapFactory.Options().apply {
+                        inJustDecodeBounds = true
+                    }
+                    BitmapFactory.decodeByteArray(art, 0, art.size, options)
+                    
+                    options.inSampleSize = calculateInSampleSize(options, 120, 120)
+                    options.inJustDecodeBounds = false
+                    
+                    val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size, options)
+                    val scaled = if (bitmap != null) Bitmap.createScaledBitmap(bitmap, 120, 120, true) else null
 
-                    try {
-                        val out = java.io.FileOutputStream(thumbFile)
-                        scaled.compress(Bitmap.CompressFormat.JPEG, 80, out)
-                        out.close()
-                    } catch (e: Exception) { e.printStackTrace() }
+                    if (scaled != null) {
+                        try {
+                            val out = java.io.FileOutputStream(thumbFile)
+                            scaled.compress(Bitmap.CompressFormat.JPEG, 80, out)
+                            out.close()
+                        } catch (e: Exception) { e.printStackTrace() }
 
-                    val imageBitmap = scaled.asImageBitmap()
-                    thumbCache.put(track.id, imageBitmap)
-                    return@withContext imageBitmap
-                } else {
-                    thumbFile.createNewFile()
-                    noArtSet.add(track.id)
+                        val imageBitmap = scaled.asImageBitmap()
+                        thumbCache.put(track.id, imageBitmap)
+                        return@withContext imageBitmap
+                    }
                 }
+                
+                thumbFile.createNewFile()
+                noArtSet.add(track.id)
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
         null
+    }
+
+    private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+        val (height: Int, width: Int) = options.outHeight to options.outWidth
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            val halfHeight: Int = height / 2
+            val halfWidth: Int = width / 2
+
+            while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+                inSampleSize *= 2
+            }
+        }
+        return inSampleSize
     }
 
     suspend fun loadFullArt(context: android.content.Context, track: TrackEntity): ImageBitmap? = withContext(Dispatchers.IO) {
@@ -144,20 +191,29 @@ object ThumbnailCache {
         }
 
         try {
-            ioSemaphore.withPermit {
-                fullCache.get(track.id)?.let { return@withContext it }
+            isPriorityLoading = true
+            fullCache.get(track.id)?.let { return@withContext it }
 
-                val art = extractRawBitmap(context, track)
-                if (art != null) {
-                    val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
-                    
-                    // Solo escalar si es ridículamente grande para ahorrar RAM
-                    val maxDimension = 600
-                    val finalBitmap = if (bitmap.width > maxDimension || bitmap.height > maxDimension) {
-                        val ratio = Math.min(maxDimension.toFloat() / bitmap.width, maxDimension.toFloat() / bitmap.height)
-                        Bitmap.createScaledBitmap(bitmap, (bitmap.width * ratio).toInt(), (bitmap.height * ratio).toInt(), true)
-                    } else bitmap
+            val art = extractRawBitmap(context, track)
+            if (art != null) {
+                val options = BitmapFactory.Options().apply {
+                    inJustDecodeBounds = true
+                }
+                BitmapFactory.decodeByteArray(art, 0, art.size, options)
+                
+                options.inSampleSize = calculateInSampleSize(options, 600, 600)
+                options.inJustDecodeBounds = false
+                
+                val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size, options)
+                
+                // Solo escalar exactamente si es necesario después de inSampleSize
+                val maxDimension = 600
+                val finalBitmap = if (bitmap != null && (bitmap.width > maxDimension || bitmap.height > maxDimension)) {
+                    val ratio = Math.min(maxDimension.toFloat() / bitmap.width, maxDimension.toFloat() / bitmap.height)
+                    Bitmap.createScaledBitmap(bitmap, (bitmap.width * ratio).toInt(), (bitmap.height * ratio).toInt(), true)
+                } else bitmap
 
+                if (finalBitmap != null) {
                     try {
                         val out = java.io.FileOutputStream(fullFile)
                         finalBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
@@ -167,13 +223,15 @@ object ThumbnailCache {
                     val imageBitmap = finalBitmap.asImageBitmap()
                     fullCache.put(track.id, imageBitmap)
                     return@withContext imageBitmap
-                } else {
-                    fullFile.createNewFile()
-                    noArtSet.add(track.id)
                 }
-            }
+            } 
+            
+            fullFile.createNewFile()
+            noArtSet.add(track.id)
         } catch (e: Exception) {
             e.printStackTrace()
+        } finally {
+            isPriorityLoading = false
         }
         null
     }

@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
@@ -18,12 +20,17 @@ android {
 
     val keystoreFile = file("../release.keystore")
     if (keystoreFile.exists()) {
+        val properties = Properties()
+        val localPropertiesFile = rootProject.file("local.properties")
+        if (localPropertiesFile.exists()) {
+            properties.load(localPropertiesFile.inputStream())
+        }
         signingConfigs {
             create("release") {
                 storeFile = keystoreFile
-                storePassword = "Du\"@\"_wave/341"
-                keyAlias = "duwave"
-                keyPassword = "Du\"@\"_wave/341"
+                storePassword = properties.getProperty("STORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: ""
+                keyAlias = properties.getProperty("KEY_ALIAS") ?: "duwave"
+                keyPassword = properties.getProperty("KEY_PASSWORD") ?: System.getenv("KEY_PASSWORD") ?: ""
             }
         }
     }
@@ -104,17 +111,17 @@ dependencies {
   implementation("androidx.navigation:navigation-compose:2.8.0")
 
   // Media3 (ExoPlayer)
-  implementation("androidx.media3:media3-exoplayer:1.2.1")
-  implementation("androidx.media3:media3-ui:1.2.1")
-  implementation("androidx.media3:media3-session:1.2.1")
+  implementation("androidx.media3:media3-exoplayer:1.6.0")
+  implementation("androidx.media3:media3-ui:1.6.0")
+  implementation("androidx.media3:media3-session:1.6.0")
 
   // Icons Extended
   implementation("androidx.compose.material:material-icons-extended:1.6.0")
 
   // Room
-  implementation("androidx.room:room-runtime:2.6.1")
-  implementation("androidx.room:room-ktx:2.6.1")
-  ksp("androidx.room:room-compiler:2.6.1")
+  implementation("androidx.room:room-runtime:2.7.0-alpha13")
+  implementation("androidx.room:room-ktx:2.7.0-alpha13")
+  ksp("androidx.room:room-compiler:2.7.0-alpha13")
 
   // Palette API
   implementation("androidx.palette:palette-ktx:1.0.0")

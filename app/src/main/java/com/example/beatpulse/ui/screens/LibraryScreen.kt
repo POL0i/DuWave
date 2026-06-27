@@ -5,6 +5,12 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.*
@@ -32,6 +39,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.material.icons.filled.MoreVert
 import com.example.beatpulse.ui.components.rememberAlbumArt
 import com.example.beatpulse.ui.components.rememberAlbumArt
 import com.example.beatpulse.ui.components.rememberTrackPalette
@@ -59,6 +67,24 @@ fun LibraryScreen(
     val colorDominant by animateColorAsState(paletteColors.dominant, label = "color_dom")
     val colorVibrant by animateColorAsState(paletteColors.vibrant, label = "color_vib")
     var searchQuery by remember { mutableStateOf("") }
+    val playlists by repository.playlistsFlow.collectAsState(initial = emptyList())
+    var trackToAddToPlaylist by remember { mutableStateOf<TrackEntity?>(null) }
+    var trackPendingConfirmation by remember { mutableStateOf<TrackEntity?>(null) }
+    var trackToDelete by remember { mutableStateOf<TrackEntity?>(null) }
+    
+    val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            trackToDelete?.let { track ->
+                scope.launch {
+                    repository.completeDeletion(track.id)
+                    prefs.showToast("Canción eliminada")
+                }
+            }
+        }
+        trackToDelete = null
+    }
 
     val bgStyle by prefs.backgroundStyleFlow.collectAsState()
     val isDarkTheme = isSystemInDarkTheme()
@@ -97,6 +123,7 @@ fun LibraryScreen(
             )
         }
     ) {
+        var sortOrder by remember { mutableStateOf(prefs.librarySortOrder) }
         Column(modifier = Modifier.fillMaxSize()) {
             TabRow(
                 selectedTabIndex = selectedTabIndex,
@@ -128,13 +155,20 @@ fun LibraryScreen(
                 }
             }
 
-            val currentList = remember(selectedTabIndex, allTracks, recentTracks, favoriteTracks, searchQuery) {
-                when (selectedTabIndex) {
+            val currentList = remember(selectedTabIndex, allTracks, recentTracks, favoriteTracks, searchQuery, sortOrder) {
+                val list = when (selectedTabIndex) {
                     0 -> allTracks
                     1 -> recentTracks
                     2 -> favoriteTracks
                     else -> allTracks
                 }.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }
+                
+                when (sortOrder) {
+                    "TITLE" -> list.sortedBy { it.title.lowercase() }
+                    "ARTIST" -> list.sortedBy { it.artist.lowercase() }
+                    "ALBUM" -> list.sortedBy { it.album.lowercase() }
+                    else -> list
+                }
             }
 
             val isScanning by repository.isScanning.collectAsState()
@@ -153,18 +187,57 @@ fun LibraryScreen(
                 }
             } else {
                 val shapeIdx by prefs.thumbnailShapeFlow.collectAsState(initial = 0)
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(currentList, key = { it.id }) { track ->
-                        TrackItem(
-                            track = track,
-                            paletteColors = paletteColors,
-                            thumbnailShapeIdx = shapeIdx,
-                            textColor = dynamicTextColor,
-                            onClick = { onTrackClick(track, currentList) },
-                            onToggleFavorite = { 
-                                scope.launch { repository.toggleFavorite(track.id, !track.isFavorite) }
+                val listState = rememberLazyListState(
+                    initialFirstVisibleItemIndex = prefs.libraryScrollIndex,
+                    initialFirstVisibleItemScrollOffset = prefs.libraryScrollOffset
+                )
+                
+                DisposableEffect(listState) {
+                    onDispose {
+                        prefs.libraryScrollIndex = listState.firstVisibleItemIndex
+                        prefs.libraryScrollOffset = listState.firstVisibleItemScrollOffset
+                    }
+                }
+                
+                val showFastScroll by remember { derivedStateOf { listState.firstVisibleItemIndex > 5 } }
+
+                Box(modifier = Modifier.fillMaxSize()) {
+                    LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
+                        items(currentList, key = { it.id }) { track ->
+                            TrackItem(
+                                track = track,
+                                paletteColors = paletteColors,
+                                thumbnailShapeIdx = shapeIdx,
+                                textColor = dynamicTextColor,
+                                onClick = { onTrackClick(track, currentList) },
+                                onToggleFavorite = { 
+                                    scope.launch { repository.toggleFavorite(track.id, !track.isFavorite) }
+                                },
+                                onAddToPlaylist = { trackToAddToPlaylist = track },
+                                onDeleteTrack = { trackPendingConfirmation = track }
+                            )
+                        }
+                    }
+                    
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(16.dp)
+                            .padding(bottom = 120.dp)
+                    ) {
+                        androidx.compose.animation.AnimatedVisibility(
+                            visible = showFastScroll,
+                            enter = fadeIn() + scaleIn(),
+                            exit = fadeOut() + scaleOut()
+                        ) {
+                            FloatingActionButton(
+                                onClick = { scope.launch { listState.animateScrollToItem(0) } },
+                                containerColor = paletteColors.vibrant,
+                                contentColor = Color.White
+                            ) {
+                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Ir arriba")
                             }
-                        )
+                        }
                     }
                 }
             }
@@ -172,6 +245,7 @@ fun LibraryScreen(
         
         // Floating search bar overlay
         var isSearchExpanded by remember { mutableStateOf(false) }
+        var isSortMenuExpanded by remember { mutableStateOf(false) }
         val searchOffset by animateDpAsState(
             targetValue = if (isSearchExpanded) 0.dp else 40.dp
         )
@@ -186,6 +260,20 @@ fun LibraryScreen(
                 .padding(end = if (!isSearchExpanded) 16.dp else 0.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+             Box {
+                 IconButton(onClick = { isSortMenuExpanded = true }) {
+                     Icon(Icons.Default.Sort, contentDescription = "Sort", tint = colorVibrant)
+                 }
+                 DropdownMenu(
+                     expanded = isSortMenuExpanded,
+                     onDismissRequest = { isSortMenuExpanded = false }
+                 ) {
+                     DropdownMenuItem(text = { Text("Directorio (Por defecto)") }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
+                     DropdownMenuItem(text = { Text("Título (A-Z)") }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
+                     DropdownMenuItem(text = { Text("Artista (A-Z)") }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
+                     DropdownMenuItem(text = { Text("Álbum (A-Z)") }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
+                 }
+             }
              IconButton(onClick = { isSearchExpanded = !isSearchExpanded }) {
                 Icon(Icons.Default.Search, contentDescription = "Search", tint = colorVibrant)
              }
@@ -211,6 +299,74 @@ fun LibraryScreen(
                  }
              }
         }
+        
+        trackToAddToPlaylist?.let { trackToAdd ->
+            AlertDialog(
+                onDismissRequest = { trackToAddToPlaylist = null },
+                title = { Text("Añadir a Playlist") },
+                text = {
+                    if (playlists.isEmpty()) {
+                        Text("No tienes playlists creadas. Crea una desde la pestaña de Álbumes.")
+                    } else {
+                        LazyColumn {
+                            items(playlists) { pl ->
+                                Text(
+                                    text = pl.name,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            scope.launch {
+                                                repository.addTrackToPlaylist(pl.playlistId, trackToAdd.id)
+                                                prefs.showToast("Añadido a ${pl.name}")
+                                            }
+                                            trackToAddToPlaylist = null
+                                        }
+                                        .padding(16.dp),
+                                    color = dynamicTextColor
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { trackToAddToPlaylist = null }) {
+                        Text("Cerrar", color = colorVibrant)
+                    }
+                },
+                containerColor = paletteColors.dominant
+            )
+        }
+
+        trackPendingConfirmation?.let { track ->
+            AlertDialog(
+                onDismissRequest = { trackPendingConfirmation = null },
+                title = { Text("Eliminar canción", color = dynamicTextColor) },
+                text = { Text("¿Estás seguro de que quieres eliminar permanentemente '${track.title}' del dispositivo?", color = dynamicTextColor) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val t = track
+                        trackPendingConfirmation = null
+                        scope.launch {
+                            val sender = repository.deleteTrack(t.id)
+                            if (sender != null) {
+                                trackToDelete = t
+                                deleteLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
+                            } else {
+                                prefs.showToast("Canción eliminada")
+                            }
+                        }
+                    }) {
+                        Text("Eliminar", color = Color.Red)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { trackPendingConfirmation = null }) {
+                        Text("Cancelar", color = colorVibrant)
+                    }
+                },
+                containerColor = paletteColors.dominant
+            )
+        }
     }
 }
 
@@ -221,7 +377,9 @@ fun TrackItem(
     thumbnailShapeIdx: Int = 0,
     textColor: Color = LocalContentColor.current,
     onClick: () -> Unit,
-    onToggleFavorite: () -> Unit
+    onToggleFavorite: () -> Unit,
+    onAddToPlaylist: (() -> Unit)? = null,
+    onDeleteTrack: (() -> Unit)? = null
 ) {
     // Usar la paleta global para evitar recalcular colores por cada pista, lo cual traba la lista
     val accentColor = paletteColors.vibrant
@@ -297,6 +455,35 @@ fun TrackItem(
                 contentDescription = "Favorite",
                 tint = if (track.isFavorite) accentColor else Color.Gray
             )
+        }
+        if (onAddToPlaylist != null) {
+            var isMenuExpanded by remember { mutableStateOf(false) }
+            Box {
+                IconButton(onClick = { isMenuExpanded = true }) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = Color.Gray)
+                }
+                DropdownMenu(
+                    expanded = isMenuExpanded,
+                    onDismissRequest = { isMenuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Añadir a Playlist") },
+                        onClick = {
+                            isMenuExpanded = false
+                            onAddToPlaylist()
+                        }
+                    )
+                    if (onDeleteTrack != null) {
+                        DropdownMenuItem(
+                            text = { Text("Eliminar del dispositivo", color = Color.Red) },
+                            onClick = {
+                                isMenuExpanded = false
+                                onDeleteTrack()
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }

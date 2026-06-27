@@ -17,6 +17,10 @@ import androidx.compose.ui.draw.clip
 import coil.compose.AsyncImage
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.foundation.lazy.items
+import com.example.beatpulse.data.PlaylistEntity
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -71,6 +75,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var prefs: PreferencesManager
     private lateinit var musicRepository: MusicRepository
     private lateinit var playerViewModel: PlayerViewModel
+    private lateinit var equalizerManager: com.example.beatpulse.service.EqualizerManager
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -97,7 +102,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         
         musicRepository = MusicRepository(this)
-        prefs = PreferencesManager(this)
+        prefs = PreferencesManager.getInstance(this)
+        equalizerManager = com.example.beatpulse.service.EqualizerManager(prefs)
         visualizerManager = AudioVisualizerManager(prefs)
         
         playerViewModel = ViewModelProvider(
@@ -112,7 +118,8 @@ class MainActivity : ComponentActivity() {
             
             BeatPulseTheme(isPixelArt = bgStyle == 8) {
                 MainScreen(
-                    visualizerManager = playerViewModel.visualizerManager,
+                    visualizerManager = visualizerManager,
+                    equalizerManager = equalizerManager,
                     prefs = prefs,
                     repository = musicRepository,
                     playerViewModel = playerViewModel
@@ -155,6 +162,16 @@ class MainActivity : ComponentActivity() {
                 musicRepository.scanMediaStore()
             }
         }
+        
+        lifecycleScope.launch {
+            com.example.beatpulse.service.PlaybackService.audioSessionIdFlow.collect { sessionId ->
+                if (sessionId != androidx.media3.common.C.AUDIO_SESSION_ID_UNSET) {
+                    equalizerManager.initialize(sessionId)
+                    kotlinx.coroutines.delay(100) // Evitar colisión de AudioFx en dispositivos Motorola
+                    visualizerManager.start(sessionId)
+                }
+            }
+        }
     }
 
     override fun onStart() {
@@ -178,6 +195,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun MainScreen(
     visualizerManager: AudioVisualizerManager,
+    equalizerManager: com.example.beatpulse.service.EqualizerManager,
     prefs: PreferencesManager,
     repository: MusicRepository,
     playerViewModel: PlayerViewModel
@@ -211,6 +229,11 @@ fun MainScreen(
     }
 
     var currentPage by remember { mutableIntStateOf(0) } // 0: Home, 1: Library, 2: Player
+    var sortOrder by remember { mutableStateOf(prefs.librarySortOrder) }
+
+    var trackToAddToPlaylist by remember { mutableStateOf<com.example.beatpulse.data.TrackEntity?>(null) }
+    val playlists by repository.playlistsFlow.collectAsState(initial = emptyList())
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     var sleepTimerSeconds by remember { mutableIntStateOf(0) }
     LaunchedEffect(sleepTimerSeconds) {
@@ -237,27 +260,57 @@ fun MainScreen(
                     animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f),
                     label = "drag"
                 )
+
+                var hintingOffset by remember { mutableFloatStateOf(0f) }
+                LaunchedEffect(Unit) {
+                    while (!prefs.hasUsedMiniplayerGesture) {
+                        kotlinx.coroutines.delay(4000)
+                        if (accumulatedDrag == 0f && !prefs.hasUsedMiniplayerGesture) {
+                            hintingOffset = 30f
+                            kotlinx.coroutines.delay(150)
+                            hintingOffset = -30f
+                            kotlinx.coroutines.delay(150)
+                            hintingOffset = 0f
+                        }
+                    }
+                }
+                
+                val totalOffset by androidx.compose.animation.core.animateFloatAsState(
+                    targetValue = animatedDrag + hintingOffset,
+                    animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f),
+                    label = "totalOffset"
+                )
+
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .offset { androidx.compose.ui.unit.IntOffset(animatedDrag.toInt(), 0) }
-                        .pointerInput(Unit) {
-                            detectHorizontalDragGestures(
-                                onDragEnd = { accumulatedDrag = 0f },
-                                onDragCancel = { accumulatedDrag = 0f },
-                                onHorizontalDrag = { _, dragAmount ->
-                                    accumulatedDrag += dragAmount
-                                    if (accumulatedDrag > 150f) {
-                                        currentPage = (currentPage - 1 + 3) % 3
-                                        accumulatedDrag = 0f
-                                    } else if (accumulatedDrag < -150f) {
-                                        currentPage = (currentPage + 1) % 3
-                                        accumulatedDrag = 0f
-                                    }
-                                }
-                            )
-                        }
+                        .navigationBarsPadding()
+                        .padding(bottom = 12.dp)
                 ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .offset { androidx.compose.ui.unit.IntOffset(totalOffset.toInt(), 0) }
+                            .pointerInput(Unit) {
+                                detectHorizontalDragGestures(
+                                    onDragEnd = { accumulatedDrag = 0f },
+                                    onDragCancel = { accumulatedDrag = 0f },
+                                    onHorizontalDrag = { _, dragAmount ->
+                                        if (!prefs.hasUsedMiniplayerGesture) {
+                                            prefs.hasUsedMiniplayerGesture = true
+                                        }
+                                        accumulatedDrag += dragAmount
+                                        if (accumulatedDrag > 150f) {
+                                            currentPage = (currentPage - 1 + 3) % 3
+                                            accumulatedDrag = 0f
+                                        } else if (accumulatedDrag < -150f) {
+                                            currentPage = (currentPage + 1) % 3
+                                            accumulatedDrag = 0f
+                                        }
+                                    }
+                                )
+                            }
+                    ) {
                     androidx.compose.animation.AnimatedContent(
                         targetState = currentPage,
                         transitionSpec = {
@@ -304,7 +357,7 @@ fun MainScreen(
                                     1 -> androidx.compose.foundation.shape.CutCornerShape(8.dp) // Cyberpunk
                                     2, 4 -> androidx.compose.foundation.shape.RoundedCornerShape(24.dp) // Anime Pastel / Y2K Kawaii (very round)
                                     5 -> androidx.compose.ui.graphics.RectangleShape // Black Metal (sharp)
-                                    6 -> androidx.compose.foundation.shape.CutCornerShape(topStart = 16.dp, bottomEnd = 16.dp) // Dark Fantasy (edgy)
+                                    6 -> androidx.compose.foundation.shape.CutCornerShape(16.dp) // Dark Fantasy (edgy, symmetrical to align with cover)
                                     else -> androidx.compose.foundation.shape.RoundedCornerShape(16.dp) // Clasico
                                 }
                                 val miniPlayerBorder = when(bgStyle) {
@@ -360,14 +413,14 @@ fun MainScreen(
                                         // Textos
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = currentTrack!!.title,
+                                                text = currentTrack?.title ?: "No playing",
                                                 color = MaterialTheme.colorScheme.onSurface,
                                                 maxLines = 1,
                                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                                 style = MaterialTheme.typography.bodyLarge
                                             )
                                             Text(
-                                                text = currentTrack!!.artist ?: "Desconocido",
+                                                text = currentTrack?.artist ?: "Desconocido",
                                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                                 maxLines = 1,
                                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -395,7 +448,10 @@ fun MainScreen(
                                         .background(Color.Transparent),
                                     contentAlignment = androidx.compose.ui.Alignment.Center
                                 ) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                    Row(
+                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                                    ) {
                                         listOf(0, 1, 2).forEach { p ->
                                             val color by animateColorAsState(
                                                 targetValue = if (currentPage == p) accentColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
@@ -407,12 +463,32 @@ fun MainScreen(
                                             )
                                             Box(modifier = Modifier.size(size.dp).background(color, androidx.compose.foundation.shape.CircleShape))
                                         }
+                                        
+                                        if (!prefs.hasSeenTutorial) {
+                                            var playAlpha by remember { mutableFloatStateOf(0.1f) }
+                                            LaunchedEffect(Unit) {
+                                                while(true) {
+                                                    playAlpha = 0.8f
+                                                    kotlinx.coroutines.delay(800)
+                                                    playAlpha = 0.1f
+                                                    kotlinx.coroutines.delay(800)
+                                                }
+                                            }
+                                            val animatedPlayAlpha by androidx.compose.animation.core.animateFloatAsState(targetValue = playAlpha, animationSpec = tween(800))
+                                            Icon(
+                                                imageVector = Icons.Default.PlayArrow,
+                                                contentDescription = "Swipe to Play",
+                                                tint = accentColor.copy(alpha = animatedPlayAlpha),
+                                                modifier = Modifier.size(20.dp).offset(x = 8.dp)
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
+            }
             }
         ) { innerPadding ->
             AnimatedContent(
@@ -460,6 +536,7 @@ fun MainScreen(
                     )
                     2 -> PlayerScreen(
                         visualizerManager = visualizerManager,
+                        equalizerManager = equalizerManager,
                         exoPlayer = exoPlayer,
                         currentTrack = currentTrack,
                         currentQueue = currentQueue,
@@ -470,6 +547,9 @@ fun MainScreen(
                         onSetSleepTimer = { sleepTimerSeconds = it },
                         onUpdateTrackMetadata = { id, title, artist, album, coverPath ->
                             playerViewModel.updateTrackMetadata(id, title, artist, album, coverPath)
+                        },
+                        onAddToPlaylist = { track ->
+                            trackToAddToPlaylist = track
                         }
                     )
                 }
@@ -531,6 +611,42 @@ fun MainScreen(
     // Render global overlay over everything
     StyleNotificationOverlay(message = globalToastMessage) {
         globalToastMessage = null
+    }
+
+    trackToAddToPlaylist?.let { trackToAdd ->
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { trackToAddToPlaylist = null },
+            title = { androidx.compose.material3.Text("Añadir a Playlist", color = paletteColors.vibrant) },
+            text = {
+                if (playlists.isEmpty()) {
+                    androidx.compose.material3.Text("No tienes playlists creadas. Crea una desde la pestaña de Álbumes.", color = androidx.compose.ui.graphics.Color.White)
+                } else {
+                    androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                        items(playlists) { pl ->
+                            androidx.compose.material3.ListItem(
+                                headlineContent = { androidx.compose.material3.Text(pl.name, color = androidx.compose.ui.graphics.Color.White) },
+                                colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                                modifier = Modifier.clickable {
+                                    scope.launch {
+                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                            repository.addTrackToPlaylist(pl.playlistId, trackToAdd.id)
+                                        }
+                                        android.widget.Toast.makeText(context, "Añadida a ${pl.name}", android.widget.Toast.LENGTH_SHORT).show()
+                                        trackToAddToPlaylist = null
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = { trackToAddToPlaylist = null }) {
+                    androidx.compose.material3.Text("Cerrar", color = paletteColors.vibrant)
+                }
+            },
+            containerColor = paletteColors.dominant.copy(alpha = 0.9f)
+        )
     }
 
     var showTutorial by remember { mutableStateOf(!prefs.hasSeenTutorial) }

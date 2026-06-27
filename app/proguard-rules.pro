@@ -14,7 +14,7 @@
 
 # Uncomment this to preserve the line number information for
 # debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+-keepattributes SourceFile,LineNumberTable
 
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
@@ -31,7 +31,6 @@
 
 # Keep Data Classes & Models
 -keep class com.example.beatpulse.data.** { *; }
--keep class com.example.beatpulse.** { *; }
 
 # Keep ViewModels
 -keep class * extends androidx.lifecycle.ViewModel { *; }

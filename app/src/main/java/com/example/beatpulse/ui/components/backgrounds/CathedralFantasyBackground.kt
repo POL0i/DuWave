@@ -130,6 +130,7 @@ fun CathedralFantasyBackground(
     val darkBlueGrey = Color(0xFF10121A)
 
     val noisePoints = remember { List(200) { Offset(Random.nextFloat(), Random.nextFloat()) to Random.nextFloat() } }
+    val archPath = remember { Path() }
 
     val runtimeShader = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -181,7 +182,7 @@ fun CathedralFantasyBackground(
                 val architectColor = vibrant.copy(alpha = 0.4f + dynamicEnergy * 0.4f)
                 val glowColor = lightVibrant.copy(alpha = 0.1f + dynamicEnergy * 0.2f)
 
-                val archPath = Path()
+                archPath.reset()
                 val archHeight = height * 0.45f
                 
                 drawLine(architectColor, Offset(width * 0.15f, height), Offset(width * 0.15f, archHeight), strokeWidth)

@@ -17,6 +17,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.ui.text.input.TextFieldValue
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.Color
@@ -49,6 +50,7 @@ fun AlbumsScreen(
     data class PlaylistViewData(val title: String, val tracks: List<TrackEntity>, val playlistId: Long? = null)
     var selectedPlaylist by remember { mutableStateOf<PlaylistViewData?>(null) }
     var isCreatingPlaylist by remember { mutableStateOf(false) }
+    var addingTracksToPlaylistId by remember { mutableStateOf<Long?>(null) }
     val playlists by repository.playlistsFlow.collectAsState(initial = emptyList())
     val coroutineScope = rememberCoroutineScope()
 
@@ -85,6 +87,17 @@ fun AlbumsScreen(
                 paletteColors = paletteColors,
                 onClose = { isCreatingPlaylist = false }
             )
+        } else if (addingTracksToPlaylistId != null) {
+            val plId = addingTracksToPlaylistId!!
+            BackHandler { addingTracksToPlaylistId = null }
+            AddTracksScreen(
+                repository = repository,
+                playlistId = plId,
+                allTracks = allTracks,
+                dynamicTextColor = dynamicTextColor,
+                paletteColors = paletteColors,
+                onClose = { addingTracksToPlaylistId = null }
+            )
         } else if (selectedPlaylist == null) {
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header
@@ -103,6 +116,27 @@ fun AlbumsScreen(
                     )
                     
                     Row {
+                        var showSettingsMenu by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { showSettingsMenu = true }) {
+                                Icon(Icons.Default.Settings, contentDescription = "Ajustes", tint = paletteColors.vibrant)
+                            }
+                            DropdownMenu(
+                                expanded = showSettingsMenu,
+                                onDismissRequest = { showSettingsMenu = false }
+                            ) {
+                                val filterWhatsApp = prefs.filterWhatsAppShorts
+                                DropdownMenuItem(
+                                    text = { Text(if (filterWhatsApp) "Mostrar audios WhatsApp" else "Ocultar audios WhatsApp") },
+                                    onClick = {
+                                        prefs.filterWhatsAppShorts = !filterWhatsApp
+                                        showSettingsMenu = false
+                                        coroutineScope.launch { repository.scanMediaStore() }
+                                    }
+                                )
+                            }
+                        }
+                        
                         IconButton(onClick = {
                             val newShape = (shapeIdx + 1) % 4
                             prefs.thumbnailShape = newShape
@@ -265,13 +299,16 @@ fun AlbumsScreen(
             }
         } else {
             // Detailed View for Selected Playlist/Folder
-            BackHandler { selectedPlaylist = null }
-            val currentViewData = selectedPlaylist!!
-            val dbTracks by if (currentViewData.playlistId != null) {
-                repository.getTracksForPlaylist(currentViewData.playlistId).collectAsState(initial = emptyList())
+            val currentViewData = selectedPlaylist
+            if (currentViewData == null) {
+                // Fallback if null
             } else {
-                remember { mutableStateOf(emptyList()) }
-            }
+                BackHandler { selectedPlaylist = null }
+                val dbTracks by if (currentViewData.playlistId != null) {
+                    repository.getTracksForPlaylist(currentViewData.playlistId).collectAsState(initial = emptyList())
+                } else {
+                    remember { mutableStateOf(emptyList()) }
+                }
             
             val tracksToDisplay = if (currentViewData.playlistId != null) dbTracks else currentViewData.tracks
 
@@ -294,6 +331,11 @@ fun AlbumsScreen(
                         color = dynamicTextColor,
                         modifier = Modifier.weight(1f)
                     )
+                    if (currentViewData.playlistId != null) {
+                        IconButton(onClick = { addingTracksToPlaylistId = currentViewData.playlistId }) {
+                            Icon(Icons.Default.Add, contentDescription = "Añadir canciones", tint = dynamicTextColor)
+                        }
+                    }
                 }
 
                 LazyColumn(
@@ -349,6 +391,7 @@ fun AlbumsScreen(
                     }
                 }
             }
+        }
         }
     }
 }
@@ -491,6 +534,98 @@ fun CreatePlaylistScreen(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(track.title, color = dynamicTextColor, style = MaterialTheme.typography.bodyLarge)
                         Text(track.artist, color = dynamicTextColor.copy(alpha=0.7f), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddTracksScreen(
+    repository: MusicRepository,
+    playlistId: Long,
+    allTracks: List<TrackEntity>,
+    dynamicTextColor: androidx.compose.ui.graphics.Color,
+    paletteColors: PaletteColors,
+    onClose: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val selectedTracks = remember { androidx.compose.runtime.mutableStateMapOf<Long, Boolean>() }
+    val coroutineScope = rememberCoroutineScope()
+    
+    // We fetch current tracks to pre-select them or not allow duplicates
+    val existingTracks by repository.getTracksForPlaylist(playlistId).collectAsState(initial = emptyList())
+    val existingTrackIds = remember(existingTracks) { existingTracks.map { it.id }.toSet() }
+
+    val filteredTracks = remember(searchQuery, allTracks, existingTrackIds) {
+        val list = allTracks.filter { it.id !in existingTrackIds }
+        if (searchQuery.isEmpty()) list
+        else list.filter { 
+            it.title.contains(searchQuery, ignoreCase = true) || 
+            it.artist.contains(searchQuery, ignoreCase = true) 
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(top = 24.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = dynamicTextColor)
+            }
+            Text("Añadir Canciones", style = MaterialTheme.typography.titleLarge, color = dynamicTextColor, modifier = Modifier.weight(1f))
+            Button(
+                onClick = {
+                    val tracksToAdd = selectedTracks.filterValues { it }.keys.toList()
+                    if (tracksToAdd.isNotEmpty()) {
+                        coroutineScope.launch {
+                            repository.addTracksToPlaylist(playlistId, tracksToAdd)
+                            onClose()
+                        }
+                    } else {
+                        onClose()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
+            ) {
+                Text(if (selectedTracks.values.any { it }) "Añadir" else "Cancelar")
+            }
+        }
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text("Buscar canciones...", color = dynamicTextColor.copy(alpha=0.5f)) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = dynamicTextColor.copy(alpha=0.5f)) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = dynamicTextColor,
+                unfocusedTextColor = dynamicTextColor,
+                focusedBorderColor = paletteColors.vibrant,
+                unfocusedBorderColor = dynamicTextColor.copy(alpha = 0.5f)
+            )
+        )
+
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 120.dp)) {
+            items(filteredTracks.size, key = { filteredTracks[it].id }) { index ->
+                val track = filteredTracks[index]
+                val isSelected = selectedTracks[track.id] == true
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { selectedTracks[track.id] = !isSelected }.padding(horizontal = 24.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { selectedTracks[track.id] = it },
+                        colors = CheckboxDefaults.colors(checkedColor = paletteColors.vibrant)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(track.title, color = dynamicTextColor, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(track.artist, color = dynamicTextColor.copy(alpha=0.7f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
             }

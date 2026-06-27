@@ -6,6 +6,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.ui.graphics.asAndroidPath
 import android.content.Intent
 import android.graphics.Bitmap
@@ -51,6 +53,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.List
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -62,6 +65,8 @@ import androidx.compose.material.icons.filled.Equalizer
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Feedback
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material.icons.filled.AllOut
 import androidx.compose.material.icons.filled.LensBlur
 import androidx.compose.material.icons.filled.TrackChanges
@@ -109,6 +114,7 @@ enum class DragAction { NONE, DJ_SEEK, OPEN_QUEUE }
 @Composable
 fun PlayerScreen(
     visualizerManager: AudioVisualizerManager,
+    equalizerManager: com.example.beatpulse.service.EqualizerManager,
     exoPlayer: androidx.media3.common.Player?,
     currentTrack: TrackEntity? = null,
     currentQueue: List<TrackEntity>,
@@ -119,7 +125,8 @@ fun PlayerScreen(
     prefs: com.example.beatpulse.data.PreferencesManager,
     sleepTimerSeconds: Int = 0,
     onSetSleepTimer: (Int) -> Unit = {},
-    onUpdateTrackMetadata: (Long, String?, String?, String?, String?) -> Unit = { _, _, _, _, _ -> }
+    onUpdateTrackMetadata: (Long, String?, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
+    onAddToPlaylist: ((TrackEntity) -> Unit)? = null
 ) {
     val albumArtBitmap = currentTrack?.let { com.example.beatpulse.ui.components.rememberFullAlbumArt(it) }
     val amplitudesState = visualizerManager.amplitudes.collectAsState()
@@ -142,6 +149,24 @@ fun PlayerScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     var duration by remember { androidx.compose.runtime.mutableLongStateOf(1L) }
+    var showLyrics by remember { mutableStateOf(false) }
+    var lyrics by remember { mutableStateOf<List<com.example.beatpulse.utils.LyricLine>>(emptyList()) }
+    
+    LaunchedEffect(currentTrack) {
+        if (currentTrack != null) {
+            val lrcFile = java.io.File(currentTrack.dataPath.substringBeforeLast(".") + ".lrc")
+            if (lrcFile.exists() && lrcFile.canRead()) {
+                val parsedLyrics = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    com.example.beatpulse.utils.LrcParser.parseLrcFile(lrcFile)
+                }
+                lyrics = parsedLyrics
+            } else {
+                lyrics = emptyList()
+            }
+        } else {
+            lyrics = emptyList()
+        }
+    }
 
     // Advanced Audio Settings State
     val isAdvanced by visualizerManager.isAdvancedMode.collectAsState()
@@ -170,19 +195,21 @@ fun PlayerScreen(
     var showQueue by remember { mutableStateOf(false) }
     var currentStyleName by remember { mutableStateOf<String?>(null) }
     var showTimerDialog by remember { mutableStateOf(false) }
+    var showEqDialog by remember { mutableStateOf(false) }
     var showEditorDialog by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     var isPlayingState by remember { mutableStateOf(exoPlayer?.isPlaying ?: false) }
 
-    LaunchedEffect(exoPlayer) {
-        if (exoPlayer != null) {
-            val listener = object : androidx.media3.common.Player.Listener {
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    isPlayingState = isPlaying
-                }
+    DisposableEffect(exoPlayer) {
+        val listener = object : androidx.media3.common.Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                isPlayingState = isPlaying
             }
-            exoPlayer.addListener(listener)
+        }
+        exoPlayer?.addListener(listener)
+        onDispose {
+            exoPlayer?.removeListener(listener)
         }
     }
 
@@ -206,14 +233,18 @@ fun PlayerScreen(
     )
 
     // Update player state periodically
-    LaunchedEffect(exoPlayer) {
+    LaunchedEffect(exoPlayer, isPlayingState) {
         while (true) {
             if (exoPlayer != null) {
                 isPlaying = exoPlayer.isPlaying
-                currentPosition = exoPlayer.currentPosition
                 duration = exoPlayer.duration.coerceAtLeast(1L)
+                currentPosition = exoPlayer.currentPosition
             }
-            delay(50L) // Poll every 50ms for smooth progress update
+            if (isPlayingState) {
+                delay(100L) // Poll at 10fps for smooth progress update
+            } else {
+                delay(1000L) // Idle poll when paused
+            }
         }
     }
 
@@ -221,32 +252,111 @@ fun PlayerScreen(
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
 
+    var showFeedbackDialog by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val dynamicTextColor = if (paletteColors.dominant.luminance() < 0.5f) Color.White else Color.Black
+
+    if (showFeedbackDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showFeedbackDialog = false },
+            title = { Text("Sugerir mejoras", color = colorVibrant) },
+            text = { Text("¿Deseas abrir el navegador para sugerir mejoras o reportar problemas en GitHub?", color = dynamicTextColor) },
+            confirmButton = {
+                TextButton(onClick = {
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/polonio/duwave/issues"))
+                    context.startActivity(intent)
+                    showFeedbackDialog = false
+                }) {
+                    Text("Abrir", color = colorVibrant)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showFeedbackDialog = false }) {
+                    Text("Cancelar", color = dynamicTextColor.copy(alpha=0.7f))
+                }
+            },
+            containerColor = paletteColors.dominant
+        )
+    }
+
     Column(modifier = modifier
         .fillMaxSize()
         .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
     ) {
         
+
         // Track Info Header
         AnimatedContent(targetState = currentTrack, label = "track_info") { track ->
             if (track != null) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 24.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = track.title,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
-                        maxLines = 1,
-                        modifier = Modifier.basicMarquee()
-                    )
-                    Text(
-                        text = track.artist,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = colorVibrant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                Box(modifier = Modifier.fillMaxWidth().padding(top = 24.dp, start = 24.dp, end = 24.dp)) {
+                    Column(
+                        modifier = Modifier.align(Alignment.Center).fillMaxWidth(0.6f),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = track.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = Color.White,
+                            maxLines = 1,
+                            modifier = Modifier.basicMarquee()
+                        )
+                        Text(
+                            text = track.artist,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = colorVibrant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Row(modifier = Modifier.align(Alignment.CenterStart)) {
+                        IconButton(
+                            onClick = { showFeedbackDialog = true },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(paletteColors.dominant.copy(alpha = 0.5f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Feedback,
+                                contentDescription = "Sugerir mejoras",
+                                tint = colorVibrant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                    Row(modifier = Modifier.align(Alignment.CenterEnd)) {
+                        IconButton(
+                            onClick = { onAddToPlaylist?.invoke(track) },
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(paletteColors.dominant.copy(alpha = 0.5f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlaylistAdd,
+                                contentDescription = "Añadir a Playlist",
+                                tint = colorVibrant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        if (lyrics.isNotEmpty()) {
+                            IconButton(
+                                onClick = { showLyrics = !showLyrics },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(paletteColors.dominant.copy(alpha = 0.5f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = "Letras",
+                                    tint = if (showLyrics) colorVibrant else colorVibrant.copy(alpha=0.4f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -259,7 +369,6 @@ fun PlayerScreen(
         var playheadPos by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
         val coroutineScope = rememberCoroutineScope()
         var accumulatedAngle by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
-        val context = LocalContext.current
         val haptic = LocalHapticFeedback.current
         val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
 
@@ -313,8 +422,9 @@ fun PlayerScreen(
                             val dy = touchPos.y - center.y
                             val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
                             
-                            if (lastAngle != null) {
-                                var deltaAngle = currentAngle - lastAngle!!
+                            val prevAngle = lastAngle
+                            if (prevAngle != null) {
+                                var deltaAngle = currentAngle - prevAngle
                                 if (deltaAngle > 180f) deltaAngle -= 360f
                                 if (deltaAngle < -180f) deltaAngle += 360f
                                 
@@ -400,18 +510,31 @@ fun PlayerScreen(
             val animatedScale = animatedScaleAnim.value
 
             // Gradiente ultra saturado
-            val sweepGradient = Brush.sweepGradient(
-
-                colors = listOf(
-                    colorDominant,
-                    colorVibrant,
-                    colorMuted,
-                    colorVibrant.copy(alpha = 0.8f),
-                    colorMuted,
-                    colorVibrant,
-                    colorDominant
+            val sweepGradient = remember(colorDominant, colorVibrant, colorMuted) {
+                Brush.sweepGradient(
+                    colors = listOf(
+                        colorDominant,
+                        colorVibrant,
+                        colorMuted,
+                        colorVibrant.copy(alpha = 0.8f),
+                        colorMuted,
+                        colorVibrant,
+                        colorDominant
+                    )
                 )
-            )
+            }
+
+            val basePath = remember { androidx.compose.ui.graphics.Path() }
+            val wavePath = remember { androidx.compose.ui.graphics.Path() }
+            val progressPath = remember { androidx.compose.ui.graphics.Path() }
+            val progressMeasure = remember { androidx.compose.ui.graphics.PathMeasure() }
+            val androidPathMeasure = remember { android.graphics.PathMeasure() }
+            val slimeX = remember { FloatArray(150) }
+            val slimeY = remember { FloatArray(150) }
+            
+            var lastSize = remember { androidx.compose.ui.geometry.Size.Zero }
+            var lastShape = remember { -1 }
+            var pathLength = remember { 0f }
 
             Canvas(modifier = Modifier.size(320.dp).scale(animatedScale)) {
                 val amplitudes = amplitudesState.value
@@ -431,18 +554,22 @@ fun PlayerScreen(
                     else -> 2.0
                 }
 
-                val basePath = androidx.compose.ui.graphics.Path()
-                val rect = androidx.compose.ui.geometry.Rect(center.x - rPx, center.y - rPx, center.x + rPx, center.y + rPx)
-                when (thumbnailShapeIdx) {
-                    0 -> basePath.addOval(rect)
-                    1 -> basePath.addRect(rect)
-                    2 -> basePath.addRoundRect(androidx.compose.ui.geometry.RoundRect(rect, androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())))
-                    3 -> basePath.addRoundRect(androidx.compose.ui.geometry.RoundRect(rect, androidx.compose.ui.geometry.CornerRadius(32.dp.toPx())))
-                    else -> basePath.addOval(rect)
+                if (size != lastSize || thumbnailShapeIdx != lastShape) {
+                    lastSize = size
+                    lastShape = thumbnailShapeIdx
+                    basePath.reset()
+                    val rect = androidx.compose.ui.geometry.Rect(center.x - rPx, center.y - rPx, center.x + rPx, center.y + rPx)
+                    when (thumbnailShapeIdx) {
+                        0 -> basePath.addOval(rect)
+                        1 -> basePath.addRect(rect)
+                        2 -> basePath.addRoundRect(androidx.compose.ui.geometry.RoundRect(rect, androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())))
+                        3 -> basePath.addRoundRect(androidx.compose.ui.geometry.RoundRect(rect, androidx.compose.ui.geometry.CornerRadius(32.dp.toPx())))
+                        else -> basePath.addOval(rect)
+                    }
+                    
+                    androidPathMeasure.setPath(basePath.asAndroidPath(), false)
+                    pathLength = androidPathMeasure.length
                 }
-                
-                val pathMeasure = android.graphics.PathMeasure(basePath.asAndroidPath(), false)
-                val pathLength = pathMeasure.length
 
 
                 // Out variables for zero-allocation math
@@ -520,7 +647,7 @@ fun PlayerScreen(
                                     if (remaining <= straightEdge) {
                                         x = rPx - cornerRadius - remaining; y = rPx; nx = 0f; ny = 1f
                                     } else {
-                                        remaining -= straightEdge
+                                        remaining -= cornerLen
                                         if (remaining <= cornerLen) {
                                             val angle = Math.PI / 2.0 + (remaining / cornerLen) * (Math.PI / 2.0)
                                             x = -rPx + cornerRadius + cornerRadius * kotlin.math.cos(angle).toFloat()
@@ -561,15 +688,11 @@ fun PlayerScreen(
                     when (currentStyle) {
                         VisualizerStyle.SLIME -> {
                             val totalPoints = numBars * 2
-                            val points = Array(totalPoints) { i ->
+                            for (i in 0 until totalPoints) {
                                 val isRightSide = i < numBars
                                 val ampIndex = if (isRightSide) i else (totalPoints - 1 - i)
                                 val amplitude = amplitudes[ampIndex]
                                 
-                                // Distance starts from top center (which is usually at pathLength * 0.75 for an oval, or we can just map it)
-                                // Let's just map symmetrically. Top is distance = topCenterDist
-                                // Right side goes 0.75f -> 1.0f -> 0.25f (bottom)
-                                // Left side goes 0.75f -> 0.5f -> 0.25f (bottom)
                                 val offsetDist = if (isRightSide) {
                                     0f + ampIndex * distStep
                                 } else {
@@ -578,19 +701,20 @@ fun PlayerScreen(
                                 
                                 computePointAndNormal(offsetDist)
                                 val extrude = 5f + (amplitude * 150f)
-                                Offset(outPx + outNx * extrude, outPy + outNy * extrude)
+                                slimeX[i] = outPx + outNx * extrude
+                                slimeY[i] = outPy + outNy * extrude
                             }
 
                             sharedPath.reset()
-                            if (points.isNotEmpty()) {
-                                var prevMidX = (points[0].x + points[totalPoints - 1].x) / 2f
-                                var prevMidY = (points[0].y + points[totalPoints - 1].y) / 2f
+                            if (totalPoints > 0) {
+                                var prevMidX = (slimeX[0] + slimeX[totalPoints - 1]) / 2f
+                                var prevMidY = (slimeY[0] + slimeY[totalPoints - 1]) / 2f
                                 sharedPath.moveTo(prevMidX, prevMidY)
                                 for (i in 0 until totalPoints) {
                                     val nextIndex = (i + 1) % totalPoints
-                                    val midX = (points[i].x + points[nextIndex].x) / 2f
-                                    val midY = (points[i].y + points[nextIndex].y) / 2f
-                                    sharedPath.quadraticTo(points[i].x, points[i].y, midX, midY)
+                                    val midX = (slimeX[i] + slimeX[nextIndex]) / 2f
+                                    val midY = (slimeY[i] + slimeY[nextIndex]) / 2f
+                                    sharedPath.quadraticTo(slimeX[i], slimeY[i], midX, midY)
                                 }
                                 sharedPath.close()
                                 
@@ -686,7 +810,7 @@ fun PlayerScreen(
                             )
                         }
                         VisualizerStyle.WAVE -> {
-                            val path = androidx.compose.ui.graphics.Path()
+                            wavePath.reset()
                             
                             for (i in 0 until numBars) {
                                 val amplitude = amplitudes[i]
@@ -695,7 +819,7 @@ fun PlayerScreen(
                                 val extrude = 20f + (amplitude * 150f)
                                 val px = outPx + outNx * extrude
                                 val py = outPy + outNy * extrude
-                                if (i == 0) path.moveTo(px, py) else path.lineTo(px, py)
+                                if (i == 0) wavePath.moveTo(px, py) else wavePath.lineTo(px, py)
                             }
                             
                             for (i in numBars - 1 downTo 0) {
@@ -703,12 +827,12 @@ fun PlayerScreen(
                                 val dLeft = pathLength - i * distStep
                                 computePointAndNormal(dLeft)
                                 val extrude = 20f + (amplitude * 150f)
-                                path.lineTo(outPx + outNx * extrude, outPy + outNy * extrude)
+                                wavePath.lineTo(outPx + outNx * extrude, outPy + outNy * extrude)
                             }
-                            path.close()
+                            wavePath.close()
                             
-                            drawPath(path = path, brush = Brush.radialGradient(listOf(colorVibrant.copy(alpha = 0.3f), Color.Transparent), center, radius + 150f))
-                            drawPath(path = path, brush = sweepGradient, style = Stroke(width = 10f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                            drawPath(path = wavePath, brush = Brush.radialGradient(listOf(colorVibrant.copy(alpha = 0.3f), Color.Transparent), center, radius + 150f))
+                            drawPath(path = wavePath, brush = sweepGradient, style = Stroke(width = 10f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                         }
                         VisualizerStyle.BARS -> {
                             for (i in 0 until numBars) {
@@ -773,10 +897,9 @@ fun PlayerScreen(
                 )
 
                                 // Progreso parcial animado en el path
-                val progressMeasure = androidx.compose.ui.graphics.PathMeasure()
                 progressMeasure.setPath(basePath, forceClosed = false)
                 val pLen = progressMeasure.length
-                val progressPath = androidx.compose.ui.graphics.Path()
+                progressPath.reset()
                 val targetLength = pLen * progressFraction
                 
                 if (targetLength > 0f) {
@@ -888,8 +1011,55 @@ fun PlayerScreen(
             }
         }
 
-        
-
+        // Lyrics Overlay
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showLyrics,
+            enter = androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.fadeOut(),
+            modifier = Modifier.fillMaxSize().padding(top = 100.dp)
+        ) {
+            Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f))) {
+                val listState = rememberLazyListState()
+                val activeLyricIndex = lyrics.indexOfLast { it.timeMs <= currentPosition }.coerceAtLeast(0)
+                
+                LaunchedEffect(activeLyricIndex) {
+                    if (activeLyricIndex >= 0 && lyrics.isNotEmpty()) {
+                        listState.animateScrollToItem(activeLyricIndex, scrollOffset = -200)
+                    }
+                }
+                
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+                    contentPadding = PaddingValues(vertical = 100.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    itemsIndexed(lyrics) { index, line ->
+                        val isActive = index == activeLyricIndex
+                        val alpha by androidx.compose.animation.core.animateFloatAsState(if (isActive) 1f else 0.4f)
+                        val scale by androidx.compose.animation.core.animateFloatAsState(if (isActive) 1.1f else 1f)
+                        val color = if (isActive) colorVibrant else Color.White
+                        
+                        Text(
+                            text = line.text,
+                            color = color.copy(alpha = alpha),
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp)
+                                .graphicsLayer {
+                                    scaleX = scale
+                                    scaleY = scale
+                                }
+                                .clickable {
+                                    exoPlayer?.seekTo(line.timeMs)
+                                }
+                        )
+                    }
+                }
+            }
+        }
 
         
         // Mode Notification Overlay
@@ -927,7 +1097,6 @@ fun PlayerScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            val context = LocalContext.current
             // Expandable Timer
             Row(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 16.dp),
@@ -939,6 +1108,14 @@ fun PlayerScreen(
                         androidx.compose.material.icons.Icons.Default.Timer, 
                         contentDescription = "Timer", 
                         tint = if (sleepTimerSeconds > 0) colorVibrant else Color.Gray,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+                IconButton(onClick = { showEqDialog = true }) {
+                    Icon(
+                        androidx.compose.material.icons.Icons.Default.GraphicEq, 
+                        contentDescription = "Equalizer", 
+                        tint = if (equalizerManager.isEnabled.collectAsState().value) colorVibrant else Color.Gray,
                         modifier = Modifier.size(28.dp)
                     )
                 }
@@ -1003,6 +1180,112 @@ fun PlayerScreen(
         )
     }
 
+    if (showEqDialog) {
+        val isEqEnabled by equalizerManager.isEnabled.collectAsState()
+        val isAutoMode by equalizerManager.isAutoMode.collectAsState()
+        val presets by equalizerManager.presets.collectAsState()
+        val currentPreset by equalizerManager.currentPreset.collectAsState()
+        val bands by equalizerManager.bands.collectAsState()
+        val bandLevels by equalizerManager.bandLevels.collectAsState()
+        val minLevel by equalizerManager.minLevel.collectAsState()
+        val maxLevel by equalizerManager.maxLevel.collectAsState()
+
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showEqDialog = false },
+            title = { Text("Ecualizador", color = colorVibrant, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Activar Ecualizador", color = Color.White)
+                        androidx.compose.material3.Switch(
+                            checked = isEqEnabled,
+                            onCheckedChange = { equalizerManager.setEnabled(it) },
+                            colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorDominant)
+                        )
+                    }
+                    
+                    if (isEqEnabled) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Modo Auto (Loudness)", color = Color.White)
+                            androidx.compose.material3.Switch(
+                                checked = isAutoMode,
+                                onCheckedChange = { equalizerManager.setAutoMode(it) },
+                                colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorDominant)
+                            )
+                        }
+
+                        if (!isAutoMode) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Preset:", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                            var expanded by remember { mutableStateOf(false) }
+                            Box {
+                                androidx.compose.material3.OutlinedButton(
+                                    onClick = { expanded = true },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    val currentName = if (currentPreset.toInt() == -1) "Personalizado" else presets.find { it.first == currentPreset }?.second ?: "Normal"
+                                    Text(currentName, color = Color.White)
+                                }
+                                androidx.compose.material3.DropdownMenu(
+                                    expanded = expanded,
+                                    onDismissRequest = { expanded = false },
+                                    modifier = Modifier.background(Color.DarkGray)
+                                ) {
+                                    androidx.compose.material3.DropdownMenuItem(
+                                        text = { Text("Personalizado", color = Color.White) },
+                                        onClick = { expanded = false }
+                                    )
+                                    presets.forEach { preset ->
+                                        androidx.compose.material3.DropdownMenuItem(
+                                            text = { Text(preset.second, color = Color.White) },
+                                            onClick = { 
+                                                equalizerManager.setPreset(preset.first)
+                                                expanded = false 
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            val range = (maxLevel - minLevel).coerceAtLeast(1)
+                            Row(modifier = Modifier.fillMaxWidth().height(150.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                bands.forEach { band ->
+                                    val level = bandLevels[band] ?: 0.toShort()
+                                    val freqHz = equalizerManager.getCenterFreq(band) / 1000
+                                    val freqStr = if (freqHz >= 1000) "${freqHz / 1000}k" else "$freqHz"
+                                    
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                        androidx.compose.material3.Slider(
+                                            value = level.toFloat(),
+                                            onValueChange = { equalizerManager.setBandLevel(band, it.toInt().toShort()) },
+                                            valueRange = minLevel.toFloat()..maxLevel.toFloat(),
+                                            colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant),
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(freqStr, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showEqDialog = false }) { Text("Cerrar", color = colorVibrant) } },
+            containerColor = colorDominant.copy(alpha = 0.95f)
+        )
+    }
+
     if (showEditorDialog && currentTrack != null) {
         var editTitle by remember { mutableStateOf(currentTrack.customTitle ?: currentTrack.title) }
         var editArtist by remember { mutableStateOf(currentTrack.customArtist ?: currentTrack.artist) }
@@ -1012,9 +1295,26 @@ fun PlayerScreen(
         val context = androidx.compose.ui.platform.LocalContext.current
         val launcher = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.OpenDocument()) { uri ->
             uri?.let {
-                // Persist permission to read this URI later
-                context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                editCoverPath = it.toString()
+                // Copy the selected image to internal storage to avoid losing it
+                // if the user deletes the original or the URI permission expires.
+                try {
+                    val coversDir = java.io.File(context.filesDir, "custom_covers")
+                    if (!coversDir.exists()) coversDir.mkdirs()
+                    val destFile = java.io.File(coversDir, "cover_${System.currentTimeMillis()}.jpg")
+                    context.contentResolver.openInputStream(it)?.use { input ->
+                        java.io.FileOutputStream(destFile).use { output ->
+                            input.copyTo(output)
+                        }
+                    }
+                    editCoverPath = destFile.absolutePath
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    // Fallback to original URI if copy fails
+                    try {
+                        context.contentResolver.takePersistableUriPermission(it, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    } catch (e2: Exception) {}
+                    editCoverPath = it.toString()
+                }
             }
         }
 
@@ -1106,57 +1406,17 @@ fun PlayerScreen(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("Modo de Repetición (Desliza para cambiar)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                val repeatModes = listOf(
-                    androidx.media3.common.Player.REPEAT_MODE_OFF to "Desactivado",
-                    androidx.media3.common.Player.REPEAT_MODE_ALL to "Repetir Lista",
-                    androidx.media3.common.Player.REPEAT_MODE_ONE to "Repetir Una"
-                )
-                
-                val currentMode = exoPlayer?.repeatMode ?: androidx.media3.common.Player.REPEAT_MODE_OFF
-                val initialPage = repeatModes.indexOfFirst { it.first == currentMode }.coerceAtLeast(0)
-                val pagerState = androidx.compose.foundation.pager.rememberPagerState(
-                    initialPage = initialPage,
-                    pageCount = { repeatModes.size }
-                )
-                
-                LaunchedEffect(pagerState.currentPage) {
-                    if (!pagerState.isScrollInProgress) {
-                        exoPlayer?.repeatMode = repeatModes[pagerState.currentPage].first
+                Text("Modo de Repetición", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    val currentMode = exoPlayer?.repeatMode ?: androidx.media3.common.Player.REPEAT_MODE_OFF
+                    TextButton(onClick = { exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF }) {
+                        Text("Desactivado", color = if (currentMode == androidx.media3.common.Player.REPEAT_MODE_OFF) colorVibrant else Color.Gray)
                     }
-                }
-                
-                LaunchedEffect(currentMode) {
-                    val targetPage = repeatModes.indexOfFirst { it.first == currentMode }.coerceAtLeast(0)
-                    if (pagerState.currentPage != targetPage && !pagerState.isScrollInProgress) {
-                        pagerState.animateScrollToPage(targetPage)
+                    TextButton(onClick = { exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ALL }) {
+                        Text("Lista", color = if (currentMode == androidx.media3.common.Player.REPEAT_MODE_ALL) colorVibrant else Color.Gray)
                     }
-                }
-
-                androidx.compose.foundation.pager.HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp)
-                        .background(Color.DarkGray.copy(alpha=0.3f), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 32.dp),
-                    flingBehavior = androidx.compose.foundation.pager.PagerDefaults.flingBehavior(
-                        state = pagerState,
-                        pagerSnapDistance = androidx.compose.foundation.pager.PagerSnapDistance.atMost(1)
-                    )
-                ) { page ->
-                    val (mode, label) = repeatModes[page]
-                    val isSelected = pagerState.currentPage == page
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = label,
-                            color = if (isSelected) colorVibrant else Color.Gray,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            style = if (isSelected) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodyMedium
-                        )
+                    TextButton(onClick = { exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE }) {
+                        Text("Una", color = if (currentMode == androidx.media3.common.Player.REPEAT_MODE_ONE) colorVibrant else Color.Gray)
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))

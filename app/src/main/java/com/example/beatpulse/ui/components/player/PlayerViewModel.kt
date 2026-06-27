@@ -11,6 +11,7 @@ import androidx.media3.session.SessionToken
 import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.service.PlaybackService
+import com.example.beatpulse.data.PreferencesManager
 import com.example.beatpulse.ui.components.PaletteCache
 import com.example.beatpulse.visualizer.AudioVisualizerManager
 import com.google.common.util.concurrent.ListenableFuture
@@ -28,6 +29,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import android.content.Context
 
+import android.annotation.SuppressLint
+
+@SuppressLint("StaticFieldLeak")
 class PlayerViewModel(
     private val context: Context,
     private val repository: MusicRepository,
@@ -61,6 +65,12 @@ class PlayerViewModel(
         controllerFuture?.addListener({
             val controller = controllerFuture?.get()
             _playerState.value = controller
+            
+            controller?.let { player ->
+                val prefs = PreferencesManager.getInstance(context)
+                player.shuffleModeEnabled = prefs.shuffleModeEnabled
+                player.repeatMode = prefs.repeatMode
+            }
             
             // Restore current or last track
             viewModelScope.launch {
@@ -134,6 +144,28 @@ class PlayerViewModel(
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                     super.onPlayerError(error)
                     android.widget.Toast.makeText(context, "Error al reproducir: Archivo no encontrado o dañado.", android.widget.Toast.LENGTH_LONG).show()
+                    val player = _playerState.value
+                    if (player != null) {
+                        val index = player.currentMediaItemIndex
+                        if (index != androidx.media3.common.C.INDEX_UNSET) {
+                            player.removeMediaItem(index)
+                            val newList = _currentQueue.value.toMutableList()
+                            if (index in newList.indices) {
+                                newList.removeAt(index)
+                                _currentQueue.value = newList
+                            }
+                            player.prepare()
+                            player.play()
+                        }
+                    }
+                }
+
+                override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
+                    PreferencesManager.getInstance(context).shuffleModeEnabled = shuffleModeEnabled
+                }
+
+                override fun onRepeatModeChanged(repeatMode: Int) {
+                    PreferencesManager.getInstance(context).repeatMode = repeatMode
                 }
             })
         }, MoreExecutors.directExecutor())
@@ -166,7 +198,11 @@ class PlayerViewModel(
                         .setAlbumTitle(it.customAlbum ?: it.album)
                         .setIsBrowsable(false)
                         .setIsPlayable(true)
-                        .setArtworkUri(android.net.Uri.parse(it.customCoverPath ?: ("file://" + it.dataPath)))
+                        .apply {
+                            it.customCoverPath?.let { path ->
+                                setArtworkUri(android.net.Uri.parse(if (path.startsWith("/")) "file://$path" else path))
+                            }
+                        }
                         .build()
                 )
                 .build()
@@ -249,7 +285,9 @@ class PlayerViewModel(
     override fun onCleared() {
         super.onCleared()
         visualizerManager.stop()
-        controllerFuture?.let { MediaController.releaseFuture(it) }
+        controllerFuture?.let {
+            MediaController.releaseFuture(it)
+        }
         _playerState.value = null
     }
 }

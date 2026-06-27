@@ -8,8 +8,9 @@ import java.io.File
 import kotlinx.coroutines.flow.first
 import androidx.room.withTransaction
 
-class MusicRepository(private val context: Context) {
-    private val db = AppDatabase.getDatabase(context)
+class MusicRepository(context: Context) {
+    private val appContext = context.applicationContext
+    private val db = AppDatabase.getDatabase(appContext)
     private val dao = db.trackDao()
 
     val isScanning = kotlinx.coroutines.flow.MutableStateFlow(false)
@@ -33,6 +34,18 @@ class MusicRepository(private val context: Context) {
         withContext(Dispatchers.IO) {
             val maxIndex = dao.getMaxOrderIndex(playlistId) ?: -1
             dao.insertPlaylistTrack(PlaylistTrackCrossRef(playlistId, trackId, maxIndex + 1))
+        }
+    }
+
+    suspend fun addTracksToPlaylist(playlistId: Long, trackIds: List<Long>) {
+        withContext(Dispatchers.IO) {
+            db.withTransaction {
+                var currentIndex = (dao.getMaxOrderIndex(playlistId) ?: -1) + 1
+                val crossRefs = trackIds.map { trackId ->
+                    PlaylistTrackCrossRef(playlistId, trackId, currentIndex++)
+                }
+                crossRefs.forEach { dao.insertPlaylistTrack(it) }
+            }
         }
     }
 
@@ -72,7 +85,7 @@ class MusicRepository(private val context: Context) {
             val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
             val sortOrder = "${MediaStore.Audio.Media.DATE_ADDED} DESC"
 
-            val cursor = context.contentResolver.query(
+            val cursor = appContext.contentResolver.query(
                 MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
                 projection,
                 selection,
@@ -85,6 +98,8 @@ class MusicRepository(private val context: Context) {
 
             val foundIds = mutableSetOf<Long>()
             val currentChunk = mutableListOf<TrackEntity>()
+            val prefs = PreferencesManager.getInstance(appContext)
+            val filterWhatsApp = prefs.filterWhatsAppShorts
 
             db.withTransaction {
                 cursor?.use {
@@ -97,12 +112,18 @@ class MusicRepository(private val context: Context) {
                     val dateAddedColumn = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATE_ADDED)
 
                     while (it.moveToNext()) {
+                        kotlinx.coroutines.yield()
+                        val duration = it.getLong(durationColumn)
+                        val dataPath = it.getString(dataColumn) ?: ""
+                        
+                        if (filterWhatsApp && duration < 60000 && dataPath.contains("WhatsApp", ignoreCase = true)) {
+                            continue
+                        }
+
                         val id = it.getLong(idColumn)
                         val title = it.getString(titleColumn) ?: "Unknown Title"
                         val artist = it.getString(artistColumn) ?: "Unknown Artist"
                         val album = it.getString(albumColumn) ?: "Unknown Album"
-                        val duration = it.getLong(durationColumn)
-                        val dataPath = it.getString(dataColumn) ?: ""
                         val dateAdded = it.getLong(dateAddedColumn) * 1000L // Convert seconds to ms
                         
                         val folderPath = File(dataPath).parent ?: ""
@@ -176,10 +197,10 @@ class MusicRepository(private val context: Context) {
             var finalCoverPath = coverPath
             if (coverPath != null && coverPath.startsWith("content://")) {
                 try {
-                    val coversDir = File(context.filesDir, "covers")
+                    val coversDir = File(appContext.filesDir, "covers")
                     if (!coversDir.exists()) coversDir.mkdirs()
                     val destFile = File(coversDir, "cover_${System.currentTimeMillis()}.jpg")
-                    context.contentResolver.openInputStream(android.net.Uri.parse(coverPath))?.use { input ->
+                    appContext.contentResolver.openInputStream(android.net.Uri.parse(coverPath))?.use { input ->
                         destFile.outputStream().use { output ->
                             input.copyTo(output)
                         }
@@ -190,7 +211,7 @@ class MusicRepository(private val context: Context) {
                 }
             } else if (coverPath != null && coverPath.startsWith("file://")) {
                 try {
-                    val coversDir = File(context.filesDir, "covers")
+                    val coversDir = File(appContext.filesDir, "covers")
                     if (!coversDir.exists()) coversDir.mkdirs()
                     val destFile = File(coversDir, "cover_${System.currentTimeMillis()}.jpg")
                     File(java.net.URI(coverPath)).inputStream().use { input ->
@@ -203,11 +224,47 @@ class MusicRepository(private val context: Context) {
                     e.printStackTrace()
                 }
             }
+            val oldTrack = dao.getTrackById(id)
+            if (oldTrack != null) {
+                com.example.beatpulse.ui.components.ThumbnailCache.invalidateTrack(appContext, oldTrack)
+            }
             dao.updateTrackMetadata(id, title, artist, album, finalCoverPath)
             val updatedTrack = dao.getTrackById(id)
             if (updatedTrack != null) {
-                com.example.beatpulse.ui.components.ThumbnailCache.invalidateTrack(context, updatedTrack)
+                com.example.beatpulse.ui.components.ThumbnailCache.invalidateTrack(appContext, updatedTrack)
             }
+        }
+    }
+
+    suspend fun deleteTrack(trackId: Long): android.content.IntentSender? {
+        return withContext(Dispatchers.IO) {
+            val track = dao.getTrackById(trackId) ?: return@withContext null
+            val contentUri = android.content.ContentUris.withAppendedId(
+                android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                trackId
+            )
+            try {
+                val deleted = appContext.contentResolver.delete(contentUri, null, null)
+                if (deleted > 0) {
+                    dao.deleteTracksById(listOf(trackId))
+                }
+                null
+            } catch (e: SecurityException) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    android.provider.MediaStore.createDeleteRequest(appContext.contentResolver, listOf(contentUri)).intentSender
+                } else {
+                    val recoverableException = e as? android.app.RecoverableSecurityException
+                    recoverableException?.userAction?.actionIntent?.intentSender
+                }
+            } catch (e: Exception) {
+                null
+            }
+        }
+    }
+
+    suspend fun completeDeletion(trackId: Long) {
+        withContext(Dispatchers.IO) {
+            dao.deleteTracksById(listOf(trackId))
         }
     }
 }

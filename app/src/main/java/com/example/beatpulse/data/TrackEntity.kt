@@ -8,7 +8,16 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
-@Entity(tableName = "tracks")
+@Entity(
+    tableName = "tracks",
+    indices = [
+        androidx.room.Index("isFavorite"),
+        androidx.room.Index("lastPlayedTime"),
+        androidx.room.Index("playCount"),
+        androidx.room.Index("dateAdded"),
+        androidx.room.Index("folderPath")
+    ]
+)
 data class TrackEntity(
     @PrimaryKey val id: Long,
     val title: String,
@@ -60,10 +69,10 @@ interface TrackDao {
     fun getRecentTracks(): Flow<List<TrackEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertTrack(track: TrackEntity)
+    suspend fun insertTrack(track: TrackEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertTracks(tracks: List<TrackEntity>)
+    suspend fun insertTracks(tracks: List<TrackEntity>)
 
     @Query("SELECT * FROM tracks WHERE playCount > 0 ORDER BY playCount DESC LIMIT 50")
     fun getTopPlayedTracks(): Flow<List<TrackEntity>>
@@ -72,19 +81,19 @@ interface TrackDao {
     fun getRecentlyAddedTracks(): Flow<List<TrackEntity>>
 
     @Query("UPDATE tracks SET isFavorite = :isFav WHERE id = :trackId")
-    fun updateFavorite(trackId: Long, isFav: Boolean)
+    suspend fun updateFavorite(trackId: Long, isFav: Boolean)
 
     @Query("UPDATE tracks SET lastPlayedTime = :time, playCount = playCount + 1 WHERE id = :trackId")
-    fun updateLastPlayed(trackId: Long, time: Long)
+    suspend fun updateLastPlayed(trackId: Long, time: Long)
 
     @Query("SELECT * FROM playlists")
     fun getAllPlaylists(): Flow<List<PlaylistEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertPlaylist(playlist: PlaylistEntity): Long
+    suspend fun insertPlaylist(playlist: PlaylistEntity): Long
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    fun insertPlaylistTrack(crossRef: PlaylistTrackCrossRef)
+    suspend fun insertPlaylistTrack(crossRef: PlaylistTrackCrossRef)
 
     @Query("SELECT t.* FROM tracks t INNER JOIN playlist_tracks pt ON t.id = pt.trackId WHERE pt.playlistId = :playlistId ORDER BY pt.orderIndex ASC")
     fun getTracksForPlaylist(playlistId: Long): Flow<List<TrackEntity>>
@@ -93,20 +102,20 @@ interface TrackDao {
     fun getPlaylistTrackCountFlow(playlistId: Long): Flow<Int>
 
     @Query("SELECT MAX(orderIndex) FROM playlist_tracks WHERE playlistId = :playlistId")
-    fun getMaxOrderIndex(playlistId: Long): Int?
+    suspend fun getMaxOrderIndex(playlistId: Long): Int?
 
     @Query("UPDATE playlist_tracks SET orderIndex = :newOrder WHERE playlistId = :playlistId AND trackId = :trackId")
-    fun updatePlaylistTrackOrder(playlistId: Long, trackId: Long, newOrder: Int)
+    suspend fun updatePlaylistTrackOrder(playlistId: Long, trackId: Long, newOrder: Int)
 
     @Query("DELETE FROM playlist_tracks WHERE playlistId = :playlistId AND trackId = :trackId")
-    fun removeTrackFromPlaylist(playlistId: Long, trackId: Long)
+    suspend fun removeTrackFromPlaylist(playlistId: Long, trackId: Long)
 
     @Query("DELETE FROM tracks WHERE id IN (:ids)")
-    fun deleteTracksById(ids: List<Long>)
+    suspend fun deleteTracksById(ids: List<Long>)
 
     @Query("UPDATE tracks SET customTitle = :title, customArtist = :artist, customAlbum = :album, customCoverPath = :coverPath WHERE id = :id")
-    fun updateTrackMetadata(id: Long, title: String?, artist: String?, album: String?, coverPath: String?)
+    suspend fun updateTrackMetadata(id: Long, title: String?, artist: String?, album: String?, coverPath: String?)
 
     @Query("SELECT * FROM tracks WHERE id = :id")
-    fun getTrackById(id: Long): TrackEntity?
+    suspend fun getTrackById(id: Long): TrackEntity?
 }
