@@ -263,7 +263,7 @@ fun PlayerScreen(
             text = { Text("¿Deseas abrir el navegador para sugerir mejoras o reportar problemas en GitHub?", color = dynamicTextColor) },
             confirmButton = {
                 TextButton(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/polonio/duwave/issues"))
+                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/POL0i/DuWave/issues"))
                     context.startActivity(intent)
                     showFeedbackDialog = false
                 }) {
@@ -568,7 +568,17 @@ fun PlayerScreen(
                     }
                     
                     androidPathMeasure.setPath(basePath.asAndroidPath(), false)
-                    pathLength = androidPathMeasure.length
+                    pathLength = when (thumbnailShapeIdx) {
+                        0 -> 2f * Math.PI.toFloat() * rPx
+                        1 -> 8f * rPx
+                        2, 3 -> {
+                            val cornerRadius = if (thumbnailShapeIdx == 2) 16.dp.toPx() else 32.dp.toPx()
+                            val straightEdge = 2f * (rPx - cornerRadius)
+                            val cornerLen = (Math.PI.toFloat() * cornerRadius) / 2f
+                            4f * straightEdge + 4f * cornerLen
+                        }
+                        else -> 2f * Math.PI.toFloat() * rPx
+                    }
                 }
 
 
@@ -647,7 +657,7 @@ fun PlayerScreen(
                                     if (remaining <= straightEdge) {
                                         x = rPx - cornerRadius - remaining; y = rPx; nx = 0f; ny = 1f
                                     } else {
-                                        remaining -= cornerLen
+                                        remaining -= straightEdge
                                         if (remaining <= cornerLen) {
                                             val angle = Math.PI / 2.0 + (remaining / cornerLen) * (Math.PI / 2.0)
                                             x = -rPx + cornerRadius + cornerRadius * kotlin.math.cos(angle).toFloat()
