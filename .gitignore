@@ -75,3 +75,4 @@ install_manifest.txt
 # Windows
 Thumbs.db
 keys_backup.zip
+get_key_hash.sh
