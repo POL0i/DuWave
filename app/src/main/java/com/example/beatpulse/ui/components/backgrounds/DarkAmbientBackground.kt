@@ -105,14 +105,14 @@ fun DarkAmbientBackground(
 
     val infiniteTransition = rememberInfiniteTransition(label = "skull_anim")
     val time by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1000f,
-        animationSpec = infiniteRepeatable(tween(100000, easing = LinearEasing), RepeatMode.Restart),
+        initialValue = 0f, targetValue = 100000f,
+        animationSpec = infiniteRepeatable(tween(10000000, easing = LinearEasing), RepeatMode.Restart),
         label = "time"
     )
 
     val runtimeShader = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            RuntimeShader(BLACK_METAL_SHADER_SRC)
+            try { RuntimeShader(BLACK_METAL_SHADER_SRC) } catch (e: Exception) { null }
         } else null
     }
     

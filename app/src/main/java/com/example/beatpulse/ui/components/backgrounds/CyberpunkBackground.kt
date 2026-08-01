@@ -38,6 +38,7 @@ fun CyberpunkBackground(
     
     // Custom loop to prevent recompositions
     LaunchedEffect(isPlayerScreen) {
+        var smoothEnergy = 0f
         var lastTime = 0L
         while(true) {
             withFrameMillis { time ->
@@ -53,9 +54,8 @@ fun CyberpunkBackground(
                 }
                 val rawEnergy = if (limit > 0) sumAmps / limit else 0f
                 
-                // Exponential decay interpolation for smoothness
-                dynamicEnergy += (rawEnergy - dynamicEnergy) * (1f - kotlin.math.exp(-15f * dt))
-                dynamicEnergy = dynamicEnergy * reactFactor
+                smoothEnergy += (rawEnergy - smoothEnergy) * (1f - kotlin.math.exp(-15f * dt))
+                dynamicEnergy = smoothEnergy * reactFactor
                 
                 // --- LOOP_HOOK ---
             }
@@ -74,7 +74,7 @@ fun CyberpunkBackground(
     val flowPhase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1000f,
-        animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing)),
+        animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing), RepeatMode.Reverse),
         label = "flow_phase"
     )
 

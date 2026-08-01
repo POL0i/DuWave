@@ -122,14 +122,14 @@ fun LuminousBackground(
 
     val infiniteTransition = rememberInfiniteTransition(label = "bokeh_anim")
     val time by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1000f,
-        animationSpec = infiniteRepeatable(tween(100000, easing = LinearEasing), RepeatMode.Restart),
+        initialValue = 0f, targetValue = 100000f,
+        animationSpec = infiniteRepeatable(tween(10000000, easing = LinearEasing), RepeatMode.Restart),
         label = "time"
     )
 
     val runtimeShader = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            RuntimeShader(LUMINOUS_SHADER_SRC)
+            try { RuntimeShader(LUMINOUS_SHADER_SRC) } catch (e: Exception) { null }
         } else null
     }
     

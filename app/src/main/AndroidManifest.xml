@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
@@ -11,6 +12,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
+        android:enableOnBackInvokedCallback="true"
+        android:name=".BeatPulseApp"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -45,6 +48,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/media_widget_info" />
+        </receiver>
+
+        <receiver android:name=".widget.MediaWidgetProvider4x1"
+            android:exported="false"
+            android:label="Reproductor 4x1">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.beatpulse.UPDATE_WIDGET" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/media_widget_4x1_info" />
         </receiver>
     </application>
 

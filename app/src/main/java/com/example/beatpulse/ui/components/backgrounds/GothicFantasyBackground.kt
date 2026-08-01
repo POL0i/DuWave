@@ -25,12 +25,14 @@ private const val DARK_FANTASY_SHADER_SRC = """
     uniform float iEnergy;
     uniform float iSpeed;
     uniform float iIntensity;
+    uniform float iOffsetY;
     uniform half4 colorDominant;
     uniform half4 colorVibrant;
     uniform half4 colorMuted;
 
     half4 main(in float2 fragCoord) {
         float2 uv = (fragCoord.xy - 0.5 * iResolution.xy) / iResolution.y;
+        uv.y += iOffsetY;
         float d = length(uv);
         
         float sunRadius = 0.15 + iEnergy * 0.1;
@@ -64,6 +66,10 @@ private const val DARK_FANTASY_SHADER_SRC = """
         return half4(finalColor * iIntensity, 1.0);
     }
 """
+
+object VisualizerState {
+    var albumArtCenterY by mutableStateOf<Float?>(null)
+}
 
 @SuppressLint("NewApi")
 @Composable
@@ -106,14 +112,14 @@ fun GothicFantasyBackground(
 
     val infiniteTransition = rememberInfiniteTransition(label = "sun_anim")
     val time by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1000f,
-        animationSpec = infiniteRepeatable(tween(100000, easing = LinearEasing), RepeatMode.Restart),
+        initialValue = 0f, targetValue = 100000f,
+        animationSpec = infiniteRepeatable(tween(10000000, easing = LinearEasing), RepeatMode.Restart),
         label = "time"
     )
 
     val runtimeShader = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            RuntimeShader(DARK_FANTASY_SHADER_SRC)
+            try { RuntimeShader(DARK_FANTASY_SHADER_SRC) } catch (e: Exception) { null }
         } else null
     }
     
@@ -136,6 +142,11 @@ fun GothicFantasyBackground(
                 runtimeShader.setFloatUniform("iEnergy", dynamicEnergy)
                 runtimeShader.setFloatUniform("iSpeed", finalSpeed)
                 runtimeShader.setFloatUniform("iIntensity", finalIntensity)
+                val centerY = VisualizerState.albumArtCenterY
+                val dynamicOffsetY = if (isPlayerScreen && centerY != null) {
+                    ((size.height / 2f) - centerY) / size.height
+                } else 0f
+                runtimeShader.setFloatUniform("iOffsetY", dynamicOffsetY)
                 runtimeShader.setFloatUniform("colorDominant", dom.red, dom.green, dom.blue, dom.alpha)
                 runtimeShader.setFloatUniform("colorVibrant", vib.red, vib.green, vib.blue, vib.alpha)
                 runtimeShader.setFloatUniform("colorMuted", mut.red, mut.green, mut.blue, mut.alpha)
@@ -144,7 +155,13 @@ fun GothicFantasyBackground(
             } else {
                 val width = size.width
                 val height = size.height
-                val center = androidx.compose.ui.geometry.Offset(width / 2f, height / 2f)
+                val fallbackCenterY = VisualizerState.albumArtCenterY
+                val centerY = if (isPlayerScreen && fallbackCenterY != null) {
+                    fallbackCenterY
+                } else {
+                    height / 2f
+                }
+                val center = androidx.compose.ui.geometry.Offset(width / 2f, centerY)
                 drawCircle(color = vibrantColorState.value.copy(alpha = 0.5f * finalIntensity), radius = 200f + dynamicEnergy * 100f, center = center)
                 drawCircle(color = Color.White.copy(alpha = finalIntensity), radius = 50f + dynamicEnergy * 50f, center = center)
             }

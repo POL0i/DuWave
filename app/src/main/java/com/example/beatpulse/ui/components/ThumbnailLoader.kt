@@ -1,8 +1,14 @@
 package com.example.beatpulse.ui.components
 
+import android.content.ContentUris
+import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
+import android.os.Build
+import android.provider.MediaStore
+import android.util.Size
 import android.util.LruCache
 import android.util.LruCache as AndroidLruCache
 import androidx.compose.runtime.*
@@ -15,14 +21,10 @@ import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.theme.PaletteColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.sync.Semaphore
-import kotlinx.coroutines.sync.withPermit
 
 object ThumbnailCache {
     private val maxMemory = (Runtime.getRuntime().maxMemory() / 1024).toInt()
     private val cacheSize = maxMemory / 6
-
-    private val ioSemaphore = Semaphore(2)
 
     // Caché de miniaturas pequeñas (120x120) para listas
     val thumbCache = object : LruCache<Long, ImageBitmap>(cacheSize / 2) {
@@ -47,34 +49,44 @@ object ThumbnailCache {
         return Math.abs((track.title + track.artist + track.album + track.duration + (track.customCoverPath ?: "")).hashCode()).toString()
     }
 
-    fun invalidateTrack(context: android.content.Context, track: TrackEntity) {
+    fun invalidateTrack(context: Context, track: TrackEntity) {
         val trackId = track.id
         thumbCache.remove(trackId)
         fullCache.remove(trackId)
         noArtSet.remove(trackId)
-        PaletteCache.remove(trackId)
+        PaletteCache.remove(context, trackId)
         
         val fingerprint = getTrackFingerprint(track)
         java.io.File(context.cacheDir, "thumb_${fingerprint}.jpg").delete()
         java.io.File(context.cacheDir, "full_${fingerprint}.jpg").delete()
     }
 
-    private suspend fun extractRawBitmap(context: android.content.Context, track: TrackEntity): ByteArray? {
+    private suspend fun extractRawBitmap(context: Context, track: TrackEntity): ByteArray? {
         return withContext(Dispatchers.IO) {
             try {
                 if (!track.customCoverPath.isNullOrEmpty()) {
                     try {
-                        val customFile = java.io.File(track.customCoverPath)
-                        if (customFile.exists()) {
-                            return@withContext customFile.readBytes()
+                        if (track.customCoverPath.startsWith("http://") || track.customCoverPath.startsWith("https://")) {
+                            val url = java.net.URL(track.customCoverPath)
+                            val connection = url.openConnection() as java.net.HttpURLConnection
+                            connection.requestMethod = "GET"
+                            connection.connect()
+                            if (connection.responseCode == java.net.HttpURLConnection.HTTP_OK) {
+                                return@withContext connection.inputStream.readBytes()
+                            }
                         } else {
-                            val uri = android.net.Uri.parse(track.customCoverPath)
-                            context.contentResolver.openInputStream(uri)?.use { stream ->
-                                return@withContext stream.readBytes()
+                            val customFile = java.io.File(track.customCoverPath)
+                            if (customFile.exists()) {
+                                return@withContext customFile.readBytes()
+                            } else {
+                                val uri = android.net.Uri.parse(track.customCoverPath)
+                                context.contentResolver.openInputStream(uri)?.use { stream ->
+                                    return@withContext stream.readBytes()
+                                }
                             }
                         }
+
                     } catch (e: Exception) {
-                        // Fallback to default loading if custom cover fails
                         e.printStackTrace()
                     }
                 }
@@ -89,7 +101,7 @@ object ThumbnailCache {
         }
     }
 
-    suspend fun loadThumbnail(context: android.content.Context, track: TrackEntity): ImageBitmap? = withContext(Dispatchers.IO) {
+    suspend fun loadThumbnail(context: Context, track: TrackEntity): ImageBitmap? = withContext(Dispatchers.IO) {
         if (noArtSet.contains(track.id)) return@withContext null
         thumbCache.get(track.id)?.let { return@withContext it }
 
@@ -98,52 +110,67 @@ object ThumbnailCache {
         
         if (thumbFile.exists()) {
             if (thumbFile.length() == 0L) {
-                noArtSet.add(track.id)
-                return@withContext null
+                thumbFile.delete()
+            } else {
+                try {
+                    val bitmap = BitmapFactory.decodeFile(thumbFile.absolutePath)
+                    if (bitmap != null) {
+                        val imageBitmap = bitmap.asImageBitmap()
+                        thumbCache.put(track.id, imageBitmap)
+                        return@withContext imageBitmap
+                    }
+                } catch (e: Exception) { e.printStackTrace() }
             }
-            try {
-                val bitmap = BitmapFactory.decodeFile(thumbFile.absolutePath)
-                if (bitmap != null) {
-                    val imageBitmap = bitmap.asImageBitmap()
-                    thumbCache.put(track.id, imageBitmap)
-                    return@withContext imageBitmap
-                }
-            } catch (e: Exception) { e.printStackTrace() }
         }
 
         try {
             while (isPriorityLoading) {
                 kotlinx.coroutines.delay(50)
             }
-            ioSemaphore.withPermit {
-                thumbCache.get(track.id)?.let { return@withContext it }
+            
+            thumbCache.get(track.id)?.let { return@withContext it }
 
+            var bitmap: Bitmap? = null
+            var triedFastPath = false
+            
+            // Fast path for Android 10+ using ContentResolver
+            if (track.customCoverPath.isNullOrEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                triedFastPath = true
+                try {
+                    val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, track.id)
+                    bitmap = context.contentResolver.loadThumbnail(uri, Size(120, 120), null)
+                } catch (e: Exception) {
+                    // Si falla aquí en API 29+, es porque NO hay carátula.
+                    // No hacemos fallback a MediaMetadataRetriever porque es súper lento.
+                }
+            }
+
+            // Fallback for custom covers or old Android versions
+            if (bitmap == null && !triedFastPath) {
                 val art = extractRawBitmap(context, track)
                 if (art != null) {
-                    val options = BitmapFactory.Options().apply {
-                        inJustDecodeBounds = true
-                    }
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeByteArray(art, 0, art.size, options)
-                    
                     options.inSampleSize = calculateInSampleSize(options, 120, 120)
                     options.inJustDecodeBounds = false
-                    
-                    val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size, options)
-                    val scaled = if (bitmap != null) Bitmap.createScaledBitmap(bitmap, 120, 120, true) else null
-
-                    if (scaled != null) {
-                        try {
-                            val out = java.io.FileOutputStream(thumbFile)
-                            scaled.compress(Bitmap.CompressFormat.JPEG, 80, out)
-                            out.close()
-                        } catch (e: Exception) { e.printStackTrace() }
-
-                        val imageBitmap = scaled.asImageBitmap()
-                        thumbCache.put(track.id, imageBitmap)
-                        return@withContext imageBitmap
+                    val decoded = BitmapFactory.decodeByteArray(art, 0, art.size, options)
+                    if (decoded != null) {
+                        bitmap = Bitmap.createScaledBitmap(decoded, 120, 120, true)
                     }
                 }
-                
+            }
+
+            if (bitmap != null) {
+                try {
+                    val out = java.io.FileOutputStream(thumbFile)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, out)
+                    out.close()
+                } catch (e: Exception) { e.printStackTrace() }
+
+                val imageBitmap = bitmap.asImageBitmap()
+                thumbCache.put(track.id, imageBitmap)
+                return@withContext imageBitmap
+            } else {
                 thumbFile.createNewFile()
                 noArtSet.add(track.id)
             }
@@ -156,11 +183,9 @@ object ThumbnailCache {
     private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
         val (height: Int, width: Int) = options.outHeight to options.outWidth
         var inSampleSize = 1
-
         if (height > reqHeight || width > reqWidth) {
             val halfHeight: Int = height / 2
             val halfWidth: Int = width / 2
-
             while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
                 inSampleSize *= 2
             }
@@ -168,7 +193,7 @@ object ThumbnailCache {
         return inSampleSize
     }
 
-    suspend fun loadFullArt(context: android.content.Context, track: TrackEntity): ImageBitmap? = withContext(Dispatchers.IO) {
+    suspend fun loadFullArt(context: Context, track: TrackEntity): ImageBitmap? = withContext(Dispatchers.IO) {
         if (noArtSet.contains(track.id)) return@withContext null
         fullCache.get(track.id)?.let { return@withContext it }
 
@@ -177,57 +202,68 @@ object ThumbnailCache {
         
         if (fullFile.exists()) {
             if (fullFile.length() == 0L) {
-                noArtSet.add(track.id)
-                return@withContext null
+                fullFile.delete()
+            } else {
+                try {
+                    val bitmap = BitmapFactory.decodeFile(fullFile.absolutePath)
+                    if (bitmap != null) {
+                        val imageBitmap = bitmap.asImageBitmap()
+                        fullCache.put(track.id, imageBitmap)
+                        return@withContext imageBitmap
+                    }
+                } catch (e: Exception) { e.printStackTrace() }
             }
-            try {
-                val bitmap = BitmapFactory.decodeFile(fullFile.absolutePath)
-                if (bitmap != null) {
-                    val imageBitmap = bitmap.asImageBitmap()
-                    fullCache.put(track.id, imageBitmap)
-                    return@withContext imageBitmap
-                }
-            } catch (e: Exception) { e.printStackTrace() }
         }
 
         try {
             isPriorityLoading = true
             fullCache.get(track.id)?.let { return@withContext it }
-
-            val art = extractRawBitmap(context, track)
-            if (art != null) {
-                val options = BitmapFactory.Options().apply {
-                    inJustDecodeBounds = true
-                }
-                BitmapFactory.decodeByteArray(art, 0, art.size, options)
-                
-                options.inSampleSize = calculateInSampleSize(options, 600, 600)
-                options.inJustDecodeBounds = false
-                
-                val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size, options)
-                
-                // Solo escalar exactamente si es necesario después de inSampleSize
-                val maxDimension = 600
-                val finalBitmap = if (bitmap != null && (bitmap.width > maxDimension || bitmap.height > maxDimension)) {
-                    val ratio = Math.min(maxDimension.toFloat() / bitmap.width, maxDimension.toFloat() / bitmap.height)
-                    Bitmap.createScaledBitmap(bitmap, (bitmap.width * ratio).toInt(), (bitmap.height * ratio).toInt(), true)
-                } else bitmap
-
-                if (finalBitmap != null) {
-                    try {
-                        val out = java.io.FileOutputStream(fullFile)
-                        finalBitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
-                        out.close()
-                    } catch (e: Exception) { e.printStackTrace() }
-
-                    val imageBitmap = finalBitmap.asImageBitmap()
-                    fullCache.put(track.id, imageBitmap)
-                    return@withContext imageBitmap
-                }
-            } 
             
-            fullFile.createNewFile()
-            noArtSet.add(track.id)
+            var bitmap: Bitmap? = null
+            var triedFastPath = false
+            
+            // Fast path for Android 10+ using ContentResolver
+            if (track.customCoverPath.isNullOrEmpty() && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                triedFastPath = true
+                try {
+                    val uri = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, track.id)
+                    bitmap = context.contentResolver.loadThumbnail(uri, Size(600, 600), null)
+                } catch (e: Exception) {
+                    // Si falla en API 29+, no hay carátula. Evitar fallback lento.
+                }
+            }
+
+            // Fallback for custom covers or old Android versions
+            if (bitmap == null && !triedFastPath) {
+                val art = extractRawBitmap(context, track)
+                if (art != null) {
+                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeByteArray(art, 0, art.size, options)
+                    options.inSampleSize = calculateInSampleSize(options, 600, 600)
+                    options.inJustDecodeBounds = false
+                    val decoded = BitmapFactory.decodeByteArray(art, 0, art.size, options)
+                    val maxDimension = 600
+                    bitmap = if (decoded != null && (decoded.width > maxDimension || decoded.height > maxDimension)) {
+                        val ratio = Math.min(maxDimension.toFloat() / decoded.width, maxDimension.toFloat() / decoded.height)
+                        Bitmap.createScaledBitmap(decoded, (decoded.width * ratio).toInt(), (decoded.height * ratio).toInt(), true)
+                    } else decoded
+                }
+            }
+
+            if (bitmap != null) {
+                try {
+                    val out = java.io.FileOutputStream(fullFile)
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)
+                    out.close()
+                } catch (e: Exception) { e.printStackTrace() }
+
+                val imageBitmap = bitmap.asImageBitmap()
+                fullCache.put(track.id, imageBitmap)
+                return@withContext imageBitmap
+            } else {
+                fullFile.createNewFile()
+                noArtSet.add(track.id)
+            }
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
@@ -237,13 +273,53 @@ object ThumbnailCache {
     }
 }
 
-// Caché en memoria para paletas de colores por track
+// Caché persistente para paletas de colores por track
 object PaletteCache {
-    private val cache = AndroidLruCache<Long, PaletteColors>(200)
+    private val memCache = AndroidLruCache<Long, PaletteColors>(200)
+    
+    private fun getPrefs(context: Context): SharedPreferences {
+        return context.getSharedPreferences("PaletteCache", Context.MODE_PRIVATE)
+    }
 
-    fun get(trackId: Long): PaletteColors? = cache.get(trackId)
-    fun put(trackId: Long, colors: PaletteColors) { cache.put(trackId, colors) }
-    fun remove(trackId: Long) { cache.remove(trackId) }
+    fun get(context: Context, trackId: Long): PaletteColors? {
+        memCache.get(trackId)?.let { return it }
+        
+        // Cargar desde disco si existe
+        val prefs = getPrefs(context)
+        val saved = prefs.getString(trackId.toString(), null)
+        if (saved != null) {
+            try {
+                val parts = saved.split(",")
+                if (parts.size == 6) {
+                    val colors = PaletteColors(
+                        dominant = Color(parts[0].toInt()),
+                        vibrant = Color(parts[1].toInt()),
+                        muted = Color(parts[2].toInt()),
+                        darkVibrant = Color(parts[3].toInt()),
+                        lightVibrant = Color(parts[4].toInt()),
+                        darkMuted = Color(parts[5].toInt())
+                    )
+                    memCache.put(trackId, colors)
+                    return colors
+                }
+            } catch (e: Exception) {}
+        }
+        return null
+    }
+    
+    fun put(context: Context, trackId: Long, colors: PaletteColors) { 
+        memCache.put(trackId, colors) 
+        
+        // Guardar en disco permanentemente
+        val colorString = "${colors.dominant.toArgb()},${colors.vibrant.toArgb()},${colors.muted.toArgb()}," +
+                "${colors.darkVibrant.toArgb()},${colors.lightVibrant.toArgb()},${colors.darkMuted.toArgb()}"
+        getPrefs(context).edit().putString(trackId.toString(), colorString).apply()
+    }
+    
+    fun remove(context: Context, trackId: Long) { 
+        memCache.remove(trackId) 
+        getPrefs(context).edit().remove(trackId.toString()).apply()
+    }
 }
 
 @Composable
@@ -278,25 +354,27 @@ fun rememberFullAlbumArt(track: TrackEntity): ImageBitmap? {
     return bitmap
 }
 
-// Paleta de colores de cada track individualmente — con caché en memoria
+// Paleta de colores de cada track individualmente — con caché persistente
 @Composable
 fun rememberTrackPalette(track: TrackEntity): PaletteColors {
     val context = androidx.compose.ui.platform.LocalContext.current
     var colors by remember(track.id) {
-        mutableStateOf(PaletteCache.get(track.id) ?: PaletteColors())
+        mutableStateOf(PaletteCache.get(context, track.id) ?: PaletteColors())
     }
 
     LaunchedEffect(track.id) {
-        if (PaletteCache.get(track.id) == null) {
+        if (PaletteCache.get(context, track.id) == null) {
             if (ThumbnailCache.noArtSet.contains(track.id)) {
-                PaletteCache.put(track.id, PaletteColors())
+                PaletteCache.put(context, track.id, PaletteColors())
             } else {
                 val imageBitmap = ThumbnailCache.loadThumbnail(context, track)
                 if (imageBitmap != null) {
                     withContext(Dispatchers.Default) {
                         try {
                             val bitmap = imageBitmap.asAndroidBitmap()
-                            val palette = Palette.from(bitmap).generate()
+                            // Usamos un bitmap pequeñito (64x64) para que Palette.generate sea instantáneo < 1ms
+                            val smallBitmap = Bitmap.createScaledBitmap(bitmap, 64, 64, false)
+                            val palette = Palette.from(smallBitmap).generate()
                             val extracted = PaletteColors(
                                 dominant = Color(palette.getDominantColor(android.graphics.Color.DKGRAY)),
                                 vibrant = Color(palette.getVibrantColor(android.graphics.Color.DKGRAY)),
@@ -305,16 +383,26 @@ fun rememberTrackPalette(track: TrackEntity): PaletteColors {
                                 lightVibrant = Color(palette.getLightVibrantColor(android.graphics.Color.DKGRAY)),
                                 darkMuted = Color(palette.getDarkMutedColor(android.graphics.Color.DKGRAY))
                             )
-                            PaletteCache.put(track.id, extracted)
+                            PaletteCache.put(context, track.id, extracted)
                             colors = extracted
                         } catch (_: Exception) {}
                     }
                 } else {
-                    PaletteCache.put(track.id, PaletteColors())
+                    PaletteCache.put(context, track.id, PaletteColors())
                 }
             }
         }
     }
 
     return colors
+}
+
+// Helper to convert Compose Color to ARGB int format for SharedPreferences
+fun Color.toArgb(): Int {
+    return android.graphics.Color.argb(
+        (alpha * 255).toInt(),
+        (red * 255).toInt(),
+        (green * 255).toInt(),
+        (blue * 255).toInt()
+    )
 }

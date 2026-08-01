@@ -71,6 +71,7 @@ class MusicRepository(context: Context) {
 
     suspend fun scanMediaStore() {
         isScanning.value = true
+        try {
         withContext(Dispatchers.IO) {
             val projection = arrayOf(
                 MediaStore.Audio.Media._ID,
@@ -128,7 +129,21 @@ class MusicRepository(context: Context) {
                         
                         val folderPath = File(dataPath).parent ?: ""
                         
-                        val existingTrack = existingMap[id]
+                        var existingTrack = existingMap[id]
+                        if (existingTrack == null) {
+                            // Check if this new local file matches an existing online track
+                            val onlineTrack = existingMap.values.find {
+                                it.dataPath.startsWith("youtube://") &&
+                                (it.title.equals(title, ignoreCase = true) || title.contains(it.title, ignoreCase = true) ||
+                                 dataPath.contains(it.title.replace(Regex("[^a-zA-Z0-9.\\- ]"), "_"), ignoreCase = true))
+                            }
+                            if (onlineTrack != null) {
+                                existingTrack = onlineTrack
+                                // Migrate playlist references to the new local ID
+                                dao.updatePlaylistTrackId(oldId = onlineTrack.id, newId = id)
+                            }
+                        }
+                        
                         foundIds.add(id)
 
                         currentChunk.add(
@@ -144,8 +159,8 @@ class MusicRepository(context: Context) {
                                 lastPlayedTime = existingTrack?.lastPlayedTime ?: 0,
                                 playCount = existingTrack?.playCount ?: 0,
                                 dateAdded = existingTrack?.dateAdded?.takeIf { d -> d > 0 } ?: dateAdded,
-                                customTitle = existingTrack?.customTitle,
-                                customArtist = existingTrack?.customArtist,
+                                customTitle = existingTrack?.customTitle ?: if (existingTrack?.dataPath?.startsWith("youtube://") == true) existingTrack.title else null,
+                                customArtist = existingTrack?.customArtist ?: if (existingTrack?.dataPath?.startsWith("youtube://") == true) existingTrack.artist else null,
                                 customAlbum = existingTrack?.customAlbum,
                                 customCoverPath = existingTrack?.customCoverPath
                             )
@@ -171,7 +186,9 @@ class MusicRepository(context: Context) {
                 }
             }
         }
-        isScanning.value = false
+        } finally {
+            isScanning.value = false
+        }
     }
 
     suspend fun toggleFavorite(trackId: Long, isFav: Boolean) {
@@ -189,6 +206,12 @@ class MusicRepository(context: Context) {
     suspend fun updateLastPlayed(trackId: Long, time: Long) {
         withContext(Dispatchers.IO) {
             dao.updateLastPlayed(trackId, time)
+        }
+    }
+
+    suspend fun insertTrack(track: TrackEntity) {
+        withContext(Dispatchers.IO) {
+            dao.insertTrack(track)
         }
     }
 
@@ -236,6 +259,11 @@ class MusicRepository(context: Context) {
         }
     }
 
+    suspend fun insertOrUpdateTrack(track: TrackEntity) {
+        withContext(Dispatchers.IO) {
+            dao.insertTrack(track)
+        }
+    }
     suspend fun deleteTrack(trackId: Long): android.content.IntentSender? {
         return withContext(Dispatchers.IO) {
             val track = dao.getTrackById(trackId) ?: return@withContext null
@@ -247,6 +275,8 @@ class MusicRepository(context: Context) {
                 val deleted = appContext.contentResolver.delete(contentUri, null, null)
                 if (deleted > 0) {
                     dao.deleteTracksById(listOf(trackId))
+                } else {
+                    dao.deleteTracksById(listOf(trackId))
                 }
                 null
             } catch (e: SecurityException) {
@@ -257,6 +287,8 @@ class MusicRepository(context: Context) {
                     recoverableException?.userAction?.actionIntent?.intentSender
                 }
             } catch (e: Exception) {
+                // If it's another exception (like IllegalArgumentException because file is gone), clean our DB
+                dao.deleteTracksById(listOf(trackId))
                 null
             }
         }
@@ -267,4 +299,15 @@ class MusicRepository(context: Context) {
             dao.deleteTracksById(listOf(trackId))
         }
     }
+
+    // Statistics methods
+    suspend fun getTopArtistsByPlayCount() = withContext(Dispatchers.IO) { dao.getTopArtistsByPlayCount() }
+    suspend fun getTopAlbumsByPlayCount() = withContext(Dispatchers.IO) { dao.getTopAlbumsByPlayCount() }
+    suspend fun getTotalListeningTimeMs() = withContext(Dispatchers.IO) { dao.getTotalListeningTimeMs() ?: 0L }
+    suspend fun getTotalTracksPlayed() = withContext(Dispatchers.IO) { dao.getTotalTracksPlayed() }
+    suspend fun getTotalPlayCount() = withContext(Dispatchers.IO) { dao.getTotalPlayCount() ?: 0 }
+    suspend fun getUniqueArtistsPlayed() = withContext(Dispatchers.IO) { dao.getUniqueArtistsPlayed() }
+    suspend fun getUniqueAlbumsPlayed() = withContext(Dispatchers.IO) { dao.getUniqueAlbumsPlayed() }
+    suspend fun getTop5Tracks() = withContext(Dispatchers.IO) { dao.getTop5Tracks() }
+    suspend fun getFavoriteTracksList() = withContext(Dispatchers.IO) { dao.getFavoriteTracks() }
 }

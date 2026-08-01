@@ -42,3 +42,11 @@
 # Keep Coil
 -keep class io.coil-kt.** { *; }
 -dontwarn io.coil-kt.**
+
+# Rhino and NewPipe
+-dontwarn org.mozilla.javascript.**
+-dontwarn java.beans.**
+-dontwarn javax.script.**
+-dontwarn jdk.dynalink.**
+-dontwarn org.schabi.newpipe.extractor.**
+-keep class org.mozilla.javascript.** { *; }

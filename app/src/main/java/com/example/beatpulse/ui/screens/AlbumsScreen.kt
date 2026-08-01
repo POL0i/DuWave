@@ -30,15 +30,15 @@ import com.example.beatpulse.ui.components.PixelIcons
 
 @Composable
 fun AlbumsScreen(
-    repository: MusicRepository,
+    viewModel: LibraryViewModel,
     paletteColors: PaletteColors,
-    prefs: PreferencesManager,
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
 ) {
-    val recentTracks by repository.recentTracksFlow.collectAsState(initial = emptyList())
-    val topTracks by repository.topPlayedFlow.collectAsState(initial = emptyList())
-    val recentlyAdded by repository.recentlyAddedFlow.collectAsState(initial = emptyList())
-    val allTracks by repository.allTracksFlow.collectAsState(initial = emptyList())
+    val prefs = viewModel.prefs
+    val recentTracks by viewModel.recentTracks.collectAsState()
+    val topTracks by viewModel.topTracks.collectAsState()
+    val recentlyAdded by viewModel.recentlyAdded.collectAsState()
+    val allTracks by viewModel.allTracks.collectAsState()
     val bgStyle by prefs.backgroundStyleFlow.collectAsState()
     val shapeIdx by prefs.thumbnailShapeFlow.collectAsState()
 
@@ -51,7 +51,7 @@ fun AlbumsScreen(
     var selectedPlaylist by remember { mutableStateOf<PlaylistViewData?>(null) }
     var isCreatingPlaylist by remember { mutableStateOf(false) }
     var addingTracksToPlaylistId by remember { mutableStateOf<Long?>(null) }
-    val playlists by repository.playlistsFlow.collectAsState(initial = emptyList())
+    val playlists by viewModel.playlists.collectAsState()
     val coroutineScope = rememberCoroutineScope()
 
     val isDarkTheme = isSystemInDarkTheme()
@@ -67,7 +67,7 @@ fun AlbumsScreen(
         if (isBackgroundLight) Color(0xFF121212) else Color.White
     }
 
-    val isScanning by repository.isScanning.collectAsState()
+    val isScanning by viewModel.isScanning.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (isScanning && allTracks.isEmpty()) {
@@ -81,7 +81,7 @@ fun AlbumsScreen(
         } else if (isCreatingPlaylist) {
             BackHandler { isCreatingPlaylist = false }
             CreatePlaylistScreen(
-                repository = repository,
+                viewModel = viewModel,
                 allTracks = allTracks,
                 dynamicTextColor = dynamicTextColor,
                 paletteColors = paletteColors,
@@ -91,7 +91,7 @@ fun AlbumsScreen(
             val plId = addingTracksToPlaylistId!!
             BackHandler { addingTracksToPlaylistId = null }
             AddTracksScreen(
-                repository = repository,
+                viewModel = viewModel,
                 playlistId = plId,
                 allTracks = allTracks,
                 dynamicTextColor = dynamicTextColor,
@@ -131,7 +131,7 @@ fun AlbumsScreen(
                                     onClick = {
                                         prefs.filterWhatsAppShorts = !filterWhatsApp
                                         showSettingsMenu = false
-                                        coroutineScope.launch { repository.scanMediaStore() }
+                                        viewModel.scanMediaStore()
                                     }
                                 )
                             }
@@ -248,8 +248,8 @@ fun AlbumsScreen(
                                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
                             )
                         }
-                        items(playlists) { pl ->
-                            val trackCount by repository.getPlaylistTrackCountFlow(pl.playlistId).collectAsState(initial = 0)
+                        items(playlists, key = { "pl_${it.playlistId}" }) { pl ->
+                            val trackCount by viewModel.getPlaylistTrackCountFlow(pl.playlistId).collectAsState(initial = 0)
                             PlaylistFolderItem(
                                 title = pl.name,
                                 count = trackCount,
@@ -284,7 +284,7 @@ fun AlbumsScreen(
                         )
                     }
                     
-                    items(tracksByFolder.keys.toList()) { folder ->
+                    items(tracksByFolder.keys.toList(), key = { "folder_$it" }) { folder ->
                         val folderTracks = tracksByFolder[folder] ?: emptyList()
                         PlaylistFolderItem(
                             title = folder.substringAfterLast("/"),
@@ -305,7 +305,7 @@ fun AlbumsScreen(
             } else {
                 BackHandler { selectedPlaylist = null }
                 val dbTracks by if (currentViewData.playlistId != null) {
-                    repository.getTracksForPlaylist(currentViewData.playlistId).collectAsState(initial = emptyList())
+                    viewModel.getTracksForPlaylist(currentViewData.playlistId).collectAsState(initial = emptyList())
                 } else {
                     remember { mutableStateOf(emptyList()) }
                 }
@@ -353,34 +353,31 @@ fun AlbumsScreen(
                                     textColor = dynamicTextColor,
                                     onClick = { onTrackClick(track, tracksToDisplay) },
                                     onToggleFavorite = {
-                                        coroutineScope.launch { repository.toggleFavorite(track.id, !track.isFavorite) }
-                                    } 
+                                        viewModel.toggleFavorite(track, !track.isFavorite)
+                                    },
+                                    onRemoveFromPlaylist = if (currentViewData.playlistId != null) { { viewModel.removeTrackFromPlaylist(currentViewData.playlistId, track.id) } } else null
                                 )
                             }
                             if (currentViewData.playlistId != null) {
                                 Column {
                                     if (index > 0) {
                                         IconButton(onClick = {
-                                            coroutineScope.launch {
-                                                val prevTrack = tracksToDisplay[index - 1]
-                                                repository.updatePlaylistOrder(
-                                                    currentViewData.playlistId, 
-                                                    listOf(Pair(track.id, index - 1), Pair(prevTrack.id, index))
-                                                )
-                                            }
+                                            val prevTrack = tracksToDisplay[index - 1]
+                                            viewModel.updatePlaylistOrder(
+                                                currentViewData.playlistId, 
+                                                listOf(Pair(track.id, index - 1), Pair(prevTrack.id, index))
+                                            )
                                         }) {
                                             Icon(Icons.Default.KeyboardArrowUp, tint = dynamicTextColor, contentDescription = "Arriba")
                                         }
                                     }
                                     if (index < tracksToDisplay.size - 1) {
                                         IconButton(onClick = {
-                                            coroutineScope.launch {
-                                                val nextTrack = tracksToDisplay[index + 1]
-                                                repository.updatePlaylistOrder(
-                                                    currentViewData.playlistId, 
-                                                    listOf(Pair(track.id, index + 1), Pair(nextTrack.id, index))
-                                                )
-                                            }
+                                            val nextTrack = tracksToDisplay[index + 1]
+                                            viewModel.updatePlaylistOrder(
+                                                currentViewData.playlistId, 
+                                                listOf(Pair(track.id, index + 1), Pair(nextTrack.id, index))
+                                            )
                                         }) {
                                             Icon(Icons.Default.KeyboardArrowDown, tint = dynamicTextColor, contentDescription = "Abajo")
                                         }
@@ -441,7 +438,7 @@ fun PlaylistFolderItem(
 
 @Composable
 fun CreatePlaylistScreen(
-    repository: MusicRepository,
+    viewModel: LibraryViewModel,
     allTracks: List<TrackEntity>,
     dynamicTextColor: androidx.compose.ui.graphics.Color,
     paletteColors: PaletteColors,
@@ -473,9 +470,12 @@ fun CreatePlaylistScreen(
                 onClick = {
                     if (name.isNotBlank()) {
                         coroutineScope.launch {
-                            val id = repository.createPlaylist(name)
+                            val id = viewModel.createPlaylist(name)
                             selectedTracks.filterValues { it }.keys.forEach { trackId ->
-                                repository.addTrackToPlaylist(id, trackId)
+                                val track = allTracks.find { it.id == trackId }
+                                if (track != null) {
+                                    viewModel.addTrackToPlaylist(id, track)
+                                }
                             }
                             onClose()
                         }
@@ -543,7 +543,7 @@ fun CreatePlaylistScreen(
 
 @Composable
 fun AddTracksScreen(
-    repository: MusicRepository,
+    viewModel: LibraryViewModel,
     playlistId: Long,
     allTracks: List<TrackEntity>,
     dynamicTextColor: androidx.compose.ui.graphics.Color,
@@ -555,7 +555,7 @@ fun AddTracksScreen(
     val coroutineScope = rememberCoroutineScope()
     
     // We fetch current tracks to pre-select them or not allow duplicates
-    val existingTracks by repository.getTracksForPlaylist(playlistId).collectAsState(initial = emptyList())
+    val existingTracks by viewModel.getTracksForPlaylist(playlistId).collectAsState(initial = emptyList())
     val existingTrackIds = remember(existingTracks) { existingTracks.map { it.id }.toSet() }
 
     val filteredTracks = remember(searchQuery, allTracks, existingTrackIds) {
@@ -578,10 +578,12 @@ fun AddTracksScreen(
             Text("Añadir Canciones", style = MaterialTheme.typography.titleLarge, color = dynamicTextColor, modifier = Modifier.weight(1f))
             Button(
                 onClick = {
-                    val tracksToAdd = selectedTracks.filterValues { it }.keys.toList()
+                    val tracksToAdd = filteredTracks.filter { selectedTracks[it.id] == true }
                     if (tracksToAdd.isNotEmpty()) {
                         coroutineScope.launch {
-                            repository.addTracksToPlaylist(playlistId, tracksToAdd)
+                            tracksToAdd.forEach { track ->
+                                viewModel.addTrackToPlaylist(playlistId, track)
+                            }
                             onClose()
                         }
                     } else {

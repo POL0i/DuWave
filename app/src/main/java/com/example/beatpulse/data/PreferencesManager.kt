@@ -23,17 +23,37 @@ class PreferencesManager private constructor(context: Context) {
         }
     }
 
+    var appLanguage: String
+        get() = prefs.getString("appLanguage", "es") ?: "es"
+        set(value) = prefs.edit().putString("appLanguage", value).apply()
+
     var visualizerStyle: String
         get() = prefs.getString("visualizerStyle", "BARS") ?: "BARS"
         set(value) = prefs.edit().putString("visualizerStyle", value).apply()
+
+    var visualizerArchetype: Int
+        get() = prefs.getInt("visualizerArchetype", 0) // 0 = Overlapped, 1 = Segmented
+        set(value) = prefs.edit().putInt("visualizerArchetype", value).apply()
+
+    var visualizerFftMode: String
+        get() = prefs.getString("visualizerFftMode", "MAX") ?: "MAX"
+        set(value) = prefs.edit().putString("visualizerFftMode", value).apply()
 
     var isAdvancedMode: Boolean
         get() = prefs.getBoolean("isAdvancedMode", true)
         set(value) = prefs.edit().putBoolean("isAdvancedMode", value).apply()
 
+    var visualizerBandsMode: Int
+        get() = prefs.getInt("visualizerBandsMode", 3) // 3 bands by default
+        set(value) = prefs.edit().putInt("visualizerBandsMode", value).apply()
+
     var filterMode: String
         get() = prefs.getString("filterMode", "ALL") ?: "ALL"
         set(value) = prefs.edit().putString("filterMode", value).apply()
+
+    var physicsMode: String
+        get() = prefs.getString("physicsMode", "EQUILIBRADO") ?: "EQUILIBRADO"
+        set(value) = prefs.edit().putString("physicsMode", value).apply()
 
     var filterWhatsAppShorts: Boolean
         get() = prefs.getBoolean("filterWhatsAppShorts", true)
@@ -58,6 +78,22 @@ class PreferencesManager private constructor(context: Context) {
     var trebleMultiplier: Float
         get() = prefs.getFloat("trebleMultiplier", 1.0f)
         set(value) = prefs.edit().putFloat("trebleMultiplier", value).apply()
+
+    var usePerBandMultiplier: Boolean
+        get() = prefs.getBoolean("usePerBandMultiplier", false)
+        set(value) = prefs.edit().putBoolean("usePerBandMultiplier", value).apply()
+
+    var lastMainScreenPage: Int
+        get() = prefs.getInt("lastMainScreenPage", 0)
+        set(value) = prefs.edit().putInt("lastMainScreenPage", value).apply()
+
+    var lastLibraryTab: Int
+        get() = prefs.getInt("lastLibraryTab", 0)
+        set(value) = prefs.edit().putInt("lastLibraryTab", value).apply()
+
+    var lastLibraryGeneralTab: Int
+        get() = prefs.getInt("lastLibraryGeneralTab", 0)
+        set(value) = prefs.edit().putInt("lastLibraryGeneralTab", value).apply()
 
     var shuffleModeEnabled: Boolean
         get() = prefs.getBoolean("shuffleModeEnabled", false)
@@ -111,6 +147,10 @@ class PreferencesManager private constructor(context: Context) {
         get() = prefs.getBoolean("hasUsedPlaylistGesture", false)
         set(value) = prefs.edit().putBoolean("hasUsedPlaylistGesture", value).apply()
 
+    var showGestureFeedback: Boolean
+        get() = prefs.getBoolean("showGestureFeedback", true)
+        set(value) = prefs.edit().putBoolean("showGestureFeedback", value).apply()
+
     var librarySortOrder: String
         get() = prefs.getString("librarySortOrder", "DIRECTORY") ?: "DIRECTORY"
         set(value) = prefs.edit().putString("librarySortOrder", value).apply()
@@ -122,6 +162,30 @@ class PreferencesManager private constructor(context: Context) {
     var libraryScrollOffset: Int
         get() = prefs.getInt("libraryScrollOffset", 0)
         set(value) = prefs.edit().putInt("libraryScrollOffset", value).apply()
+
+    var playbackSpeed: Float
+        get() = prefs.getFloat("playbackSpeed", 1.0f)
+        set(value) = prefs.edit().putFloat("playbackSpeed", value).apply()
+
+    var playbackPitch: Float
+        get() = prefs.getFloat("playbackPitch", 1.0f)
+        set(value) = prefs.edit().putFloat("playbackPitch", value).apply()
+
+    var reverbEnabled: Boolean
+        get() = prefs.getBoolean("reverbEnabled", false)
+        set(value) = prefs.edit().putBoolean("reverbEnabled", value).apply()
+
+    var effectsPreset: String
+        get() = prefs.getString("effectsPreset", "NORMAL") ?: "NORMAL"
+        set(value) = prefs.edit().putString("effectsPreset", value).apply()
+
+    var lastRecommendationsTimestamp: Long
+        get() = prefs.getLong("lastRecommendationsTimestamp", 0L)
+        set(value) = prefs.edit().putLong("lastRecommendationsTimestamp", value).apply()
+
+    var cachedRecommendationsJson: String
+        get() = prefs.getString("cachedRecommendationsJson", "") ?: ""
+        set(value) = prefs.edit().putString("cachedRecommendationsJson", value).apply()
 
     private val _backgroundStyleFlow = MutableStateFlow(prefs.getInt("backgroundStyle", 0))
     val backgroundStyleFlow: StateFlow<Int> = _backgroundStyleFlow
@@ -154,4 +218,8 @@ class PreferencesManager private constructor(context: Context) {
     fun showToast(message: String) {
         _toastFlow.tryEmit(message)
     }
+
+    var autoAnalyzeLyrics: Boolean
+        get() = prefs.getBoolean("autoAnalyzeLyrics", true)
+        set(value) = prefs.edit().putBoolean("autoAnalyzeLyrics", value).apply()
 }

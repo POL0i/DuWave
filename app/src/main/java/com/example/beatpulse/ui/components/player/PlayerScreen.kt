@@ -1,5 +1,6 @@
 package com.example.beatpulse.ui.components.player
 
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.animation.animateContentSize
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -113,6 +114,7 @@ enum class DragAction { NONE, DJ_SEEK, OPEN_QUEUE }
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun PlayerScreen(
+    playerViewModel: com.example.beatpulse.ui.components.player.PlayerViewModel,
     visualizerManager: AudioVisualizerManager,
     equalizerManager: com.example.beatpulse.service.EqualizerManager,
     exoPlayer: androidx.media3.common.Player?,
@@ -123,14 +125,25 @@ fun PlayerScreen(
     paletteColors: com.example.beatpulse.theme.PaletteColors,
     modifier: Modifier = Modifier,
     prefs: com.example.beatpulse.data.PreferencesManager,
+    repeatModeState: Int = 0,
+    shuffleModeState: Boolean = false,
+    playbackSpeed: Float = 1.0f,
+    playbackPitch: Float = 1.0f,
+    reverbEnabled: Boolean = false,
+    effectsPreset: String = "NORMAL",
+    onSetSpeed: (Float) -> Unit = {},
+    onSetPitch: (Float) -> Unit = {},
+    onSetReverb: (Boolean) -> Unit = {},
+    onApplyPreset: (String) -> Unit = {},
     sleepTimerSeconds: Int = 0,
     onSetSleepTimer: (Int) -> Unit = {},
     onUpdateTrackMetadata: (Long, String?, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
     onAddToPlaylist: ((TrackEntity) -> Unit)? = null
 ) {
     val albumArtBitmap = currentTrack?.let { com.example.beatpulse.ui.components.rememberFullAlbumArt(it) }
-    val amplitudesState = visualizerManager.amplitudes.collectAsState()
-    val ghostsState = visualizerManager.ghostsFlow.collectAsState()
+    val bassAmplitudesState = visualizerManager.bassAmplitudes.collectAsState()
+    val midAmplitudesState = visualizerManager.midAmplitudes.collectAsState()
+    val highAmplitudesState = visualizerManager.highAmplitudes.collectAsState()
     val bgStyle by prefs.backgroundStyleFlow.collectAsState(initial = 0)
     var currentStyle by remember { 
         mutableStateOf(
@@ -149,6 +162,12 @@ fun PlayerScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     var duration by remember { androidx.compose.runtime.mutableLongStateOf(1L) }
+    val isFetchingLyrics by playerViewModel.isFetchingLyrics.collectAsState()
+    val searchFailed by playerViewModel.searchFailed.collectAsState()
+    val availableLyricsResults by playerViewModel.availableLyricsResults.collectAsState()
+    val autoAnalyzeLyrics by playerViewModel.autoAnalyzeLyrics.collectAsState()
+    var showLyricsMatches by remember { mutableStateOf(false) }
+
     var showLyrics by remember { mutableStateOf(false) }
     var lyrics by remember { mutableStateOf<List<com.example.beatpulse.utils.LyricLine>>(emptyList()) }
     
@@ -176,6 +195,9 @@ fun PlayerScreen(
     val bassMult by visualizerManager.bassMultiplier.collectAsState()
     val midMult by visualizerManager.midMultiplier.collectAsState()
     val trebleMult by visualizerManager.trebleMultiplier.collectAsState()
+    val visualizerArchetype by visualizerManager.visualizerArchetype.collectAsState()
+    val fftMode by visualizerManager.fftMode.collectAsState()
+    val combinedAmplitudesState = visualizerManager.combinedAmplitudes.collectAsState()
     var showAdvancedSettings by remember { mutableStateOf(false) }
 
     val colorDominant by animateColorAsState(paletteColors.dominant, label = "color_dom")
@@ -196,6 +218,7 @@ fun PlayerScreen(
     var currentStyleName by remember { mutableStateOf<String?>(null) }
     var showTimerDialog by remember { mutableStateOf(false) }
     var showEqDialog by remember { mutableStateOf(false) }
+    var showEffectsDialog by remember { mutableStateOf(false) }
     var showEditorDialog by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
@@ -487,27 +510,36 @@ fun PlayerScreen(
             val trebleAvgAnim = remember { androidx.compose.animation.core.Animatable(0f) }
             val animatedScaleAnim = remember { androidx.compose.animation.core.Animatable(1f) }
 
-            LaunchedEffect(visualizerManager.amplitudes) {
-                visualizerManager.amplitudes.collect { amps ->
-                    if (amps.isNotEmpty()) {
-                        val rawBass = amps.take(amps.size / 3).average().toFloat().let { if(it.isNaN()) 0f else it }
-                        val rawMid = amps.drop(amps.size / 3).take(amps.size / 3).average().toFloat().let { if(it.isNaN()) 0f else it }
-                        val rawTreble = amps.takeLast(amps.size / 3).average().toFloat().let { if(it.isNaN()) 0f else it }
-                        
-                        launch { bassAvgAnim.animateTo(rawBass, androidx.compose.animation.core.tween(150, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
-                        launch { midAvgAnim.animateTo(rawMid, androidx.compose.animation.core.tween(150, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
-                        launch { trebleAvgAnim.animateTo(rawTreble, androidx.compose.animation.core.tween(150, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
-                        
-                        val bassIntensity = rawBass.coerceIn(0f, 1f)
-                        launch { animatedScaleAnim.animateTo(1f + (bassIntensity * 0.45f), androidx.compose.animation.core.spring(dampingRatio = 0.4f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium)) }
+            LaunchedEffect(visualizerManager.bassAmplitudes, visualizerManager.midAmplitudes, visualizerManager.highAmplitudes) {
+                launch {
+                    visualizerManager.bassAmplitudes.collect { amps ->
+                        if (amps.isNotEmpty()) {
+                            val rawBass = amps.average().toFloat().let { if(it.isNaN()) 0f else it }
+                            launch { bassAvgAnim.animateTo(rawBass, androidx.compose.animation.core.tween(150, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
+                            val bassIntensity = rawBass.coerceIn(0f, 1f)
+                            launch { animatedScaleAnim.animateTo(1f + (bassIntensity * 0.45f), androidx.compose.animation.core.spring(dampingRatio = 0.4f, stiffness = androidx.compose.animation.core.Spring.StiffnessMedium)) }
+                        }
+                    }
+                }
+                launch {
+                    visualizerManager.midAmplitudes.collect { amps ->
+                        if (amps.isNotEmpty()) {
+                            val rawMid = amps.average().toFloat().let { if(it.isNaN()) 0f else it }
+                            launch { midAvgAnim.animateTo(rawMid, androidx.compose.animation.core.tween(150, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
+                        }
+                    }
+                }
+                launch {
+                    visualizerManager.highAmplitudes.collect { amps ->
+                        if (amps.isNotEmpty()) {
+                            val rawTreble = amps.average().toFloat().let { if(it.isNaN()) 0f else it }
+                            launch { trebleAvgAnim.animateTo(rawTreble, androidx.compose.animation.core.tween(150, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
+                        }
                     }
                 }
             }
             
-            val bassAvg = bassAvgAnim.value
-            val midAvg = midAvgAnim.value
-            val trebleAvg = trebleAvgAnim.value
-            val animatedScale = animatedScaleAnim.value
+            // Removing direct Animatable.value reads at composition scope to prevent infinite recomposition loops.
 
             // Gradiente ultra saturado
             val sweepGradient = remember(colorDominant, colorVibrant, colorMuted) {
@@ -526,6 +558,8 @@ fun PlayerScreen(
 
             val basePath = remember { androidx.compose.ui.graphics.Path() }
             val wavePath = remember { androidx.compose.ui.graphics.Path() }
+            val wavePathL = remember { androidx.compose.ui.graphics.Path() }
+            val wavePathR = remember { androidx.compose.ui.graphics.Path() }
             val progressPath = remember { androidx.compose.ui.graphics.Path() }
             val progressMeasure = remember { androidx.compose.ui.graphics.PathMeasure() }
             val androidPathMeasure = remember { android.graphics.PathMeasure() }
@@ -536,420 +570,312 @@ fun PlayerScreen(
             var lastShape = remember { -1 }
             var pathLength = remember { 0f }
 
-            Canvas(modifier = Modifier.size(320.dp).scale(animatedScale)) {
-                val amplitudes = amplitudesState.value
-                val ghosts = ghostsState.value
-                val radius = size.minDimension / 4f
-                val center = Offset(size.width / 2, size.height / 2)
+                        Canvas(modifier = Modifier.size(320.dp).graphicsLayer {
+                            scaleX = animatedScaleAnim.value
+                            scaleY = animatedScaleAnim.value
+                        }) {
+                val bassAmplitudes = bassAmplitudesState.value
+                val midAmplitudes = midAmplitudesState.value
+                val highAmplitudes = highAmplitudesState.value
 
-                
-                // --- Dynamic Path for Shape ---
+                val bassAvg = bassAvgAnim.value
+                val midAvg = midAvgAnim.value
+                val trebleAvg = trebleAvgAnim.value
+                val maxAnim = maxOf(bassAvg, midAvg, trebleAvg, 0.001f)
+                val bassOpacity = (bassAvg / maxAnim).coerceIn(0.2f, 1.0f)
+                val midOpacity = (midAvg / maxAnim).coerceIn(0.2f, 1.0f)
+                val highOpacity = (trebleAvg / maxAnim).coerceIn(0.2f, 1.0f)
+
+                val radius = size.minDimension / 4f
+                val center = androidx.compose.ui.geometry.Offset(size.width / 2, size.height / 2)
+
                 val coverSize = 160.dp.toPx()
                 val rPx = coverSize / 2f
-                val m = when (thumbnailShapeIdx) {
-                    0 -> 2.0 // Circle
-                    1 -> 16.0 // Square
-                    2 -> 4.0 // Squircle 16dp
-                    3 -> 3.0 // Squircle 32dp
-                    else -> 2.0
-                }
 
                 if (size != lastSize || thumbnailShapeIdx != lastShape) {
+                    basePath.reset()
+                    if (thumbnailShapeIdx == 0) {
+                        basePath.addOval(androidx.compose.ui.geometry.Rect(center.x - rPx, center.y - rPx, center.x + rPx, center.y + rPx))
+                    } else if (thumbnailShapeIdx == 1) {
+                        basePath.addRect(androidx.compose.ui.geometry.Rect(center.x - rPx, center.y - rPx, center.x + rPx, center.y + rPx))
+                    } else if (thumbnailShapeIdx == 2) {
+                        basePath.addRoundRect(androidx.compose.ui.geometry.RoundRect(
+                            left = center.x - rPx, top = center.y - rPx, right = center.x + rPx, bottom = center.y + rPx,
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(32.dp.toPx(), 32.dp.toPx())
+                        ))
+                    }
+                    progressMeasure.setPath(basePath, forceClosed = false)
                     lastSize = size
                     lastShape = thumbnailShapeIdx
-                    basePath.reset()
-                    val rect = androidx.compose.ui.geometry.Rect(center.x - rPx, center.y - rPx, center.x + rPx, center.y + rPx)
-                    when (thumbnailShapeIdx) {
-                        0 -> basePath.addOval(rect)
-                        1 -> basePath.addRect(rect)
-                        2 -> basePath.addRoundRect(androidx.compose.ui.geometry.RoundRect(rect, androidx.compose.ui.geometry.CornerRadius(16.dp.toPx())))
-                        3 -> basePath.addRoundRect(androidx.compose.ui.geometry.RoundRect(rect, androidx.compose.ui.geometry.CornerRadius(32.dp.toPx())))
-                        else -> basePath.addOval(rect)
-                    }
-                    
-                    androidPathMeasure.setPath(basePath.asAndroidPath(), false)
-                    pathLength = when (thumbnailShapeIdx) {
-                        0 -> 2f * Math.PI.toFloat() * rPx
-                        1 -> 8f * rPx
-                        2, 3 -> {
-                            val cornerRadius = if (thumbnailShapeIdx == 2) 16.dp.toPx() else 32.dp.toPx()
-                            val straightEdge = 2f * (rPx - cornerRadius)
-                            val cornerLen = (Math.PI.toFloat() * cornerRadius) / 2f
-                            4f * straightEdge + 4f * cornerLen
-                        }
-                        else -> 2f * Math.PI.toFloat() * rPx
-                    }
                 }
 
+                val pathLength = if (thumbnailShapeIdx == 0) rPx * 2f * Math.PI.toFloat() else progressMeasure.length
 
-                // Out variables for zero-allocation math
-                var outPx = 0f
-                var outPy = 0f
-                var outNx = 0f
-                var outNy = 0f
-                
-                fun computePointAndNormal(dist: Float) {
-                    val d = (dist % pathLength + pathLength) % pathLength
+                fun drawLayer(amps: FloatArray, layerColor: Color, opacity: Float, isBassLayer: Boolean) {
+                    val numBars = amps.size
+                    if (numBars == 0 || currentStyle == VisualizerStyle.RINGS || currentStyle == VisualizerStyle.AURA) return
+                    val distStep = (pathLength / 2f) / (numBars - 1).coerceAtLeast(1).toFloat()
+                    var outPx = 0f; var outPy = 0f; var outNx = 0f; var outNy = 0f
                     
-                    if (thumbnailShapeIdx == 0) { // Circle
-                        val angle = (d / pathLength) * Math.PI * 2.0 - Math.PI / 2.0
-                        outPx = center.x + rPx * kotlin.math.cos(angle).toFloat()
-                        outPy = center.y + rPx * kotlin.math.sin(angle).toFloat()
-                        outNx = kotlin.math.cos(angle).toFloat()
-                        outNy = kotlin.math.sin(angle).toFloat()
-                        return
-                    }
-                    
-                    if (thumbnailShapeIdx == 1) { // Square
-                        var x = 0f
-                        var y = 0f
-                        var nx = 0f
-                        var ny = 0f
-                        if (d < rPx) { 
-                            x = d; y = -rPx; nx = 0f; ny = -1f
-                        } else if (d < 3f * rPx) { 
-                            x = rPx; y = d - 2f * rPx; nx = 1f; ny = 0f
-                        } else if (d < 5f * rPx) { 
-                            x = 4f * rPx - d; y = rPx; nx = 0f; ny = 1f
-                        } else if (d < 7f * rPx) { 
-                            x = -rPx; y = 6f * rPx - d; nx = -1f; ny = 0f
-                        } else { 
-                            x = d - 8f * rPx; y = -rPx; nx = 0f; ny = -1f
-                        }
-                        outPx = center.x + x
-                        outPy = center.y + y
-                        outNx = nx
-                        outNy = ny
-                        return
-                    }
-                    
-                    // Squircle (rounded rect)
-                    val cornerRadius = if (thumbnailShapeIdx == 2) 16.dp.toPx() else 32.dp.toPx()
-                    val straightEdge = 2f * (rPx - cornerRadius)
-                    val cornerLen = (Math.PI.toFloat() * cornerRadius) / 2f
-                    
-                    var x = 0f; var y = 0f; var nx = 0f; var ny = 0f
-                    var remaining = d
-                    
-                    val halfTop = straightEdge / 2f
-                    if (remaining <= halfTop) {
-                        x = remaining; y = -rPx; nx = 0f; ny = -1f
-                    } else {
-                        remaining -= halfTop
-                        if (remaining <= cornerLen) {
-                            val angle = -Math.PI / 2.0 + (remaining / cornerLen) * (Math.PI / 2.0)
-                            x = rPx - cornerRadius + cornerRadius * kotlin.math.cos(angle).toFloat()
-                            y = -rPx + cornerRadius + cornerRadius * kotlin.math.sin(angle).toFloat()
-                            nx = kotlin.math.cos(angle).toFloat(); ny = kotlin.math.sin(angle).toFloat()
+                    fun computePointAndNormal(d: Float) {
+                        if (thumbnailShapeIdx == 0) {
+                            val angle = (d / pathLength) * 2 * Math.PI - Math.PI / 2
+                            outNx = kotlin.math.cos(angle).toFloat()
+                            outNy = kotlin.math.sin(angle).toFloat()
+                            outPx = center.x + rPx * outNx
+                            outPy = center.y + rPx * outNy
                         } else {
-                            remaining -= cornerLen
-                            if (remaining <= straightEdge) {
-                                x = rPx; y = -rPx + cornerRadius + remaining; nx = 1f; ny = 0f
+                            val pos = progressMeasure.getPosition(d % pathLength)
+                            val tan = progressMeasure.getTangent(d % pathLength)
+                            if (pos != androidx.compose.ui.geometry.Offset.Unspecified && tan != androidx.compose.ui.geometry.Offset.Unspecified) {
+                                outPx = pos.x
+                                outPy = pos.y
+                                outNx = tan.y
+                                outNy = -tan.x
+                                val len = kotlin.math.hypot(outNx, outNy)
+                                if (len > 0) { outNx /= len; outNy /= len }
                             } else {
-                                remaining -= straightEdge
-                                if (remaining <= cornerLen) {
-                                    val angle = 0.0 + (remaining / cornerLen) * (Math.PI / 2.0)
-                                    x = rPx - cornerRadius + cornerRadius * kotlin.math.cos(angle).toFloat()
-                                    y = rPx - cornerRadius + cornerRadius * kotlin.math.sin(angle).toFloat()
-                                    nx = kotlin.math.cos(angle).toFloat(); ny = kotlin.math.sin(angle).toFloat()
-                                } else {
-                                    remaining -= cornerLen
-                                    if (remaining <= straightEdge) {
-                                        x = rPx - cornerRadius - remaining; y = rPx; nx = 0f; ny = 1f
-                                    } else {
-                                        remaining -= straightEdge
-                                        if (remaining <= cornerLen) {
-                                            val angle = Math.PI / 2.0 + (remaining / cornerLen) * (Math.PI / 2.0)
-                                            x = -rPx + cornerRadius + cornerRadius * kotlin.math.cos(angle).toFloat()
-                                            y = rPx - cornerRadius + cornerRadius * kotlin.math.sin(angle).toFloat()
-                                            nx = kotlin.math.cos(angle).toFloat(); ny = kotlin.math.sin(angle).toFloat()
-                                        } else {
-                                            remaining -= cornerLen
-                                            if (remaining <= straightEdge) {
-                                                x = -rPx; y = rPx - cornerRadius - remaining; nx = -1f; ny = 0f
-                                            } else {
-                                                remaining -= straightEdge
-                                                if (remaining <= cornerLen) {
-                                                    val angle = Math.PI + (remaining / cornerLen) * (Math.PI / 2.0)
-                                                    x = -rPx + cornerRadius + cornerRadius * kotlin.math.cos(angle).toFloat()
-                                                    y = -rPx + cornerRadius + cornerRadius * kotlin.math.sin(angle).toFloat()
-                                                    nx = kotlin.math.cos(angle).toFloat(); ny = kotlin.math.sin(angle).toFloat()
-                                                } else {
-                                                    remaining -= cornerLen
-                                                    x = -rPx + cornerRadius + remaining; y = -rPx; nx = 0f; ny = -1f
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
+                                outPx = center.x; outPy = center.y; outNx = 0f; outNy = -1f
                             }
                         }
                     }
-                    outPx = center.x + x
-                    outPy = center.y + y
-                    outNx = nx
-                    outNy = ny
-                }
 
-                val numBars = amplitudes.size
-                if (numBars > 0) {
-                    val distStep = (pathLength / 2f) / (numBars - 1).coerceAtLeast(1).toFloat()
-                    
+                    val colorVibrantLayer = layerColor.copy(alpha = opacity)
+
                     when (currentStyle) {
+                        VisualizerStyle.BARS, VisualizerStyle.WAVE -> {
+                            val isWave = currentStyle == VisualizerStyle.WAVE
+                            if (isWave) {
+                                wavePathR.reset()
+                                wavePathL.reset()
+                            }
+
+                            for (i in 0 until numBars) {
+                                val amplitude = amps[i]
+                                val dist = 30f + (amplitude * 180f)
+                                val barLength = 8f + (amplitude * 60f)
+
+                                val dRight = 0f + i * distStep
+                                val dLeft = pathLength - i * distStep
+
+                                computePointAndNormal(dRight)
+                                val pxR = outPx; val pyR = outPy; val nxR = outNx; val nyR = outNy
+                                computePointAndNormal(dLeft)
+                                val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
+                                
+                                if (isWave) {
+                                    val rX = pxR + nxR * dist; val rY = pyR + nyR * dist
+                                    val lX = pxL + nxL * dist; val lY = pyL + nyL * dist
+                                    if (i == 0) {
+                                        wavePathR.moveTo(rX, rY); wavePathL.moveTo(lX, lY)
+                                    } else {
+                                        wavePathR.lineTo(rX, rY); wavePathL.lineTo(lX, lY)
+                                    }
+                                } else {
+                                    drawLine(color = colorVibrantLayer, start = androidx.compose.ui.geometry.Offset(pxR + nxR * dist, pyR + nyR * dist),
+                                             end = androidx.compose.ui.geometry.Offset(pxR + nxR * (dist + barLength), pyR + nyR * (dist + barLength)), strokeWidth = 8f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                    drawLine(color = colorVibrantLayer, start = androidx.compose.ui.geometry.Offset(pxL + nxL * dist, pyL + nyL * dist),
+                                             end = androidx.compose.ui.geometry.Offset(pxL + nxL * (dist + barLength), pyL + nyL * (dist + barLength)), strokeWidth = 8f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                }
+                            }
+
+                            if (isWave) {
+                                drawPath(wavePathR, color = colorVibrantLayer, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                                drawPath(wavePathL, color = colorVibrantLayer, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                            }
+                        }
+                        VisualizerStyle.DOTS -> {
+                            for (i in 0 until numBars) {
+                                val amplitude = amps[i]
+                                val dist = 30f + (amplitude * 180f)
+                                val capLen = 8f + (amplitude * 30f)
+
+                                val dRight = 0f + i * distStep
+                                val dLeft = pathLength - i * distStep
+
+                                computePointAndNormal(dRight)
+                                val pxR = outPx; val pyR = outPy; val nxR = outNx; val nyR = outNy
+                                computePointAndNormal(dLeft)
+                                val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
+
+                                drawLine(color = colorVibrantLayer, start = androidx.compose.ui.geometry.Offset(pxR + nxR * dist, pyR + nyR * dist),
+                                         end = androidx.compose.ui.geometry.Offset(pxR + nxR * (dist + capLen), pyR + nyR * (dist + capLen)), strokeWidth = 6f + amplitude*4f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                drawLine(color = colorVibrantLayer, start = androidx.compose.ui.geometry.Offset(pxL + nxL * dist, pyL + nyL * dist),
+                                         end = androidx.compose.ui.geometry.Offset(pxL + nxL * (dist + capLen), pyL + nyL * (dist + capLen)), strokeWidth = 6f + amplitude*4f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+
+                                drawCircle(color = colorVibrantLayer, radius = 3f + amplitude*2f, center = androidx.compose.ui.geometry.Offset(pxR + nxR * (dist + capLen), pyR + nyR * (dist + capLen)))
+                                drawCircle(color = colorVibrantLayer, radius = 3f + amplitude*2f, center = androidx.compose.ui.geometry.Offset(pxL + nxL * (dist + capLen), pyL + nyL * (dist + capLen)))
+                            }
+                        }
                         VisualizerStyle.SLIME -> {
                             val totalPoints = numBars * 2
+                            val slimeX = FloatArray(totalPoints)
+                            val slimeY = FloatArray(totalPoints)
+                            
                             for (i in 0 until totalPoints) {
                                 val isRightSide = i < numBars
                                 val ampIndex = if (isRightSide) i else (totalPoints - 1 - i)
-                                val amplitude = amplitudes[ampIndex]
-                                
+                                val amplitude = amps[ampIndex]
+
                                 val offsetDist = if (isRightSide) {
                                     0f + ampIndex * distStep
                                 } else {
                                     pathLength - ampIndex * distStep
                                 }
-                                
+
                                 computePointAndNormal(offsetDist)
                                 val extrude = 5f + (amplitude * 150f)
                                 slimeX[i] = outPx + outNx * extrude
                                 slimeY[i] = outPy + outNy * extrude
                             }
 
-                            sharedPath.reset()
+                            wavePathR.reset()
                             if (totalPoints > 0) {
                                 var prevMidX = (slimeX[0] + slimeX[totalPoints - 1]) / 2f
                                 var prevMidY = (slimeY[0] + slimeY[totalPoints - 1]) / 2f
-                                sharedPath.moveTo(prevMidX, prevMidY)
+                                wavePathR.moveTo(prevMidX, prevMidY)
                                 for (i in 0 until totalPoints) {
                                     val nextIndex = (i + 1) % totalPoints
                                     val midX = (slimeX[i] + slimeX[nextIndex]) / 2f
                                     val midY = (slimeY[i] + slimeY[nextIndex]) / 2f
-                                    sharedPath.quadraticTo(slimeX[i], slimeY[i], midX, midY)
+                                    wavePathR.quadraticTo(slimeX[i], slimeY[i], midX, midY)
                                 }
-                                sharedPath.close()
-                                
+                                wavePathR.close()
+
                                 drawPath(
-                                    path = sharedPath,
-                                    brush = Brush.radialGradient(
-                                        colors = listOf(colorDominant.copy(alpha = 1f), colorVibrant.copy(alpha = 0.8f)),
+                                    path = wavePathR,
+                                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                                        colors = listOf(layerColor.copy(alpha = opacity), layerColor.copy(alpha = opacity * 0.5f)),
                                         center = center,
                                         radius = radius + 250f
                                     )
                                 )
-                                drawPath(path = sharedPath, color = colorVibrant, style = Stroke(width = 8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                                drawPath(path = wavePathR, color = layerColor.copy(alpha = opacity), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 8f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
                             }
                         }
                         VisualizerStyle.PARTICLES -> {
                             for (i in 0 until numBars) {
-                                val amplitude = amplitudes[i]
+                                val amplitude = amps[i]
                                 val multiplicador = 1f + (i.toFloat() / numBars) * 1.5f
                                 val boostedAmplitude = amplitude * multiplicador
 
-                                val distFromEdge = 10f + (boostedAmplitude * 90f)
-                                
+                                val extrude = 20f + (boostedAmplitude * 300f)
+                                val size = 2f + (boostedAmplitude * 15f)
+
                                 val dRight = 0f + i * distStep
                                 val dLeft = pathLength - i * distStep
 
                                 computePointAndNormal(dRight)
-                                val pxR = outPx; val pyR = outPy; val nxR = outNx; val nyR = outNy
+                                drawCircle(color = colorVibrantLayer, radius = size, center = androidx.compose.ui.geometry.Offset(outPx + outNx * extrude, outPy + outNy * extrude))
+                                
                                 computePointAndNormal(dLeft)
-                                val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
-
-                                val mainRadius = 4f + (amplitude * 6f)
-
-                                // Main particle
-                                drawCircle(color = colorVibrant, radius = mainRadius, center = Offset(pxR + nxR * distFromEdge, pyR + nyR * distFromEdge))
-                                drawCircle(color = colorVibrant, radius = mainRadius, center = Offset(pxL + nxL * distFromEdge, pyL + nyL * distFromEdge))
-
-                                // Trail 1
-                                val trail1Dist = distFromEdge * 0.6f
-                                drawCircle(color = colorDominant.copy(alpha = 0.6f), radius = mainRadius * 0.7f, center = Offset(pxR + nxR * trail1Dist, pyR + nyR * trail1Dist))
-                                drawCircle(color = colorDominant.copy(alpha = 0.6f), radius = mainRadius * 0.7f, center = Offset(pxL + nxL * trail1Dist, pyL + nyL * trail1Dist))
-
-                                // Trail 2
-                                val trail2Dist = distFromEdge * 0.3f
-                                drawCircle(color = colorMuted.copy(alpha = 0.3f), radius = mainRadius * 0.4f, center = Offset(pxR + nxR * trail2Dist, pyR + nyR * trail2Dist))
-                                drawCircle(color = colorMuted.copy(alpha = 0.3f), radius = mainRadius * 0.4f, center = Offset(pxL + nxL * trail2Dist, pyL + nyL * trail2Dist))
+                                drawCircle(color = colorVibrantLayer, radius = size, center = androidx.compose.ui.geometry.Offset(outPx + outNx * extrude, outPy + outNy * extrude))
                             }
                         }
+                        else -> {}
+                    }
+                }
+
+                if (currentStyle == VisualizerStyle.RINGS || currentStyle == VisualizerStyle.AURA) {
+                    when (currentStyle) {
                         VisualizerStyle.RINGS -> {
-                            // RINGS son círculos abstractos independientemente de la forma, así que los mantendré concéntricos.
-                            val bassRadius = radius + 30f + (bassAvg * 80f)
-                            val midRadius = radius + 60f + (midAvg * 70f)
-                            val trebleRadius = radius + 90f + (trebleAvg * 60f)
-                            
                             val dynamicRotation = rotationAngle + (bassAvg * 90f)
                             val dynamicFastRotation = fastRotationAngle - (midAvg * 90f)
-                            
+
                             fun drawGlitchRing(r: Float, thickness: Float, gapAngle: Float, startOffset: Float, brushColor: Color) {
                                 val sweep = 360f / 4f - gapAngle
                                 for (i in 0 until 4) {
                                     drawArc(
                                         color = brushColor, startAngle = startOffset + (i * 90f), sweepAngle = sweep,
-                                        useCenter = false, topLeft = Offset(center.x - r, center.y - r), size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
-                                        style = Stroke(width = thickness, cap = StrokeCap.Square)
+                                        useCenter = false, topLeft = androidx.compose.ui.geometry.Offset(center.x - r, center.y - r), size = androidx.compose.ui.geometry.Size(r * 2, r * 2),
+                                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = thickness, cap = androidx.compose.ui.graphics.StrokeCap.Square)
                                     )
                                 }
                             }
-                            drawGlitchRing(bassRadius, 8f + (bassAvg * 15f), 20f - (bassAvg * 10f), dynamicRotation, colorDominant.copy(alpha = 0.8f))
-                            drawGlitchRing(midRadius, 4f + (midAvg * 10f), 30f, dynamicFastRotation, colorVibrant.copy(alpha = 0.6f))
-                            drawGlitchRing(trebleRadius, 2f + (trebleAvg * 5f), 45f, dynamicRotation * 0.5f, colorMuted.copy(alpha = 0.5f))
+
+                            if (visualizerArchetype == 1) {
+                                val maxPulse = maxOf(bassAvg, midAvg, trebleAvg)
+                                val combinedRadius = radius + 60f + (maxPulse * 80f)
+                                drawGlitchRing(combinedRadius, 8f + (maxPulse * 15f), 20f, dynamicRotation, colorVibrant.copy(alpha = 0.8f))
+                            } else {
+                                val bassRadius = radius + 30f + (bassAvg * 80f)
+                                val midRadius = radius + 60f + (midAvg * 70f)
+                                val trebleRadius = radius + 90f + (trebleAvg * 60f)
+
+                                drawGlitchRing(bassRadius, 8f + (bassAvg * 15f), 20f - (bassAvg * 10f), dynamicRotation, colorDominant.copy(alpha = 0.8f))
+                                drawGlitchRing(midRadius, 4f + (midAvg * 10f), 30f, dynamicFastRotation, colorVibrant.copy(alpha = 0.6f))
+                                drawGlitchRing(trebleRadius, 2f + (trebleAvg * 5f), 45f, dynamicRotation * 0.5f, colorMuted.copy(alpha = 0.5f))
+                            }
                         }
                         VisualizerStyle.AURA -> {
-                            val bassPulse = (bassAvg * 1.5f).coerceIn(0f, 1f)
-                            val midPulse = (midAvg * 1.5f).coerceIn(0f, 1f)
-                            val treblePulse = (trebleAvg * 1.5f).coerceIn(0f, 1f)
+                            if (visualizerArchetype == 1) {
+                                val maxPulse = maxOf(bassAvg, midAvg, trebleAvg)
+                                drawPath(
+                                    path = basePath,
+                                    color = colorVibrant.copy(alpha = 0.2f + 0.2f * maxPulse.coerceIn(0f, 1f)),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 60f + maxPulse * 150f, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                                )
+                            } else {
+                                val bassPulse = (bassAvg * 1.5f).coerceIn(0f, 1f)
+                                val midPulse = (midAvg * 1.5f).coerceIn(0f, 1f)
+                                val treblePulse = (trebleAvg * 1.5f).coerceIn(0f, 1f)
 
-                            // Bass (Low) Aura
-                            drawPath(
-                                path = basePath,
-                                color = colorDominant.copy(alpha = 0.1f + 0.1f * bassPulse),
-                                style = Stroke(width = 80f + bassAvg * 200f, join = StrokeJoin.Round)
-                            )
-                            // Mid Aura
-                            drawPath(
-                                path = basePath,
-                                color = colorVibrant.copy(alpha = 0.15f + 0.15f * midPulse),
-                                style = Stroke(width = 40f + midAvg * 100f, join = StrokeJoin.Round)
-                            )
-                            // Treble (High) Aura
-                            drawPath(
-                                path = basePath,
-                                color = colorMuted.copy(alpha = 0.25f + 0.25f * treblePulse),
-                                style = Stroke(width = 15f + trebleAvg * 50f, join = StrokeJoin.Round)
-                            )
-                        }
-                        VisualizerStyle.WAVE -> {
-                            wavePath.reset()
-                            
-                            for (i in 0 until numBars) {
-                                val amplitude = amplitudes[i]
-                                val dRight = 0f + i * distStep
-                                computePointAndNormal(dRight)
-                                val extrude = 20f + (amplitude * 150f)
-                                val px = outPx + outNx * extrude
-                                val py = outPy + outNy * extrude
-                                if (i == 0) wavePath.moveTo(px, py) else wavePath.lineTo(px, py)
-                            }
-                            
-                            for (i in numBars - 1 downTo 0) {
-                                val amplitude = amplitudes[i]
-                                val dLeft = pathLength - i * distStep
-                                computePointAndNormal(dLeft)
-                                val extrude = 20f + (amplitude * 150f)
-                                wavePath.lineTo(outPx + outNx * extrude, outPy + outNy * extrude)
-                            }
-                            wavePath.close()
-                            
-                            drawPath(path = wavePath, brush = Brush.radialGradient(listOf(colorVibrant.copy(alpha = 0.3f), Color.Transparent), center, radius + 150f))
-                            drawPath(path = wavePath, brush = sweepGradient, style = Stroke(width = 10f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                        }
-                        VisualizerStyle.BARS -> {
-                            for (i in 0 until numBars) {
-                                val amplitude = amplitudes[i]
-                                val barLength = 10f + (amplitude * 200f)
-                                
-                                val dRight = 0f + i * distStep
-                                val dLeft = pathLength - i * distStep
-                                
-                                computePointAndNormal(dRight)
-                                val pxR = outPx; val pyR = outPy; val nxR = outNx; val nyR = outNy
-                                computePointAndNormal(dLeft)
-                                val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
-                                
-                                drawLine(brush = sweepGradient, start = Offset(pxR + nxR * 20f, pyR + nyR * 20f), 
-                                         end = Offset(pxR + nxR * (20f + barLength), pyR + nyR * (20f + barLength)), strokeWidth = 8f, cap = StrokeCap.Round)
-                                drawLine(brush = sweepGradient, start = Offset(pxL + nxL * 20f, pyL + nyL * 20f), 
-                                         end = Offset(pxL + nxL * (20f + barLength), pyL + nyL * (20f + barLength)), strokeWidth = 8f, cap = StrokeCap.Round)
+                                drawPath(
+                                    path = basePath,
+                                    color = colorDominant.copy(alpha = 0.1f + 0.1f * bassPulse),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 80f + bassAvg * 200f, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                                )
+                                drawPath(
+                                    path = basePath,
+                                    color = colorVibrant.copy(alpha = 0.15f + 0.15f * midPulse),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 40f + midAvg * 100f, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                                )
+                                drawPath(
+                                    path = basePath,
+                                    color = colorMuted.copy(alpha = 0.25f + 0.25f * treblePulse),
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 15f + trebleAvg * 50f, join = androidx.compose.ui.graphics.StrokeJoin.Round)
+                                )
                             }
                         }
-                        VisualizerStyle.DOTS -> {
-                            for (i in 0 until numBars) {
-                                val amplitude = amplitudes[i]
-                                val dist = 30f + (amplitude * 180f)
-                                val capLen = 8f + (amplitude * 30f)
-                                val ghostAmp = if (i < ghosts.size) ghosts[i] else 0f
-                                val ghostDist = 30f + (ghostAmp * 180f)
-                                
-                                val dRight = 0f + i * distStep
-                                val dLeft = pathLength - i * distStep
-                                
-                                computePointAndNormal(dRight)
-                                val pxR = outPx; val pyR = outPy; val nxR = outNx; val nyR = outNy
-                                computePointAndNormal(dLeft)
-                                val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
-                                
-                                drawLine(color = colorVibrant, start = Offset(pxR + nxR * dist, pyR + nyR * dist), 
-                                         end = Offset(pxR + nxR * (dist + capLen), pyR + nyR * (dist + capLen)), strokeWidth = 6f + amplitude*4f, cap = StrokeCap.Round)
-                                drawLine(color = colorVibrant, start = Offset(pxL + nxL * dist, pyL + nyL * dist), 
-                                         end = Offset(pxL + nxL * (dist + capLen), pyL + nyL * (dist + capLen)), strokeWidth = 6f + amplitude*4f, cap = StrokeCap.Round)
-                                
-                                if (ghostAmp > amplitude + 0.05f) {
-                                    drawLine(color = colorVibrant.copy(alpha=0.3f), start = Offset(pxR + nxR * ghostDist, pyR + nyR * ghostDist), 
-                                             end = Offset(pxR + nxR * (ghostDist + 8f), pyR + nyR * (ghostDist + 8f)), strokeWidth = 6f + amplitude*4f, cap = StrokeCap.Round)
-                                    drawLine(color = colorVibrant.copy(alpha=0.3f), start = Offset(pxL + nxL * ghostDist, pyL + nyL * ghostDist), 
-                                             end = Offset(pxL + nxL * (ghostDist + 8f), pyL + nyL * (ghostDist + 8f)), strokeWidth = 6f + amplitude*4f, cap = StrokeCap.Round)
-                                }
-                            }
-                        }
+                        else -> {}
+                    }
+                } else {
+                    if (visualizerArchetype == 1) {
+                        // 1 Onda Combinada Segmentada
+                        drawLayer(combinedAmplitudesState.value, paletteColors.vibrant, maxOf(bassOpacity, midOpacity, highOpacity), true)
+                    } else {
+                        // 3 Ondas Superpuestas
+                        drawLayer(bassAmplitudes, paletteColors.dominant, bassOpacity, true)
+                        drawLayer(midAmplitudes, paletteColors.vibrant, midOpacity, false)
+                        drawLayer(highAmplitudes, paletteColors.muted, highOpacity, false)
                     }
                 }
-                
-                // Draw Song Progress Ring on the boundary
+
                 val activePosition = dragSeekTimeMs ?: currentPosition
                 val progressFraction = if (duration > 0) activePosition.toFloat() / duration else 0f
-                
-                // Fondo de la ruta
-                drawPath(
-                    path = basePath,
-                    color = colorDominant.copy(alpha = 0.3f),
-                    style = Stroke(width = 4f)
-                )
+                drawPath(path = basePath, color = colorDominant.copy(alpha = 0.3f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 4f))
 
-                                // Progreso parcial animado en el path
                 progressMeasure.setPath(basePath, forceClosed = false)
                 val pLen = progressMeasure.length
                 progressPath.reset()
                 val targetLength = pLen * progressFraction
-                
+
                 if (targetLength > 0f) {
-                    // For square/squircle drawn via addRect/addRoundRect, it starts at Top-Left (0.0). Top-Center is ~ 0.125 * pLen
-                    // For circle (addOval), it starts at Right-Center (0.0). Top-Center is 0.75 * pLen
                     val startD = if (thumbnailShapeIdx == 0) pLen * 0.75f else pLen * 0.125f
                     val endD = startD + targetLength
-                    
                     if (endD <= pLen) {
                         progressMeasure.getSegment(startD, endD, progressPath, true)
                     } else {
                         progressMeasure.getSegment(startD, pLen, progressPath, true)
                         progressMeasure.getSegment(0f, endD % pLen, progressPath, true)
                     }
-                    
-                    drawPath(
-                        path = progressPath,
-                        brush = sweepGradient,
-                        style = Stroke(width = 6f, cap = StrokeCap.Round)
-                    )
-                    
+                    drawPath(path = progressPath, brush = sweepGradient, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round))
+
                     val thumbDist = endD % pLen
                     val thumbPos = progressMeasure.getPosition(thumbDist)
                     if (thumbPos != androidx.compose.ui.geometry.Offset.Unspecified) {
                         playheadPos = thumbPos
                         drawCircle(color = androidx.compose.ui.graphics.Color.White, radius = 8f, center = thumbPos)
-                    }
-                }
-
-                // Draw sparks
-                val iterator = sparks.iterator()
-                while (iterator.hasNext()) {
-                    val spark = iterator.next()
-                    spark.x += spark.vx
-                    spark.y += spark.vy
-                    spark.alpha -= 0.03f
-                    if (spark.alpha <= 0f) {
-                        iterator.remove()
-                    } else {
-                        drawCircle(color = spark.color.copy(alpha = spark.alpha), radius = 4f, center = Offset(spark.x, spark.y))
                     }
                 }
             }
@@ -959,8 +885,8 @@ fun PlayerScreen(
                 modifier = Modifier
                     .size(160.dp)
                     .graphicsLayer {
-                        scaleX = animatedScale
-                        scaleY = animatedScale
+                        scaleX = animatedScaleAnim.value
+                        scaleY = animatedScaleAnim.value
                         if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value
                     }
                     .clip(shape)
@@ -1018,6 +944,63 @@ fun PlayerScreen(
                         )
                     }
                 }
+        // Lyrics status block
+        if (lyrics.isEmpty() && autoAnalyzeLyrics) {
+            if (isFetchingLyrics) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(y = 110.dp)
+                        .size(40.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(androidx.compose.ui.graphics.Color(0xFF333333)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White.copy(alpha = 0.8f),
+                        strokeWidth = 2.dp
+                    )
+                }
+            } else if (availableLyricsResults.isNotEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(y = 110.dp)
+                        .size(40.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(androidx.compose.ui.graphics.Color(0xFF333333))
+                        .clickable { showLyricsMatches = true },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        androidx.compose.material.icons.Icons.Filled.List,
+                        contentDescription = "Buscar Letras",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            } else if (searchFailed) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .offset(y = 110.dp)
+                        .size(40.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .background(androidx.compose.ui.graphics.Color(0xFF333333)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        androidx.compose.material.icons.Icons.Default.Close,
+                        contentDescription = "No hay letras",
+                        tint = Color.Red.copy(alpha = 0.8f),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+
             }
         }
 
@@ -1128,6 +1111,9 @@ fun PlayerScreen(
                         tint = if (equalizerManager.isEnabled.collectAsState().value) colorVibrant else Color.Gray,
                         modifier = Modifier.size(28.dp)
                     )
+                }
+                IconButton(onClick = { showEffectsDialog = true }) {
+                    Icon(Icons.Default.Star, contentDescription = "Audio Effects", tint = Color.Gray, modifier = Modifier.size(28.dp))
                 }
                 IconButton(onClick = { showEditorDialog = true }) {
                     Icon(Icons.Default.Edit, contentDescription = "Edit Track", tint = Color.Gray, modifier = Modifier.size(28.dp))
@@ -1396,7 +1382,7 @@ fun PlayerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
+            .padding(horizontal = 24.dp)
                     .verticalScroll(rememberScrollState())
             ) {
                 Text("Ajustes de Reproducción", color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -1404,15 +1390,29 @@ fun PlayerScreen(
                 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                     Text("Reproducción Aleatoria", color = Color.White)
-                    var isShuffleEnabled by remember { mutableStateOf(exoPlayer?.shuffleModeEnabled == true) }
-                    androidx.compose.material3.Switch(
-                        checked = isShuffleEnabled,
-                        onCheckedChange = { 
-                            isShuffleEnabled = it
-                            exoPlayer?.shuffleModeEnabled = it 
-                        },
-                        colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorVibrant.copy(alpha=0.5f))
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val context = androidx.compose.ui.platform.LocalContext.current
+                        androidx.compose.material3.IconToggleButton(
+                            checked = autoAnalyzeLyrics,
+                            onCheckedChange = { playerViewModel.toggleAutoAnalyze() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.List,
+                                contentDescription = "Auto-Analyze Lyrics",
+                                tint = if (autoAnalyzeLyrics) colorVibrant else Color.Gray.copy(alpha = 0.5f),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
+                        var isShuffleEnabled by remember { mutableStateOf(exoPlayer?.shuffleModeEnabled == true) }
+                        androidx.compose.material3.Switch(
+                            checked = isShuffleEnabled,
+                            onCheckedChange = { 
+                                isShuffleEnabled = it
+                                exoPlayer?.shuffleModeEnabled = it 
+                            },
+                            colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorVibrant.copy(alpha=0.5f))
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -1451,57 +1451,115 @@ fun PlayerScreen(
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
-                Text("Física del Visualizador", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Text("Arquetipo de Ondas", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    TextButton(onClick = { 
-                        visualizerManager.isAdvancedMode.value = false
-                        prefs.isAdvancedMode = false
+                    TextButton(onClick = {
+                        visualizerManager.visualizerArchetype.value = 0
+                        prefs.visualizerArchetype = 0
                     }) {
-                        Text("Clásico (Suave)", color = if (!isAdvanced) colorVibrant else Color.Gray)
+                        Text("3 Ondas Superpuestas", color = if (visualizerArchetype == 0) colorVibrant else Color.Gray)
                     }
-                    TextButton(onClick = { 
-                        visualizerManager.isAdvancedMode.value = true
-                        prefs.isAdvancedMode = true
+                    TextButton(onClick = {
+                        visualizerManager.visualizerArchetype.value = 1
+                        prefs.visualizerArchetype = 1
                     }) {
-                        Text("Gravedad (Monstercat)", color = if (isAdvanced) colorVibrant else Color.Gray)
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text("Filtro de Frecuencias", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    TextButton(onClick = { 
-                        visualizerManager.filterMode.value = FilterMode.ALL
-                        prefs.filterMode = "ALL"
-                    }) {
-                        Text("Todos", color = if (filterMode == FilterMode.ALL) colorVibrant else Color.Gray)
-                    }
-                    TextButton(onClick = { 
-                        visualizerManager.filterMode.value = FilterMode.BASS
-                        prefs.filterMode = "BASS"
-                    }) {
-                        Text("Bajos", color = if (filterMode == FilterMode.BASS) colorVibrant else Color.Gray)
-                    }
-                    TextButton(onClick = { 
-                        visualizerManager.filterMode.value = FilterMode.MIDS
-                        prefs.filterMode = "MIDS"
-                    }) {
-                        Text("Medios", color = if (filterMode == FilterMode.MIDS) colorVibrant else Color.Gray)
+                        Text("1 Onda Combinada", color = if (visualizerArchetype == 1) colorVibrant else Color.Gray)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("Sensibilidad (Multiplicador): ${String.format("%.1f", sensitivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Text("Modo de Cálculo (FFT)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    TextButton(onClick = {
+                        visualizerManager.fftMode.value = "AVERAGE"
+                        prefs.visualizerFftMode = "AVERAGE"
+                    }) {
+                        Text("Promedio (Estable)", color = if (fftMode == "AVERAGE") colorVibrant else Color.Gray)
+                    }
+                    TextButton(onClick = {
+                        visualizerManager.fftMode.value = "MAX"
+                        prefs.visualizerFftMode = "MAX"
+                    }) {
+                        Text("Máximo (Dinámico)", color = if (fftMode == "MAX") colorVibrant else Color.Gray)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("Sensibilidad General: ${String.format("%.1f", sensitivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = sensitivity,
-                    onValueChange = { 
-                        visualizerManager.sensitivity.value = it 
+                    onValueChange = {
+                        visualizerManager.sensitivity.value = it
                         prefs.sensitivity = it
                     },
                     valueRange = 0.5f..3.0f,
                     colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text("Reactividad (Ghosts): ${String.format("%.2f", reactivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Slider(
+                    value = reactivity,
+                    onValueChange = {
+                        visualizerManager.reactivity.value = it
+                        prefs.reactivity = it
+                    },
+                    valueRange = 0.1f..1.5f,
+                    colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorDominant, androidx.compose.foundation.shape.CircleShape))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sensibilidad de Graves (Bajos): ${String.format("%.1f", bassMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                }
+                Slider(
+                    value = bassMult,
+                    onValueChange = {
+                        visualizerManager.bassMultiplier.value = it
+                        prefs.bassMultiplier = it
+                    },
+                    valueRange = 0.5f..3.0f,
+                    colors = SliderDefaults.colors(thumbColor = colorDominant, activeTrackColor = colorDominant)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorVibrant, androidx.compose.foundation.shape.CircleShape))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sensibilidad de Medios: ${String.format("%.1f", midMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                }
+                Slider(
+                    value = midMult,
+                    onValueChange = {
+                        visualizerManager.midMultiplier.value = it
+                        prefs.midMultiplier = it
+                    },
+                    valueRange = 0.5f..3.0f,
+                    colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorMuted, androidx.compose.foundation.shape.CircleShape))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Sensibilidad de Altos (Agudos): ${String.format("%.1f", trebleMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                }
+                Slider(
+                    value = trebleMult,
+                    onValueChange = {
+                        visualizerManager.trebleMultiplier.value = it
+                        prefs.trebleMultiplier = it
+                    },
+                    valueRange = 0.5f..3.0f,
+                    colors = SliderDefaults.colors(thumbColor = colorMuted, activeTrackColor = colorMuted)
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -1550,5 +1608,71 @@ fun PlayerScreen(
                 }
             }
         }
+    }
+    if (showEffectsDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showEffectsDialog = false },
+            title = { Text("Efectos de Audio", color = colorVibrant) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text("Slow Reverb", color = Color.White)
+                        androidx.compose.material3.Switch(
+                            checked = reverbEnabled,
+                            onCheckedChange = { onSetReverb(it) },
+                            colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorVibrant.copy(alpha=0.5f))
+                        )
+                    }
+
+                    Column {
+                        Text("Velocidad: ${String.format("%.2f", playbackSpeed)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Slider(
+                            value = playbackSpeed,
+                            onValueChange = { onSetSpeed(it) },
+                            valueRange = 0.5f..2.0f,
+                            colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
+                        )
+                    }
+
+                    Column {
+                        Text("Tono: ${String.format("%.2f", playbackPitch)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Slider(
+                            value = playbackPitch,
+                            onValueChange = { onSetPitch(it) },
+                            valueRange = 0.5f..2.0f,
+                            colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
+                        )
+                    }
+
+                    Column {
+                        Text("Preajuste (Efectos)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val presets = listOf(
+                                "NORMAL" to "Normal",
+                                "NIGHTCORE" to "Nightcore",
+                                "SLOWED" to "Slowed + Reverb",
+                                "CHIPMUNK" to "Chipmunk",
+                                "BASS" to "Bass Boost"
+                            )
+                            items(presets.size) { i ->
+                                val (key, label) = presets[i]
+                                androidx.compose.material3.FilterChip(
+                                    selected = effectsPreset == key,
+                                    onClick = { onApplyPreset(key) },
+                                    label = { Text(label) },
+                                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(selectedContainerColor = colorVibrant, selectedLabelColor = Color.White)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showEffectsDialog = false }) {
+                    Text("Cerrar", color = colorVibrant)
+                }
+            },
+            containerColor = colorDominant
+        )
     }
 }

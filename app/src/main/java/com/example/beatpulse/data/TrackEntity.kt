@@ -57,6 +57,17 @@ data class PlaylistTrackCrossRef(
     val orderIndex: Int = 0
 )
 
+data class ArtistStats(
+    val artist: String,
+    val totalPlays: Int
+)
+
+data class AlbumStats(
+    val album: String,
+    val artist: String,
+    val totalPlays: Int
+)
+
 @Dao
 interface TrackDao {
     @Query("SELECT * FROM tracks")
@@ -110,6 +121,9 @@ interface TrackDao {
     @Query("DELETE FROM playlist_tracks WHERE playlistId = :playlistId AND trackId = :trackId")
     suspend fun removeTrackFromPlaylist(playlistId: Long, trackId: Long)
 
+    @Query("UPDATE playlist_tracks SET trackId = :newId WHERE trackId = :oldId")
+    suspend fun updatePlaylistTrackId(oldId: Long, newId: Long)
+
     @Query("DELETE FROM tracks WHERE id IN (:ids)")
     suspend fun deleteTracksById(ids: List<Long>)
 
@@ -118,4 +132,32 @@ interface TrackDao {
 
     @Query("SELECT * FROM tracks WHERE id = :id")
     suspend fun getTrackById(id: Long): TrackEntity?
+
+    // Statistics queries
+    @Query("SELECT artist, SUM(playCount) as totalPlays FROM tracks WHERE playCount > 0 GROUP BY artist ORDER BY totalPlays DESC LIMIT 10")
+    suspend fun getTopArtistsByPlayCount(): List<ArtistStats>
+
+    @Query("SELECT album, artist, SUM(playCount) as totalPlays FROM tracks WHERE playCount > 0 AND album != '' GROUP BY album ORDER BY totalPlays DESC LIMIT 10")
+    suspend fun getTopAlbumsByPlayCount(): List<AlbumStats>
+
+    @Query("SELECT SUM(CAST(playCount AS INTEGER) * CAST(duration AS INTEGER)) FROM tracks WHERE playCount > 0")
+    suspend fun getTotalListeningTimeMs(): Long?
+
+    @Query("SELECT COUNT(*) FROM tracks WHERE playCount > 0")
+    suspend fun getTotalTracksPlayed(): Int
+
+    @Query("SELECT SUM(playCount) FROM tracks")
+    suspend fun getTotalPlayCount(): Int?
+
+    @Query("SELECT COUNT(DISTINCT artist) FROM tracks WHERE playCount > 0")
+    suspend fun getUniqueArtistsPlayed(): Int
+
+    @Query("SELECT COUNT(DISTINCT album) FROM tracks WHERE playCount > 0 AND album != ''")
+    suspend fun getUniqueAlbumsPlayed(): Int
+
+    @Query("SELECT * FROM tracks WHERE playCount > 0 ORDER BY playCount DESC LIMIT 5")
+    suspend fun getTop5Tracks(): List<TrackEntity>
+
+    @Query("SELECT * FROM tracks WHERE isFavorite = 1 ORDER BY playCount DESC")
+    suspend fun getFavoriteTracks(): List<TrackEntity>
 }

@@ -7,11 +7,16 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
+import android.os.SystemClock
 import android.view.View
 import android.widget.RemoteViews
+import androidx.palette.graphics.Palette
 import com.example.beatpulse.MainActivity
 import com.example.beatpulse.R
 import com.example.beatpulse.service.PlaybackService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MediaWidgetProvider : AppWidgetProvider() {
 
@@ -20,20 +25,34 @@ class MediaWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        for (appWidgetId in appWidgetIds) {
-            updateAppWidget(context, appWidgetManager, appWidgetId)
+        val pendingResult = goAsync()
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                for (appWidgetId in appWidgetIds) {
+                    updateAppWidget(context, appWidgetManager, appWidgetId)
+                }
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         super.onReceive(context, intent)
         if (intent.action == ACTION_UPDATE_WIDGET) {
-            val appWidgetManager = AppWidgetManager.getInstance(context)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(
-                ComponentName(context, MediaWidgetProvider::class.java)
-            )
-            for (appWidgetId in appWidgetIds) {
-                updateAppWidget(context, appWidgetManager, appWidgetId, intent)
+            val pendingResult = goAsync()
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val appWidgetManager = AppWidgetManager.getInstance(context)
+                    val appWidgetIds = appWidgetManager.getAppWidgetIds(
+                        ComponentName(context, MediaWidgetProvider::class.java)
+                    )
+                    for (appWidgetId in appWidgetIds) {
+                        updateAppWidget(context, appWidgetManager, appWidgetId, intent)
+                    }
+                } finally {
+                    pendingResult.finish()
+                }
             }
         }
     }
@@ -44,6 +63,7 @@ class MediaWidgetProvider : AppWidgetProvider() {
         const val EXTRA_ARTIST = "extra_artist"
         const val EXTRA_IS_PLAYING = "extra_is_playing"
         const val EXTRA_COVER_PATH = "extra_cover_path"
+        const val EXTRA_POSITION = "extra_position"
 
         internal fun updateAppWidget(
             context: Context,
@@ -67,7 +87,9 @@ class MediaWidgetProvider : AppWidgetProvider() {
             views.setOnClickPendingIntent(R.id.widget_btn_prev, prevPendingIntent)
 
             // Open App Intent
-            val appIntent = Intent(context, MainActivity::class.java)
+            val appIntent = Intent(context, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
             val appPendingIntent = PendingIntent.getActivity(context, 3, appIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
             views.setOnClickPendingIntent(R.id.widget_root, appPendingIntent)
 
@@ -85,6 +107,15 @@ class MediaWidgetProvider : AppWidgetProvider() {
                 } else {
                     views.setImageViewResource(R.id.widget_btn_play_pause, android.R.drawable.ic_media_play)
                 }
+                
+                val position = intent.getLongExtra(EXTRA_POSITION, 0L)
+                if (isPlaying) {
+                    views.setViewVisibility(R.id.widget_chronometer, View.VISIBLE)
+                    views.setChronometer(R.id.widget_chronometer, SystemClock.elapsedRealtime() - position, null, true)
+                } else {
+                    views.setViewVisibility(R.id.widget_chronometer, View.VISIBLE)
+                    views.setChronometer(R.id.widget_chronometer, SystemClock.elapsedRealtime() - position, null, false)
+                }
 
                 if (!coverPath.isNullOrEmpty()) {
                     var bitmap: android.graphics.Bitmap? = null
@@ -96,6 +127,10 @@ class MediaWidgetProvider : AppWidgetProvider() {
                             mmr.release()
                             if (data != null) {
                                 bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
+                            }
+                        } else if (coverPath.startsWith("http://") || coverPath.startsWith("https://")) {
+                            java.net.URL(coverPath).openStream().use { stream ->
+                                bitmap = BitmapFactory.decodeStream(stream)
                             }
                         } else {
                             bitmap = BitmapFactory.decodeFile(coverPath)
@@ -109,11 +144,25 @@ class MediaWidgetProvider : AppWidgetProvider() {
                         val bgStyle = prefs.backgroundStyle
                         val styledBitmap = getStyledBitmap(bitmap, bgStyle)
                         views.setImageViewBitmap(R.id.widget_cover, styledBitmap)
+                        
+                        // Extract Palette color for dynamic background
+                        val palette = Palette.from(bitmap).generate()
+                        val dominantColor = palette.getDominantColor(0xFF222222.toInt())
+                        // Make the background color semi-transparent and dark
+                        val darkenedColor = android.graphics.Color.argb(
+                            200, // Alpha
+                            (android.graphics.Color.red(dominantColor) * 0.4).toInt(),
+                            (android.graphics.Color.green(dominantColor) * 0.4).toInt(),
+                            (android.graphics.Color.blue(dominantColor) * 0.4).toInt()
+                        )
+                        views.setInt(R.id.widget_root, "setBackgroundColor", darkenedColor)
                     } else {
                         views.setImageViewResource(R.id.widget_cover, android.R.drawable.ic_media_play)
+                        views.setInt(R.id.widget_root, "setBackgroundColor", 0xCC222222.toInt())
                     }
                 } else {
                     views.setImageViewResource(R.id.widget_cover, android.R.drawable.ic_media_play)
+                    views.setInt(R.id.widget_root, "setBackgroundColor", 0xCC222222.toInt())
                 }
             } else {
                 val prefs = com.example.beatpulse.data.PreferencesManager.getInstance(context)

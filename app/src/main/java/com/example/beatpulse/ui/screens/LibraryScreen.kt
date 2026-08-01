@@ -15,12 +15,15 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -28,8 +31,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.data.TrackEntity
+import com.example.beatpulse.ui.screens.LibraryViewModel
 import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -49,27 +54,34 @@ import androidx.compose.foundation.isSystemInDarkTheme
 
 @Composable
 fun LibraryScreen(
-    repository: MusicRepository,
+    viewModel: LibraryViewModel,
     paletteColors: com.example.beatpulse.theme.PaletteColors,
-    prefs: com.example.beatpulse.data.PreferencesManager,
-    onRescan: () -> Unit,
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
 ) {
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
-    val tabs = listOf("Todos", "Recientes", "Favoritos")
+    val prefs = viewModel.prefs
+    val onRescan = { viewModel.scanMediaStore() }
+    var selectedTabIndex by remember { mutableIntStateOf(prefs.lastLibraryGeneralTab) }
+    LaunchedEffect(selectedTabIndex) {
+        prefs.lastLibraryGeneralTab = selectedTabIndex
+    }
+    val tabs = listOf("Todos", "Navegador", "Recomendaciones")
 
-    val allTracks by repository.allTracksFlow.collectAsState(initial = emptyList())
-    val recentTracks by repository.recentTracksFlow.collectAsState(initial = emptyList())
-    val favoriteTracks by repository.favoritesFlow.collectAsState(initial = emptyList())
+    val allTracks by viewModel.allTracks.collectAsState()
+    val recentTracks by viewModel.recentTracks.collectAsState()
+    val favoriteTracks by viewModel.favoriteTracks.collectAsState()
+    val resolvingTracks by viewModel.resolvingTracks.collectAsState()
     
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
     
     val colorDominant by animateColorAsState(paletteColors.dominant, label = "color_dom")
     val colorVibrant by animateColorAsState(paletteColors.vibrant, label = "color_vib")
-    var searchQuery by remember { mutableStateOf("") }
-    val playlists by repository.playlistsFlow.collectAsState(initial = emptyList())
+    var localSearchQuery by remember { mutableStateOf("") }
+    val onlineSearchQuery by viewModel.searchQuery.collectAsState()
+    val playlists by viewModel.playlists.collectAsState()
     var trackToAddToPlaylist by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingConfirmation by remember { mutableStateOf<TrackEntity?>(null) }
+    var trackPendingDownload by remember { mutableStateOf<TrackEntity?>(null) }
     var trackToDelete by remember { mutableStateOf<TrackEntity?>(null) }
     
     val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -77,13 +89,47 @@ fun LibraryScreen(
     ) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             trackToDelete?.let { track ->
-                scope.launch {
-                    repository.completeDeletion(track.id)
-                    prefs.showToast("Canción eliminada")
-                }
+                viewModel.completeDeletion(track.id)
+                prefs.showToast("Canción eliminada")
             }
         }
         trackToDelete = null
+    }
+
+    val isSearchingOnline = selectedTabIndex == 1
+    val onlineSearchResults by viewModel.onlineSearchResults.collectAsState()
+    val isOnlineSearchLoading by viewModel.isOnlineSearchLoading.collectAsState()
+    
+    val recommendations by viewModel.recommendations.collectAsState()
+    val isRecommendationsLoading by viewModel.isRecommendationsLoading.collectAsState()
+
+    LaunchedEffect(selectedTabIndex) {
+        if (selectedTabIndex == 2) {
+            viewModel.loadRecommendations()
+        }
+    }
+
+    LaunchedEffect(onlineSearchQuery, isSearchingOnline) {
+        if (isSearchingOnline && onlineSearchQuery.isNotBlank()) {
+            viewModel.isOnlineSearchLoading.value = true
+            try {
+                kotlinx.coroutines.delay(500)
+                viewModel.onlineSearchResults.value = viewModel.searchOnlineMusic(onlineSearchQuery)
+            } catch (e: Exception) {
+                if (e !is kotlinx.coroutines.CancellationException) {
+                    viewModel.onlineSearchResults.value = emptyList()
+                } else {
+                    throw e
+                }
+            } finally {
+                viewModel.isOnlineSearchLoading.value = false
+            }
+        } else if (isSearchingOnline) {
+            viewModel.onlineSearchResults.value = emptyList()
+            viewModel.isOnlineSearchLoading.value = false
+        } else {
+            viewModel.isOnlineSearchLoading.value = false
+        }
     }
 
     val bgStyle by prefs.backgroundStyleFlow.collectAsState()
@@ -101,7 +147,7 @@ fun LibraryScreen(
     }
 
     var accumulatedDrag by remember { mutableFloatStateOf(0f) }
-    
+
     Box(modifier = Modifier
         .fillMaxSize()
         .pointerInput(Unit) {
@@ -155,35 +201,40 @@ fun LibraryScreen(
                 }
             }
 
-            val currentList = remember(selectedTabIndex, allTracks, recentTracks, favoriteTracks, searchQuery, sortOrder) {
+            val currentList = remember(selectedTabIndex, allTracks, recentTracks, favoriteTracks, localSearchQuery, sortOrder) {
                 val list = when (selectedTabIndex) {
                     0 -> allTracks
                     1 -> recentTracks
-                    2 -> favoriteTracks
+                    2 -> emptyList() // handled separately
                     else -> allTracks
-                }.filter { it.title.contains(searchQuery, ignoreCase = true) || it.artist.contains(searchQuery, ignoreCase = true) }
+                }.filter { it.title.contains(localSearchQuery, ignoreCase = true) || it.artist.contains(localSearchQuery, ignoreCase = true) }
                 
                 when (sortOrder) {
                     "TITLE" -> list.sortedBy { it.title.lowercase() }
                     "ARTIST" -> list.sortedBy { it.artist.lowercase() }
                     "ALBUM" -> list.sortedBy { it.album.lowercase() }
+                    "DIRECTORY" -> list.sortedWith(compareBy<TrackEntity> { if (it.dataPath.startsWith("youtube://")) "1_Online" else "0_Locales" }.thenBy { it.folderPath }.thenBy { it.title })
                     else -> list
                 }
             }
 
-            val isScanning by repository.isScanning.collectAsState()
+            val isScanning by viewModel.isScanning.collectAsState()
 
-            if (isScanning) {
+            if (isScanning || isOnlineSearchLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = paletteColors.vibrant)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Buscando música...", color = dynamicTextColor)
+                        Text(if (isOnlineSearchLoading) androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.searching_online) else "Buscando música...", color = dynamicTextColor)
                     }
                 }
-            } else if (currentList.isEmpty()) {
+            } else if (!isSearchingOnline && selectedTabIndex != 2 && currentList.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("No hay canciones aquí.", color = dynamicTextColor)
+                }
+            } else if (isSearchingOnline && onlineSearchResults.isEmpty() && onlineSearchQuery.isNotBlank()) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No se encontraron resultados online.", color = dynamicTextColor)
                 }
             } else {
                 val shapeIdx by prefs.thumbnailShapeFlow.collectAsState(initial = 0)
@@ -202,20 +253,86 @@ fun LibraryScreen(
                 val showFastScroll by remember { derivedStateOf { listState.firstVisibleItemIndex > 5 } }
 
                 Box(modifier = Modifier.fillMaxSize()) {
-                    LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
-                        items(currentList, key = { it.id }) { track ->
-                            TrackItem(
-                                track = track,
-                                paletteColors = paletteColors,
-                                thumbnailShapeIdx = shapeIdx,
-                                textColor = dynamicTextColor,
-                                onClick = { onTrackClick(track, currentList) },
-                                onToggleFavorite = { 
-                                    scope.launch { repository.toggleFavorite(track.id, !track.isFavorite) }
-                                },
-                                onAddToPlaylist = { trackToAddToPlaylist = track },
-                                onDeleteTrack = { trackPendingConfirmation = track }
-                            )
+                    if (selectedTabIndex == 2) {
+                        if (isRecommendationsLoading && recommendations.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    CircularProgressIndicator(color = paletteColors.vibrant)
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.searching_recommendations), color = dynamicTextColor, modifier = Modifier.padding(16.dp))
+                                }
+                            }
+                        } else {
+                            val lastTime = prefs.lastRecommendationsTimestamp
+                            val now = System.currentTimeMillis()
+                            val nextUpdate = lastTime + (24 * 60 * 60 * 1000L)
+                            val remainingMs = nextUpdate - now
+                            val remainingHours = (remainingMs / (1000 * 60 * 60)).coerceAtLeast(0)
+                            val remainingMinutes = ((remainingMs % (1000 * 60 * 60)) / (1000 * 60)).coerceAtLeast(0)
+                            
+                            LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
+                                item {
+                                    Text(
+                                        text = if (remainingMs > 0) androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.next_update_in_h_m, remainingHours, remainingMinutes) else androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.updating_soon),
+                                        color = dynamicTextColor.copy(alpha = 0.6f),
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 0.dp)
+                                    )
+                                }
+                                recommendations.forEach { (category, tracks) ->
+                                    if (tracks.isNotEmpty()) {
+                                        item {
+                                            Text(
+                                                text = category,
+                                                color = colorVibrant,
+                                                fontWeight = FontWeight.Bold,
+                                                modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 8.dp)
+                                            )
+                                        }
+                                        itemsIndexed(tracks, key = { index, track -> "${category}_${track.id}_$index" }) { _, track ->
+                                            TrackItem(
+                                                track = track,
+                                                paletteColors = paletteColors,
+                                                thumbnailShapeIdx = shapeIdx,
+                                                textColor = dynamicTextColor,
+                                                onClick = { onTrackClick(track, tracks) },
+                                                onToggleFavorite = { 
+                                                    viewModel.toggleFavorite(track, !track.isFavorite)
+                                                },
+                                                onAddToPlaylist = null,
+                                                onDeleteTrack = null,
+                                                isResolving = resolvingTracks.contains(track.id),
+                                                onDownloadTrack = if (track.dataPath.startsWith("youtube://")) {
+                                                    { trackPendingDownload = track }
+                                                } else null
+                                            )
+                                        }
+                                    }
+                                }
+                                item { Spacer(modifier = Modifier.height(100.dp)) }
+                            }
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
+                            val itemsToShow = if (isSearchingOnline) onlineSearchResults else currentList
+                            items(itemsToShow, key = { it.id }) { track ->
+                                TrackItem(
+                                    track = track,
+                                    paletteColors = paletteColors,
+                                    thumbnailShapeIdx = shapeIdx,
+                                    textColor = dynamicTextColor,
+                                    onClick = { onTrackClick(track, itemsToShow) },
+                                    onToggleFavorite = { 
+                                        viewModel.toggleFavorite(track, !track.isFavorite)
+                                    },
+                                    onAddToPlaylist = if (!isSearchingOnline) { { trackToAddToPlaylist = track } } else null,
+                                    onDeleteTrack = if (!isSearchingOnline) { { trackPendingConfirmation = track } } else null,
+                                    isResolving = resolvingTracks.contains(track.id),
+                                    onDownloadTrack = if (isSearchingOnline && track.dataPath.startsWith("youtube://")) {
+                                        { trackPendingDownload = track }
+                                    } else null
+                                )
+                            }
                         }
                     }
                     
@@ -244,7 +361,8 @@ fun LibraryScreen(
         }
         
         // Floating search bar overlay
-        var isSearchExpanded by remember { mutableStateOf(false) }
+        var isLocalSearchExpanded by remember { mutableStateOf(false) }
+        val isSearchExpanded = if (selectedTabIndex == 1) true else isLocalSearchExpanded
         var isSortMenuExpanded by remember { mutableStateOf(false) }
         val searchOffset by animateDpAsState(
             targetValue = if (isSearchExpanded) 0.dp else 40.dp
@@ -257,32 +375,41 @@ fun LibraryScreen(
                 .clip(RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp))
                 .background(Color.Black.copy(alpha=0.7f))
                 .animateContentSize()
-                .padding(end = if (!isSearchExpanded) 16.dp else 0.dp),
+                .padding(end = if (!isSearchExpanded && selectedTabIndex != 1) 16.dp else 0.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
              Box {
                  IconButton(onClick = { isSortMenuExpanded = true }) {
                      Icon(Icons.Default.Sort, contentDescription = "Sort", tint = colorVibrant)
                  }
-                 DropdownMenu(
-                     expanded = isSortMenuExpanded,
-                     onDismissRequest = { isSortMenuExpanded = false }
+                 androidx.compose.material3.MaterialTheme(
+                     colorScheme = androidx.compose.material3.MaterialTheme.colorScheme.copy(
+                         surface = paletteColors.dominant,
+                         onSurface = paletteColors.vibrant
+                     )
                  ) {
-                     DropdownMenuItem(text = { Text("Directorio (Por defecto)") }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
-                     DropdownMenuItem(text = { Text("Título (A-Z)") }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
-                     DropdownMenuItem(text = { Text("Artista (A-Z)") }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
-                     DropdownMenuItem(text = { Text("Álbum (A-Z)") }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
+                     DropdownMenu(
+                         expanded = isSortMenuExpanded,
+                         onDismissRequest = { isSortMenuExpanded = false }
+                     ) {
+                         DropdownMenuItem(text = { Text("Directorio (Por defecto)") }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
+                         DropdownMenuItem(text = { Text("Título (A-Z)") }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
+                         DropdownMenuItem(text = { Text("Artista (A-Z)") }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
+                         DropdownMenuItem(text = { Text("Álbum (A-Z)") }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
+                     }
                  }
              }
-             IconButton(onClick = { isSearchExpanded = !isSearchExpanded }) {
-                Icon(Icons.Default.Search, contentDescription = "Search", tint = colorVibrant)
+             if (selectedTabIndex != 1) {
+                 IconButton(onClick = { isLocalSearchExpanded = !isLocalSearchExpanded }) {
+                    Icon(Icons.Default.Search, contentDescription = "Search", tint = colorVibrant)
+                 }
              }
              AnimatedVisibility(visible = isSearchExpanded) {
                  Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
                      OutlinedTextField(
-                         value = searchQuery,
-                         onValueChange = { searchQuery = it },
-                         placeholder = { Text("Buscar...", color = Color.LightGray) },
+                         value = if (isSearchingOnline) onlineSearchQuery else localSearchQuery,
+                         onValueChange = { if (isSearchingOnline) viewModel.searchQuery.value = it else localSearchQuery = it },
+                         placeholder = { Text(if (isSearchingOnline) "Buscar online..." else "Buscar...", color = Color.LightGray) },
                          singleLine = true,
                          modifier = Modifier.width(200.dp),
                          colors = OutlinedTextFieldDefaults.colors(
@@ -315,10 +442,8 @@ fun LibraryScreen(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clickable {
-                                            scope.launch {
-                                                repository.addTrackToPlaylist(pl.playlistId, trackToAdd.id)
-                                                prefs.showToast("Añadido a ${pl.name}")
-                                            }
+                                            viewModel.addTrackToPlaylist(pl.playlistId, trackToAdd)
+                                            prefs.showToast("Añadido a ${pl.name}")
                                             trackToAddToPlaylist = null
                                         }
                                         .padding(16.dp),
@@ -347,7 +472,7 @@ fun LibraryScreen(
                         val t = track
                         trackPendingConfirmation = null
                         scope.launch {
-                            val sender = repository.deleteTrack(t.id)
+                            val sender = viewModel.deleteTrack(t.id)
                             if (sender != null) {
                                 trackToDelete = t
                                 deleteLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
@@ -367,6 +492,29 @@ fun LibraryScreen(
                 containerColor = paletteColors.dominant
             )
         }
+
+        trackPendingDownload?.let { track ->
+            AlertDialog(
+                onDismissRequest = { trackPendingDownload = null },
+                title = { Text("Confirmar descarga", color = dynamicTextColor) },
+                text = { Text("¿Deseas descargar '${track.title}' a tu dispositivo para escucharla sin conexión?", color = dynamicTextColor) },
+                confirmButton = {
+                    TextButton(onClick = {
+                        trackPendingDownload = null
+                        viewModel.downloadOnlineTrack(context, track)
+                        prefs.showToast("Descargando ${track.title}...")
+                    }) {
+                        Text("Descargar", color = colorVibrant)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { trackPendingDownload = null }) {
+                        Text("Cancelar", color = dynamicTextColor)
+                    }
+                },
+                containerColor = paletteColors.dominant
+            )
+        }
     }
 }
 
@@ -379,7 +527,10 @@ fun TrackItem(
     onClick: () -> Unit,
     onToggleFavorite: () -> Unit,
     onAddToPlaylist: (() -> Unit)? = null,
-    onDeleteTrack: (() -> Unit)? = null
+    onDeleteTrack: (() -> Unit)? = null,
+    onRemoveFromPlaylist: (() -> Unit)? = null,
+    onDownloadTrack: (() -> Unit)? = null,
+    isResolving: Boolean = false
 ) {
     // Usar la paleta global para evitar recalcular colores por cada pista, lo cual traba la lista
     val accentColor = paletteColors.vibrant
@@ -435,14 +586,16 @@ fun TrackItem(
         
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = track.title,
+                text = track.customTitle ?: track.title,
                 style = MaterialTheme.typography.bodyLarge,
                 color = textColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
+            val displayArtist = track.customArtist ?: track.artist
+            val displayAlbum = track.customAlbum ?: track.album
             Text(
-                text = "${track.artist} • ${track.album}",
+                text = "$displayArtist • $displayAlbum",
                 style = MaterialTheme.typography.bodySmall,
                 color = textColor.copy(alpha = 0.7f),
                 maxLines = 1,
@@ -456,31 +609,65 @@ fun TrackItem(
                 tint = if (track.isFavorite) accentColor else Color.Gray
             )
         }
-        if (onAddToPlaylist != null) {
+        val hasMenuOptions = onAddToPlaylist != null || onDeleteTrack != null || onDownloadTrack != null || onRemoveFromPlaylist != null
+        if (isResolving) {
+            androidx.compose.material3.CircularProgressIndicator(
+                modifier = Modifier.size(24.dp).padding(4.dp),
+                color = accentColor,
+                strokeWidth = 2.dp
+            )
+        } else if (hasMenuOptions) {
             var isMenuExpanded by remember { mutableStateOf(false) }
             Box {
                 IconButton(onClick = { isMenuExpanded = true }) {
                     Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = Color.Gray)
                 }
-                DropdownMenu(
-                    expanded = isMenuExpanded,
-                    onDismissRequest = { isMenuExpanded = false }
-                ) {
-                    DropdownMenuItem(
-                        text = { Text("Añadir a Playlist") },
-                        onClick = {
-                            isMenuExpanded = false
-                            onAddToPlaylist()
-                        }
+                androidx.compose.material3.MaterialTheme(
+                    colorScheme = androidx.compose.material3.MaterialTheme.colorScheme.copy(
+                        surface = paletteColors.dominant,
+                        onSurface = paletteColors.vibrant
                     )
-                    if (onDeleteTrack != null) {
-                        DropdownMenuItem(
-                            text = { Text("Eliminar del dispositivo", color = Color.Red) },
-                            onClick = {
-                                isMenuExpanded = false
-                                onDeleteTrack()
-                            }
-                        )
+                ) {
+                    DropdownMenu(
+                        expanded = isMenuExpanded,
+                        onDismissRequest = { isMenuExpanded = false }
+                    ) {
+                        if (onAddToPlaylist != null) {
+                            DropdownMenuItem(
+                                text = { Text("Añadir a Playlist") },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onAddToPlaylist()
+                                }
+                            )
+                        }
+                        if (onDeleteTrack != null) {
+                            DropdownMenuItem(
+                                text = { Text("Eliminar del dispositivo") },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onDeleteTrack()
+                                }
+                            )
+                        }
+                        if (onRemoveFromPlaylist != null) {
+                            DropdownMenuItem(
+                                text = { Text("Quitar de la Playlist") },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onRemoveFromPlaylist()
+                                }
+                            )
+                        }
+                        if (onDownloadTrack != null) {
+                            DropdownMenuItem(
+                                text = { Text("Descargar música") },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onDownloadTrack()
+                                }
+                            )
+                        }
                     }
                 }
             }

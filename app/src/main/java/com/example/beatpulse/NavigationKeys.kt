@@ -1,6 +1,12 @@
 package com.example.beatpulse
 
-import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
-@Serializable data object Main : NavKey
+@Serializable
+data object LibraryRoute
+
+@Serializable
+data object UnifiedLibraryRoute
+
+@Serializable
+data object PlayerRoute

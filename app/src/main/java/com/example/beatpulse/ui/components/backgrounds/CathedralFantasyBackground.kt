@@ -38,6 +38,7 @@ private const val SHADER_SRC = """
     uniform half4 colorDominant;
     uniform half4 colorVibrant;
     uniform half4 colorMuted;
+    uniform float iOffsetY;
 
     mat2 rot(float a) {
         float s = sin(a), c = cos(a);
@@ -45,7 +46,7 @@ private const val SHADER_SRC = """
     }
 
     half4 main(in float2 fragCoord) {
-        float2 uv = (fragCoord.xy - 0.5 * iResolution.xy) / iResolution.y;
+        float2 uv = (fragCoord.xy - 0.5 * iResolution.xy + float2(0.0, iOffsetY * iResolution.y)) / iResolution.y;
         float r = length(uv);
         float a = atan(uv.y, uv.x);
         
@@ -121,8 +122,8 @@ fun CathedralFantasyBackground(
 
     val infiniteTransition = rememberInfiniteTransition(label = "ash_fall")
     val time by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1000f,
-        animationSpec = infiniteRepeatable(tween(100000, easing = LinearEasing), RepeatMode.Restart),
+        initialValue = 0f, targetValue = 100000f,
+        animationSpec = infiniteRepeatable(tween(10000000, easing = LinearEasing), RepeatMode.Restart),
         label = "time"
     )
 
@@ -134,7 +135,7 @@ fun CathedralFantasyBackground(
 
     val runtimeShader = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            RuntimeShader(SHADER_SRC)
+            try { RuntimeShader(SHADER_SRC) } catch (e: Exception) { null }
         } else null
     }
     val shaderBrush = remember(runtimeShader) {
@@ -166,6 +167,13 @@ fun CathedralFantasyBackground(
                 runtimeShader.setFloatUniform("iResolution", size.width, size.height)
                 runtimeShader.setFloatUniform("iTime", time * 0.5f)
                 runtimeShader.setFloatUniform("iEnergy", dynamicEnergy)
+                
+                val centerY = VisualizerState.albumArtCenterY
+                val dynamicOffsetY = if (isPlayerScreen && centerY != null) {
+                    ((size.height / 2f) - centerY) / size.height
+                } else 0f
+                runtimeShader.setFloatUniform("iOffsetY", dynamicOffsetY)
+                
                 runtimeShader.setFloatUniform("colorDominant", dom.red, dom.green, dom.blue, dom.alpha)
                 runtimeShader.setFloatUniform("colorVibrant", vib.red, vib.green, vib.blue, vib.alpha)
                 runtimeShader.setFloatUniform("colorMuted", mut.red, mut.green, mut.blue, mut.alpha)
@@ -196,7 +204,13 @@ fun CathedralFantasyBackground(
                 drawPath(archPath, architectColor, style = Stroke(strokeWidth))
                 drawPath(archPath, glowColor, style = Stroke(strokeWidth * 4)) 
 
-                val roseCenter = Offset(width * 0.5f, height * 0.25f)
+                val fallbackCenterY = VisualizerState.albumArtCenterY
+                val centerY = if (isPlayerScreen && fallbackCenterY != null) {
+                    fallbackCenterY
+                } else {
+                    height * 0.25f
+                }
+                val roseCenter = Offset(width * 0.5f, centerY)
                 val roseOuterRadius = width * 0.25f
                 val roseInnerRadius = width * 0.1f
 
@@ -216,40 +230,40 @@ fun CathedralFantasyBackground(
         }
 
         // Capa de cenizas (por encima del shader para que se vean)
-        Canvas(modifier = Modifier.fillMaxSize()
-            .graphicsLayer {
-                if (!isPlayerScreen) {
+        if (!isPlayerScreen) {
+            Canvas(modifier = Modifier.fillMaxSize()
+                .graphicsLayer {
                     scaleX = 1f + dynamicEnergy * 0.15f
                     scaleY = 1f + dynamicEnergy * 0.15f
                 }
-            }
-        ) {
-            val lightVibrant = lightVibrantState.value
-            val width = size.width
-            val height = size.height
-            val currentAmps = amplitudesState.value
-            
-            noisePoints.forEachIndexed { index, (normOffset, alpha) ->
-                val speed = 0.008f + (index % 10) * 0.005f 
-                val drift = sin(time * 0.05f + index) * 20f
+            ) {
+                val lightVibrant = lightVibrantState.value
+                val width = size.width
+                val height = size.height
+                val currentAmps = amplitudesState.value
+                
+                noisePoints.forEachIndexed { index, (normOffset, alpha) ->
+                    val speed = 0.008f + (index % 10) * 0.005f 
+                    val drift = sin(time * 0.05f + index) * 20f
 
-                val pseudoRandX = ((index * 13) % 100) / 100f
-                val audioShakeX = (pseudoRandX - 0.5f) * dynamicEnergy * 150f
-                val pseudoRandY = (((index + 1) * 17) % 100) / 100f
-                val audioShakeY = (pseudoRandY - 0.5f) * dynamicEnergy * 150f
+                    val pseudoRandX = ((index * 13) % 100) / 100f
+                    val audioShakeX = (pseudoRandX - 0.5f) * dynamicEnergy * 300f
+                    val pseudoRandY = (((index + 1) * 17) % 100) / 100f
+                    val audioShakeY = (pseudoRandY - 0.5f) * dynamicEnergy * 300f
 
-                val currentY = (normOffset.y * height + time * speed * height + audioShakeY) % height
-                val currentX = (normOffset.x * width + drift + audioShakeX + width) % width
+                    val currentY = (normOffset.y * height + time * speed * height + audioShakeY) % height
+                    val currentX = (normOffset.x * width + drift + audioShakeX + width) % width
 
-                val ampIndex = index % 120
-                val localAmp = if (currentAmps.size > ampIndex) currentAmps[ampIndex] else 0f
-                val flare = if (localAmp > 0.7f) (localAmp - 0.7f) * 12f else 0f
+                    val ampIndex = index % 120
+                    val localAmp = if (currentAmps.size > ampIndex) currentAmps[ampIndex] else 0f
+                    val flare = if (localAmp > 0.2f) (localAmp - 0.2f) * 15f else 0f
 
-                drawCircle(
-                    color = lightVibrant.copy(alpha = (alpha * 0.6f + flare * 0.2f).coerceIn(0f, 1f)),
-                    radius = (alpha * 3f) + (flare * 6f),
-                    center = Offset(currentX, currentY)
-                )
+                    drawCircle(
+                        color = lightVibrant.copy(alpha = (alpha * 0.6f + flare * 0.2f).coerceIn(0f, 1f)),
+                        radius = (alpha * 1.5f) + (flare * 3f),
+                        center = Offset(currentX, currentY)
+                    )
+                }
             }
         }
 

@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
@@ -29,6 +30,8 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import com.example.beatpulse.ui.screens.UnifiedLibraryScreen
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -61,21 +64,52 @@ import com.example.beatpulse.ui.components.player.PlayerViewModel
 import com.example.beatpulse.ui.components.player.PlayerViewModelFactory
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
-
-
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import androidx.hilt.navigation.compose.hiltViewModel
+import java.util.concurrent.atomic.AtomicBoolean
 object NavigationKeys {
     const val LIBRARY = "library"
     const val FOLDERS = "folders"
     const val PLAYER = "player"
 }
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private lateinit var visualizerManager: AudioVisualizerManager
-    private lateinit var prefs: PreferencesManager
-    private lateinit var musicRepository: MusicRepository
-    private lateinit var playerViewModel: PlayerViewModel
-    private lateinit var equalizerManager: com.example.beatpulse.service.EqualizerManager
+    @Inject lateinit var visualizerManager: AudioVisualizerManager
+    @Inject lateinit var prefs: PreferencesManager
+    @Inject lateinit var musicRepository: MusicRepository
+    @Inject lateinit var equalizerManager: com.example.beatpulse.service.EqualizerManager
+
+    private val playerViewModel: com.example.beatpulse.ui.components.player.PlayerViewModel by viewModels()
+    private val libraryViewModel: com.example.beatpulse.ui.screens.LibraryViewModel by viewModels()
+    private val isSetupDone = AtomicBoolean(false)
+    
+    private val downloadReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            if (intent?.action == android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE) {
+                val downloadId = intent.getLongExtra(android.app.DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+                if (downloadId != -1L && context != null) {
+                    val downloadManager = context.getSystemService(android.content.Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                    val query = android.app.DownloadManager.Query().setFilterById(downloadId)
+                    val cursor = downloadManager.query(query)
+                    if (cursor != null && cursor.moveToFirst()) {
+                        val titleIndex = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_TITLE)
+                        val statusIndex = cursor.getColumnIndex(android.app.DownloadManager.COLUMN_STATUS)
+                        if (titleIndex >= 0 && statusIndex >= 0) {
+                            val title = cursor.getString(titleIndex)
+                            val status = cursor.getInt(statusIndex)
+                            if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
+                                prefs.showToast("✅ Descarga completada: $title")
+                            }
+                        }
+                        cursor.close()
+                    }
+                }
+            }
+        }
+    }
 
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -97,20 +131,28 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        val sharedPrefs = newBase.getSharedPreferences("beatpulse_prefs", android.content.Context.MODE_PRIVATE)
+        val lang = sharedPrefs.getString("appLanguage", "es") ?: "es"
+        val locale = java.util.Locale(lang)
+        java.util.Locale.setDefault(locale)
+        val config = android.content.res.Configuration(newBase.resources.configuration)
+        config.setLocale(locale)
+        val context = newBase.createConfigurationContext(config)
+        super.attachBaseContext(context)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        musicRepository = MusicRepository(this)
-        prefs = PreferencesManager.getInstance(this)
-        equalizerManager = com.example.beatpulse.service.EqualizerManager(prefs)
-        visualizerManager = AudioVisualizerManager(prefs)
-        
-        playerViewModel = ViewModelProvider(
+        ContextCompat.registerReceiver(
             this,
-            PlayerViewModelFactory(this.applicationContext, musicRepository, visualizerManager)
-        )[PlayerViewModel::class.java]
-
+            downloadReceiver,
+            android.content.IntentFilter(android.app.DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+            ContextCompat.RECEIVER_EXPORTED
+        )
+        
         checkPermissionsAndSetup()
 
         setContent {
@@ -121,11 +163,28 @@ class MainActivity : ComponentActivity() {
                     visualizerManager = visualizerManager,
                     equalizerManager = equalizerManager,
                     prefs = prefs,
-                    repository = musicRepository,
+                    libraryViewModel = libraryViewModel,
                     playerViewModel = playerViewModel
                 )
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        playerViewModel.isUiVisible = true
+        visualizerManager.isEnabled = true
+    }
+
+    override fun onPause() {
+        super.onPause()
+        playerViewModel.isUiVisible = false
+        visualizerManager.isEnabled = false
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        unregisterReceiver(downloadReceiver)
     }
 
     private fun checkPermissionsAndSetup() {
@@ -156,6 +215,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun setupApp() {
+        if (!isSetupDone.compareAndSet(false, true)) return // Guard against duplicate calls
         lifecycleScope.launch {
             val existing = musicRepository.allTracksFlow.first()
             if (existing.isEmpty()) {
@@ -167,7 +227,7 @@ class MainActivity : ComponentActivity() {
             com.example.beatpulse.service.PlaybackService.audioSessionIdFlow.collect { sessionId ->
                 if (sessionId != androidx.media3.common.C.AUDIO_SESSION_ID_UNSET) {
                     equalizerManager.initialize(sessionId)
-                    kotlinx.coroutines.delay(100) // Evitar colisión de AudioFx en dispositivos Motorola
+                    kotlinx.coroutines.delay(100)
                     visualizerManager.start(sessionId)
                 }
             }
@@ -176,17 +236,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
-        if (::playerViewModel.isInitialized && playerViewModel.isPlaying.value) {
-            val sessionId = com.example.beatpulse.service.PlaybackService.audioSessionIdFlow.value
-            if (sessionId != androidx.media3.common.C.AUDIO_SESSION_ID_UNSET) {
-                visualizerManager.start(sessionId)
-            }
+        // Always restart visualizer on return — isPlaying may be stale during MediaController reconnection
+        val sessionId = com.example.beatpulse.service.PlaybackService.audioSessionIdFlow.value
+        if (sessionId != androidx.media3.common.C.AUDIO_SESSION_ID_UNSET) {
+            visualizerManager.start(sessionId)
         }
     }
 
     override fun onStop() {
         super.onStop()
         if (::visualizerManager.isInitialized) {
+            // Only stop with decay; the visualizer will be restarted in onStart()
             visualizerManager.stop()
         }
     }
@@ -197,7 +257,7 @@ fun MainScreen(
     visualizerManager: AudioVisualizerManager,
     equalizerManager: com.example.beatpulse.service.EqualizerManager,
     prefs: PreferencesManager,
-    repository: MusicRepository,
+    libraryViewModel: com.example.beatpulse.ui.screens.LibraryViewModel,
     playerViewModel: PlayerViewModel
 ) {
     val exoPlayer by playerViewModel.playerState.collectAsState()
@@ -205,6 +265,12 @@ fun MainScreen(
     val currentTrack by playerViewModel.currentTrack.collectAsState()
     val currentQueue by playerViewModel.currentQueue.collectAsState()
     val paletteColors by playerViewModel.paletteColors.collectAsState()
+    val repeatModeState by playerViewModel.repeatMode.collectAsState()
+    val shuffleModeState by playerViewModel.shuffleModeEnabled.collectAsState()
+    val playbackSpeed by playerViewModel.playbackSpeed.collectAsState()
+    val playbackPitch by playerViewModel.playbackPitch.collectAsState()
+    val reverbEnabled by playerViewModel.reverbEnabled.collectAsState()
+    val effectsPreset by playerViewModel.effectsPreset.collectAsState()
     val bgStyle by prefs.backgroundStyleFlow.collectAsState()
     val scope = rememberCoroutineScope()
 
@@ -228,11 +294,14 @@ fun MainScreen(
         else -> Modifier.background(Color.Transparent)
     }
 
-    var currentPage by remember { mutableIntStateOf(0) } // 0: Home, 1: Library, 2: Player
+    var currentPage by remember { mutableIntStateOf(prefs.lastMainScreenPage) } // 0: Home, 1: Library, 2: Player
+    LaunchedEffect(currentPage) {
+        prefs.lastMainScreenPage = currentPage
+    }
     var sortOrder by remember { mutableStateOf(prefs.librarySortOrder) }
 
     var trackToAddToPlaylist by remember { mutableStateOf<com.example.beatpulse.data.TrackEntity?>(null) }
-    val playlists by repository.playlistsFlow.collectAsState(initial = emptyList())
+    val playlists by libraryViewModel.playlists.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
 
     var sleepTimerSeconds by remember { mutableIntStateOf(0) }
@@ -249,246 +318,21 @@ fun MainScreen(
     }
 
     val content: @Composable () -> Unit = {
+        var accumulatedDrag by remember { mutableFloatStateOf(0f) }
         Scaffold(
             containerColor = Color.Transparent,
                         bottomBar = {
-                // isPlaying read directly from StateFlow
-                
-                var accumulatedDrag by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
-                val animatedDrag by androidx.compose.animation.core.animateFloatAsState(
-                    targetValue = accumulatedDrag,
-                    animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f),
-                    label = "drag"
+                com.example.beatpulse.ui.components.BottomNavigationBar(
+                    currentPage = currentPage,
+                    onPageChange = { currentPage = it },
+                    currentTrack = currentTrack,
+                    isPlaying = isPlaying,
+                    accentColor = accentColor,
+                    paletteColors = paletteColors,
+                    bgStyle = bgStyle,
+                    prefs = prefs,
+                    onPlayPauseClick = { if (exoPlayer?.isPlaying == true) exoPlayer?.pause() else exoPlayer?.play() }
                 )
-
-                var hintingOffset by remember { mutableFloatStateOf(0f) }
-                LaunchedEffect(Unit) {
-                    while (!prefs.hasUsedMiniplayerGesture) {
-                        kotlinx.coroutines.delay(4000)
-                        if (accumulatedDrag == 0f && !prefs.hasUsedMiniplayerGesture) {
-                            hintingOffset = 30f
-                            kotlinx.coroutines.delay(150)
-                            hintingOffset = -30f
-                            kotlinx.coroutines.delay(150)
-                            hintingOffset = 0f
-                        }
-                    }
-                }
-                
-                val totalOffset by androidx.compose.animation.core.animateFloatAsState(
-                    targetValue = animatedDrag + hintingOffset,
-                    animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 400f),
-                    label = "totalOffset"
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(bottom = 12.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .offset { androidx.compose.ui.unit.IntOffset(totalOffset.toInt(), 0) }
-                            .pointerInput(Unit) {
-                                detectHorizontalDragGestures(
-                                    onDragEnd = { accumulatedDrag = 0f },
-                                    onDragCancel = { accumulatedDrag = 0f },
-                                    onHorizontalDrag = { _, dragAmount ->
-                                        if (!prefs.hasUsedMiniplayerGesture) {
-                                            prefs.hasUsedMiniplayerGesture = true
-                                        }
-                                        accumulatedDrag += dragAmount
-                                        if (accumulatedDrag > 150f) {
-                                            currentPage = (currentPage - 1 + 3) % 3
-                                            accumulatedDrag = 0f
-                                        } else if (accumulatedDrag < -150f) {
-                                            currentPage = (currentPage + 1) % 3
-                                            accumulatedDrag = 0f
-                                        }
-                                    }
-                                )
-                            }
-                    ) {
-                    androidx.compose.animation.AnimatedContent(
-                        targetState = currentPage,
-                        transitionSpec = {
-                            androidx.compose.animation.fadeIn() togetherWith androidx.compose.animation.fadeOut()
-                        }, label = "BottomBarContent"
-                    ) { page ->
-                        if (page == 2) {
-                            // Pantalla del reproductor: solo mostrar 3 puntos con un marco resaltado
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(60.dp)
-                                    .background(Color.Transparent),
-                                contentAlignment = androidx.compose.ui.Alignment.Center
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .background(Color.Black.copy(alpha = 0.2f), androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
-                                        .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), androidx.compose.foundation.shape.RoundedCornerShape(20.dp))
-                                        .padding(horizontal = 24.dp, vertical = 12.dp)
-                                ) {
-                                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                        listOf(0, 1, 2).forEach { p ->
-                                            val color by animateColorAsState(
-                                                targetValue = if (currentPage == p) accentColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                                animationSpec = tween(300), label = "indicator"
-                                            )
-                                            val size by androidx.compose.animation.core.animateFloatAsState(
-                                                targetValue = if (currentPage == p) 10f else 6f,
-                                                animationSpec = tween(300), label = "size"
-                                            )
-                                            Box(modifier = Modifier.size(size.dp).background(color, androidx.compose.foundation.shape.CircleShape))
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            // Pantallas de Biblioteca/Carpetas: mostrar Mini-Reproductor si hay canción, sino 3 puntos
-                            if (currentTrack != null) {
-
-                                val miniPlayerShape = when(bgStyle) {
-                                    8 -> androidx.compose.ui.graphics.RectangleShape // Pixel
-                                    7 -> androidx.compose.foundation.shape.RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 0.dp, bottomEnd = 0.dp) // Catedral
-                                    1 -> androidx.compose.foundation.shape.CutCornerShape(8.dp) // Cyberpunk
-                                    2, 4 -> androidx.compose.foundation.shape.RoundedCornerShape(24.dp) // Anime Pastel / Y2K Kawaii (very round)
-                                    5 -> androidx.compose.ui.graphics.RectangleShape // Black Metal (sharp)
-                                    6 -> androidx.compose.foundation.shape.CutCornerShape(16.dp) // Dark Fantasy (edgy, symmetrical to align with cover)
-                                    else -> androidx.compose.foundation.shape.RoundedCornerShape(16.dp) // Clasico
-                                }
-                                val miniPlayerBorder = when(bgStyle) {
-                                    8 -> androidx.compose.foundation.BorderStroke(3.dp, accentColor) // Pixel
-                                    1 -> androidx.compose.foundation.BorderStroke(2.dp, paletteColors.vibrant) // Cyberpunk
-                                    7 -> androidx.compose.foundation.BorderStroke(1.dp, paletteColors.dominant) // Catedral
-                                    3 -> androidx.compose.foundation.BorderStroke(2.dp, Color.White.copy(alpha=0.5f)) // Luminoso
-                                    2 -> androidx.compose.foundation.BorderStroke(3.dp, Color(0xFFFFB7B2)) // Anime Pastel
-                                    4 -> androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFFF9CEE)) // Y2K Kawaii
-                                    5 -> androidx.compose.foundation.BorderStroke(2.dp, Color.DarkGray) // Black Metal
-                                    6 -> androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8B0000)) // Dark Fantasy
-                                    else -> androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.3f))
-                                }
-                                val miniPlayerBg = when(bgStyle) {
-                                    8 -> Brush.horizontalGradient(listOf(Color.Black, Color.DarkGray)) // Pixel
-                                    1 -> Brush.horizontalGradient(listOf(Color.Black.copy(alpha=0.8f), paletteColors.dominant.copy(alpha=0.8f))) // Cyberpunk
-                                    3 -> Brush.horizontalGradient(listOf(paletteColors.lightVibrant.copy(alpha=0.6f), Color.White.copy(alpha=0.2f))) // Luminoso
-                                    7 -> Brush.horizontalGradient(listOf(Color(0xFF1A1A1A), Color(0xFF2D2D2D))) // Catedral
-                                    2 -> Brush.horizontalGradient(listOf(paletteColors.lightVibrant.copy(alpha=0.9f), paletteColors.dominant.copy(alpha=0.6f))) // Anime Pastel based on cover
-                                    4 -> Brush.horizontalGradient(listOf(paletteColors.vibrant.copy(alpha=0.8f), paletteColors.lightVibrant.copy(alpha=0.8f))) // Y2K Kawaii based on cover
-                                    5 -> Brush.horizontalGradient(listOf(Color.Black, Color(0xFF111111))) // Black Metal
-                                    6 -> Brush.horizontalGradient(listOf(Color(0xFF1A0000), Color(0xFF0D0D0D))) // Dark Fantasy
-                                    else -> Brush.horizontalGradient(listOf(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f), MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)))
-                                }
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(8.dp)
-                                        .background(miniPlayerBg, miniPlayerShape)
-                                        .border(miniPlayerBorder, miniPlayerShape)
-                                        .padding(8.dp)
-                                ) {
-                                    Row(
-                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        // Portada
-                                        val albumArtBitmap = currentTrack?.let { com.example.beatpulse.ui.components.rememberFullAlbumArt(it) }
-                                          if (albumArtBitmap != null) {
-                                              androidx.compose.foundation.Image(
-                                                  bitmap = albumArtBitmap,
-                                                  contentDescription = "Album Art",
-                                                  modifier = Modifier.size(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)),
-                                                  contentScale = androidx.compose.ui.layout.ContentScale.Crop
-                                              )
-                                          } else {
-                                              androidx.compose.foundation.layout.Box(modifier = Modifier.size(48.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).background(androidx.compose.ui.graphics.Color.DarkGray))
-                                          }
-                                        
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        
-                                        // Textos
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = currentTrack?.title ?: "No playing",
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                maxLines = 1,
-                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                                style = MaterialTheme.typography.bodyLarge
-                                            )
-                                            Text(
-                                                text = currentTrack?.artist ?: "Desconocido",
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                                                maxLines = 1,
-                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                                                style = MaterialTheme.typography.bodyMedium
-                                            )
-                                        }
-                                        
-                                        // Play/Pause
-                                        IconButton(onClick = { if (exoPlayer?.isPlaying == true) exoPlayer?.pause() else exoPlayer?.play() }) {
-                                            Icon(
-                                                imageVector = if (isPlaying) androidx.compose.material.icons.Icons.Default.Pause else androidx.compose.material.icons.Icons.Default.PlayArrow,
-                                                contentDescription = "Play/Pause",
-                                                tint = accentColor,
-                                                modifier = Modifier.size(32.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            } else {
-                                // No hay canción, mostrar los puntos
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(60.dp)
-                                        .background(Color.Transparent),
-                                    contentAlignment = androidx.compose.ui.Alignment.Center
-                                ) {
-                                    Row(
-                                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                                    ) {
-                                        listOf(0, 1, 2).forEach { p ->
-                                            val color by animateColorAsState(
-                                                targetValue = if (currentPage == p) accentColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
-                                                animationSpec = tween(300), label = "indicator"
-                                            )
-                                            val size by androidx.compose.animation.core.animateFloatAsState(
-                                                targetValue = if (currentPage == p) 10f else 6f,
-                                                animationSpec = tween(300), label = "size"
-                                            )
-                                            Box(modifier = Modifier.size(size.dp).background(color, androidx.compose.foundation.shape.CircleShape))
-                                        }
-                                        
-                                        if (!prefs.hasSeenTutorial) {
-                                            var playAlpha by remember { mutableFloatStateOf(0.1f) }
-                                            LaunchedEffect(Unit) {
-                                                while(true) {
-                                                    playAlpha = 0.8f
-                                                    kotlinx.coroutines.delay(800)
-                                                    playAlpha = 0.1f
-                                                    kotlinx.coroutines.delay(800)
-                                                }
-                                            }
-                                            val animatedPlayAlpha by androidx.compose.animation.core.animateFloatAsState(targetValue = playAlpha, animationSpec = tween(800))
-                                            Icon(
-                                                imageVector = Icons.Default.PlayArrow,
-                                                contentDescription = "Swipe to Play",
-                                                tint = accentColor.copy(alpha = animatedPlayAlpha),
-                                                modifier = Modifier.size(20.dp).offset(x = 8.dp)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
             }
         ) { innerPadding ->
             AnimatedContent(
@@ -511,30 +355,30 @@ fun MainScreen(
                         }
                     }.using(SizeTransform(clip = false))
                 },
-                modifier = Modifier.padding(innerPadding).fillMaxSize(),
+                modifier = Modifier
+                    .padding(innerPadding)
+                    .fillMaxSize(),
                 label = "page_transition"
             ) { page ->
                 when (page) {
-                    0 -> AlbumsScreen(
-                        repository = repository,
+                    0 -> UnifiedLibraryScreen(
+                        viewModel = libraryViewModel,
                         paletteColors = paletteColors,
-                        prefs = prefs,
-                        onTrackClick = { track, queue ->
+                        onTrackClick = { track: com.example.beatpulse.data.TrackEntity, queue: List<com.example.beatpulse.data.TrackEntity> ->
                             playerViewModel.playTrack(track, queue)
                             currentPage = 2
                         }
                     )
                     1 -> LibraryScreen(
-                        repository = repository,
+                        viewModel = libraryViewModel,
                         paletteColors = paletteColors,
-                        prefs = prefs,
-                        onRescan = { scope.launch { repository.scanMediaStore() } },
                         onTrackClick = { track, queue ->
                             playerViewModel.playTrack(track, queue)
                             currentPage = 2
                         }
                     )
                     2 -> PlayerScreen(
+                        playerViewModel = playerViewModel,
                         visualizerManager = visualizerManager,
                         equalizerManager = equalizerManager,
                         exoPlayer = exoPlayer,
@@ -543,6 +387,8 @@ fun MainScreen(
                         onPlayTrack = { track, queue -> playerViewModel.playTrack(track, queue) },
                         paletteColors = paletteColors,
                         prefs = prefs,
+                        repeatModeState = repeatModeState,
+                        shuffleModeState = shuffleModeState,
                         sleepTimerSeconds = sleepTimerSeconds,
                         onSetSleepTimer = { sleepTimerSeconds = it },
                         onUpdateTrackMetadata = { id, title, artist, album, coverPath ->
@@ -550,7 +396,15 @@ fun MainScreen(
                         },
                         onAddToPlaylist = { track ->
                             trackToAddToPlaylist = track
-                        }
+                        },
+                        playbackSpeed = playbackSpeed,
+                        playbackPitch = playbackPitch,
+                        reverbEnabled = reverbEnabled,
+                        effectsPreset = effectsPreset,
+                        onSetSpeed = { playerViewModel.setSpeed(it) },
+                        onSetPitch = { playerViewModel.setPitch(it) },
+                        onSetReverb = { playerViewModel.setReverb(it) },
+                        onApplyPreset = { playerViewModel.applyPreset(it) }
                     )
                 }
             }
@@ -627,13 +481,9 @@ fun MainScreen(
                                 headlineContent = { androidx.compose.material3.Text(pl.name, color = androidx.compose.ui.graphics.Color.White) },
                                 colors = androidx.compose.material3.ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
                                 modifier = Modifier.clickable {
-                                    scope.launch {
-                                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                            repository.addTrackToPlaylist(pl.playlistId, trackToAdd.id)
-                                        }
-                                        android.widget.Toast.makeText(context, "Añadida a ${pl.name}", android.widget.Toast.LENGTH_SHORT).show()
-                                        trackToAddToPlaylist = null
-                                    }
+                                    libraryViewModel.addTrackToPlaylist(pl.playlistId, trackToAdd)
+                                    android.widget.Toast.makeText(context, "Añadida a ${pl.name}", android.widget.Toast.LENGTH_SHORT).show()
+                                    trackToAddToPlaylist = null
                                 }
                             )
                         }

@@ -26,6 +26,7 @@ private const val TALE_LEGEND_SHADER_SRC = """
     uniform float isPlayer;
     uniform half4 colorDominant;
     uniform half4 colorVibrant;
+    uniform float iOffsetY;
     
     // Retro resolution
     float pixelate = 110.0;
@@ -41,7 +42,7 @@ private const val TALE_LEGEND_SHADER_SRC = """
     }
     
     half4 main(in float2 fragCoord) {
-        float2 uv = (fragCoord - 0.5 * iResolution.xy) / iResolution.y;
+        float2 uv = (fragCoord - 0.5 * iResolution.xy + float2(0.0, iOffsetY * iResolution.y)) / iResolution.y;
         
         // Quantize UV to create automatic pixel art
         float2 puv = floor(uv * pixelate) / pixelate;
@@ -166,14 +167,14 @@ fun TaleLegendBackground(
 
     val infiniteTransition = rememberInfiniteTransition(label = "tl_anim")
     val time by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 1000f,
-        animationSpec = infiniteRepeatable(tween(100000, easing = LinearEasing), RepeatMode.Restart),
+        initialValue = 0f, targetValue = 100000f,
+        animationSpec = infiniteRepeatable(tween(10000000, easing = LinearEasing), RepeatMode.Restart),
         label = "time"
     )
 
     val runtimeShader = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            RuntimeShader(TALE_LEGEND_SHADER_SRC)
+            try { RuntimeShader(TALE_LEGEND_SHADER_SRC) } catch (e: Exception) { null }
         } else null
     }
     
@@ -199,6 +200,13 @@ fun TaleLegendBackground(
                 runtimeShader.setFloatUniform("iEnergy", dynamicEnergy)
                 runtimeShader.setFloatUniform("iSpeed", finalSpeed)
                 runtimeShader.setFloatUniform("isPlayer", if (isPlayerScreen) 1f else 0f)
+                
+                val centerY = VisualizerState.albumArtCenterY
+                val dynamicOffsetY = if (isPlayerScreen && centerY != null) {
+                    ((size.height / 2f) - centerY) / size.height
+                } else 0f
+                runtimeShader.setFloatUniform("iOffsetY", dynamicOffsetY)
+                
                 runtimeShader.setFloatUniform("colorDominant", dom.red, dom.green, dom.blue, dom.alpha)
                 runtimeShader.setFloatUniform("colorVibrant", vib.red, vib.green, vib.blue, vib.alpha)
                 
@@ -206,7 +214,13 @@ fun TaleLegendBackground(
             } else {
                 val width = size.width
                 val height = size.height
-                val center = androidx.compose.ui.geometry.Offset(width / 2f, height / 2f)
+                val fallbackCenterY = VisualizerState.albumArtCenterY
+                val centerY = if (isPlayerScreen && fallbackCenterY != null) {
+                    fallbackCenterY
+                } else {
+                    height / 2f
+                }
+                val center = androidx.compose.ui.geometry.Offset(width / 2f, centerY)
                 drawCircle(color = vibrantColorState.value.copy(alpha = 0.5f), radius = 200f + dynamicEnergy * 100f, center = center)
             }
         }
