@@ -173,13 +173,21 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         playerViewModel.isUiVisible = true
-        visualizerManager.isEnabled = true
+        if (::visualizerManager.isInitialized) {
+            visualizerManager.isEnabled = prefs.lastMainScreenPage == 2
+            if (visualizerManager.isEnabled) {
+                visualizerManager.start(0)
+            }
+        }
     }
 
     override fun onPause() {
         super.onPause()
         playerViewModel.isUiVisible = false
-        visualizerManager.isEnabled = false
+        if (::visualizerManager.isInitialized) {
+            visualizerManager.isEnabled = false
+            visualizerManager.stop(decay = false)
+        }
     }
 
     override fun onDestroy() {
@@ -297,6 +305,13 @@ fun MainScreen(
     var currentPage by remember { mutableIntStateOf(prefs.lastMainScreenPage) } // 0: Home, 1: Library, 2: Player
     LaunchedEffect(currentPage) {
         prefs.lastMainScreenPage = currentPage
+        if (currentPage == 2) {
+            visualizerManager.isEnabled = true
+            visualizerManager.start(0)
+        } else {
+            visualizerManager.isEnabled = false
+            visualizerManager.stop(decay = true)
+        }
     }
     var sortOrder by remember { mutableStateOf(prefs.librarySortOrder) }
 
@@ -331,6 +346,7 @@ fun MainScreen(
                     paletteColors = paletteColors,
                     bgStyle = bgStyle,
                     prefs = prefs,
+                    exoPlayer = exoPlayer,
                     onPlayPauseClick = { if (exoPlayer?.isPlaying == true) exoPlayer?.pause() else exoPlayer?.play() }
                 )
             }
@@ -516,7 +532,7 @@ fun MainScreen(
                 modifier = Modifier.padding(32.dp)
             ) {
                 androidx.compose.material3.Text(
-                    text = "¡Bienvenido a BeatPulse!",
+                    text = "¡Bienvenido a DuWave!",
                     color = Color.White,
                     style = MaterialTheme.typography.headlineMedium,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center

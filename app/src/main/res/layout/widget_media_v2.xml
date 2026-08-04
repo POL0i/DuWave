@@ -42,7 +42,7 @@
                 android:id="@+id/widget_artist"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="BeatPulse"
+                android:text="DuWave"
                 android:textColor="#AAAAAA"
                 android:textSize="12sp"
                 android:singleLine="true"

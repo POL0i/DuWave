@@ -245,7 +245,25 @@ class LibraryViewModel @Inject constructor(
                 val url = onlineRepository.getStreamUrl(videoId)
                 if (url != null) {
                     // Guardar en la base de datos para recordar la metadata (portada, título real) cuando MediaStore lo escanee
-                    val coverUrl = track.dataPath.substringAfter("|cover=", "").takeIf { it.isNotEmpty() }
+                    var coverUrl = track.dataPath.substringAfter("|cover=", "").takeIf { it.isNotEmpty() }
+                    
+                    // Descargar la miniatura offline
+                    if (coverUrl != null && (coverUrl.startsWith("http://") || coverUrl.startsWith("https://"))) {
+                        try {
+                            val coversDir = java.io.File(context.filesDir, "covers")
+                            if (!coversDir.exists()) coversDir.mkdirs()
+                            val destFile = java.io.File(coversDir, "cover_${System.currentTimeMillis()}.jpg")
+                            java.net.URL(coverUrl).openStream().use { input ->
+                                destFile.outputStream().use { output ->
+                                    input.copyTo(output)
+                                }
+                            }
+                            coverUrl = destFile.absolutePath
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
+                    }
+
                     val trackToSave = track.copy(
                         customTitle = track.customTitle ?: track.title,
                         customArtist = track.customArtist ?: track.artist,

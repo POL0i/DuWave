@@ -74,6 +74,13 @@ import androidx.compose.material.icons.filled.TrackChanges
 import androidx.compose.material.icons.filled.VerticalAlignCenter
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+
+import androidx.compose.material.icons.filled.Shuffle
+import androidx.compose.material.icons.filled.Waves
+import androidx.compose.material.icons.filled.ShowChart
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
+
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -162,6 +169,12 @@ fun PlayerScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var currentPosition by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     var duration by remember { androidx.compose.runtime.mutableLongStateOf(1L) }
+    
+    // A-B Repeat state
+    var abRepeatModeEnabled by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var abPointA by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+    var abPointB by remember { androidx.compose.runtime.mutableFloatStateOf(0.5f) }
+    var showRemainingTime by remember { androidx.compose.runtime.mutableStateOf(false) }
     val isFetchingLyrics by playerViewModel.isFetchingLyrics.collectAsState()
     val searchFailed by playerViewModel.searchFailed.collectAsState()
     val availableLyricsResults by playerViewModel.availableLyricsResults.collectAsState()
@@ -262,6 +275,18 @@ fun PlayerScreen(
                 isPlaying = exoPlayer.isPlaying
                 duration = exoPlayer.duration.coerceAtLeast(1L)
                 currentPosition = exoPlayer.currentPosition
+                
+                if (abRepeatModeEnabled) {
+                    val aPos = (abPointA * duration).toLong()
+                    val bPos = (abPointB * duration).toLong()
+                    if (currentPosition >= bPos && bPos > aPos) {
+                        exoPlayer.seekTo(aPos)
+                        currentPosition = aPos
+                    } else if (currentPosition < aPos && bPos > aPos) {
+                        exoPlayer.seekTo(aPos)
+                        currentPosition = aPos
+                    }
+                }
             }
             if (isPlayingState) {
                 delay(100L) // Poll at 10fps for smooth progress update
@@ -323,13 +348,37 @@ fun PlayerScreen(
                             maxLines = 1,
                             modifier = Modifier.basicMarquee()
                         )
-                        Text(
-                            text = track.artist,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = colorVibrant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        var showRemainingTime by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                        androidx.compose.foundation.layout.Row(
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                            modifier = androidx.compose.ui.Modifier.clickable(
+                                interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null
+                            ) { showRemainingTime = !showRemainingTime }
+                        ) {
+                            Text(
+                                text = track.artist,
+                                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                                color = colorVibrant,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                            androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
+                            val dur = exoPlayer?.duration?.takeIf { it > 0 } ?: 0L
+                            val pos = exoPlayer?.currentPosition ?: 0L
+                            val formatTime = { ms: Long -> 
+                                val totalSeconds = ms / 1000
+                                val m = totalSeconds / 60
+                                val s = totalSeconds % 60
+                                String.format("%02d:%02d", m, s)
+                            }
+                            val timeText = if (showRemainingTime) "-${formatTime(dur - pos)}" else formatTime(pos)
+                            Text(
+                                text = timeText,
+                                style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                                color = colorVibrant
+                            )
+                        }
                     }
                     Row(modifier = Modifier.align(Alignment.CenterStart)) {
                         IconButton(
@@ -573,6 +622,106 @@ fun PlayerScreen(
                         Canvas(modifier = Modifier.size(320.dp).graphicsLayer {
                             scaleX = animatedScaleAnim.value
                             scaleY = animatedScaleAnim.value
+                        }.pointerInput(abRepeatModeEnabled, thumbnailShapeIdx) {
+                            if (!abRepeatModeEnabled) return@pointerInput
+                            
+                            val cx = size.width / 2f
+                            val cy = size.height / 2f
+                            val rPx = 160.dp.toPx() / 2f
+                            
+                            val getProgressFromOffset = { offset: androidx.compose.ui.geometry.Offset ->
+                                if (thumbnailShapeIdx == 0) {
+                                    var angle = Math.atan2((offset.y - cy).toDouble(), (offset.x - cx).toDouble())
+                                    angle += Math.PI / 2
+                                    if (angle < 0) angle += 2 * Math.PI
+                                    (angle / (2 * Math.PI)).toFloat()
+                                } else {
+                                    val basePath = android.graphics.Path()
+                                    if (thumbnailShapeIdx == 1) {
+                                        basePath.addRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, android.graphics.Path.Direction.CW)
+                                    } else if (thumbnailShapeIdx == 2) {
+                                        basePath.addRoundRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, 16.dp.toPx(), 16.dp.toPx(), android.graphics.Path.Direction.CW)
+                                    } else {
+                                        basePath.addRoundRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, 32.dp.toPx(), 32.dp.toPx(), android.graphics.Path.Direction.CW)
+                                    }
+                                    val pm = android.graphics.PathMeasure(basePath, true)
+                                    val len = pm.length
+                                    var minD = Float.MAX_VALUE
+                                    var bestP = 0f
+                                    val pos = FloatArray(2)
+                                    for(i in 0..180) {
+                                        val p = i / 180f
+                                        if (pm.getPosTan(p * len, pos, null)) {
+                                            val dx = pos[0] - offset.x
+                                            val dy = pos[1] - offset.y
+                                            val dSq = dx*dx + dy*dy
+                                            if (dSq < minD) {
+                                                minD = dSq
+                                                bestP = p
+                                            }
+                                        }
+                                    }
+                                    bestP
+                                }
+                            }
+                            
+                            val getPosFromProgress = { progress: Float ->
+                                if (thumbnailShapeIdx == 0) {
+                                    val angle = progress * 2 * Math.PI - Math.PI / 2
+                                    androidx.compose.ui.geometry.Offset(cx + rPx * kotlin.math.cos(angle).toFloat(), cy + rPx * kotlin.math.sin(angle).toFloat())
+                                } else {
+                                    val basePath = android.graphics.Path()
+                                    if (thumbnailShapeIdx == 1) {
+                                        basePath.addRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, android.graphics.Path.Direction.CW)
+                                    } else if (thumbnailShapeIdx == 2) {
+                                        basePath.addRoundRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, 16.dp.toPx(), 16.dp.toPx(), android.graphics.Path.Direction.CW)
+                                    } else {
+                                        basePath.addRoundRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, 32.dp.toPx(), 32.dp.toPx(), android.graphics.Path.Direction.CW)
+                                    }
+                                    val pm = android.graphics.PathMeasure(basePath, true)
+                                    val pos = FloatArray(2)
+                                    pm.getPosTan(progress * pm.length, pos, null)
+                                    androidx.compose.ui.geometry.Offset(pos[0], pos[1])
+                                }
+                            }
+
+                            var draggingHandle: String? = null
+                            val hitRadius = 24.dp.toPx()
+                            
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    val change = event.changes.firstOrNull() ?: continue
+                                    
+                                    if (change.pressed) {
+                                        if (draggingHandle == null) {
+                                            val posA = getPosFromProgress(abPointA)
+                                            val posB = getPosFromProgress(abPointB)
+                                            
+                                            val distA = kotlin.math.hypot((change.position.x - posA.x).toDouble(), (change.position.y - posA.y).toDouble()).toFloat()
+                                            val distB = kotlin.math.hypot((change.position.x - posB.x).toDouble(), (change.position.y - posB.y).toDouble()).toFloat()
+
+                                            if (distA < hitRadius && distA <= distB) {
+                                                draggingHandle = "A"
+                                                change.consume()
+                                            } else if (distB < hitRadius) {
+                                                draggingHandle = "B"
+                                                change.consume()
+                                            }
+                                        } else {
+                                            val newProgress = getProgressFromOffset(change.position)
+                                            if (draggingHandle == "A") {
+                                                abPointA = newProgress
+                                            } else {
+                                                abPointB = newProgress
+                                            }
+                                            change.consume()
+                                        }
+                                    } else {
+                                        draggingHandle = null
+                                    }
+                                }
+                            }
                         }) {
                 val bassAmplitudes = bassAmplitudesState.value
                 val midAmplitudes = midAmplitudesState.value
@@ -603,13 +752,21 @@ fun PlayerScreen(
                             left = center.x - rPx, top = center.y - rPx, right = center.x + rPx, bottom = center.y + rPx,
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(32.dp.toPx(), 32.dp.toPx())
                         ))
+                    } else if (thumbnailShapeIdx == 3) {
+                        val squircleRadius = 64.dp.toPx()
+                        basePath.addRoundRect(androidx.compose.ui.geometry.RoundRect(
+                            left = center.x - rPx, top = center.y - rPx, right = center.x + rPx, bottom = center.y + rPx,
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(squircleRadius, squircleRadius)
+                        ))
                     }
+                    basePath.close()
                     progressMeasure.setPath(basePath, forceClosed = false)
+                    androidPathMeasure.setPath(basePath.asAndroidPath(), false)
                     lastSize = size
                     lastShape = thumbnailShapeIdx
                 }
 
-                val pathLength = if (thumbnailShapeIdx == 0) rPx * 2f * Math.PI.toFloat() else progressMeasure.length
+                val pathLength = if (thumbnailShapeIdx == 0) rPx * 2f * Math.PI.toFloat() else androidPathMeasure.length
 
                 fun drawLayer(amps: FloatArray, layerColor: Color, opacity: Float, isBassLayer: Boolean) {
                     val numBars = amps.size
@@ -625,13 +782,15 @@ fun PlayerScreen(
                             outPx = center.x + rPx * outNx
                             outPy = center.y + rPx * outNy
                         } else {
-                            val pos = progressMeasure.getPosition(d % pathLength)
-                            val tan = progressMeasure.getTangent(d % pathLength)
-                            if (pos != androidx.compose.ui.geometry.Offset.Unspecified && tan != androidx.compose.ui.geometry.Offset.Unspecified) {
-                                outPx = pos.x
-                                outPy = pos.y
-                                outNx = tan.y
-                                outNy = -tan.x
+                            val dMod = d % pathLength
+                            val localPosTan = FloatArray(2)
+                            val localPosTanTan = FloatArray(2)
+                            val success = androidPathMeasure.getPosTan(dMod, localPosTan, localPosTanTan)
+                            if (success) {
+                                outPx = localPosTan[0]
+                                outPy = localPosTan[1]
+                                outNx = -localPosTanTan[1]
+                                outNy = localPosTanTan[0]
                                 val len = kotlin.math.hypot(outNx, outNy)
                                 if (len > 0) { outNx /= len; outNy /= len }
                             } else {
@@ -872,10 +1031,49 @@ fun PlayerScreen(
                     drawPath(path = progressPath, brush = sweepGradient, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round))
 
                     val thumbDist = endD % pLen
-                    val thumbPos = progressMeasure.getPosition(thumbDist)
-                    if (thumbPos != androidx.compose.ui.geometry.Offset.Unspecified) {
+                    var thumbPos = progressMeasure.getPosition(thumbDist)
+                    if (thumbnailShapeIdx != 0 && (thumbPos == androidx.compose.ui.geometry.Offset.Unspecified || thumbPos == androidx.compose.ui.geometry.Offset.Zero)) {
+                        val localPosTan = FloatArray(2)
+                        if (androidPathMeasure.getPosTan(thumbDist, localPosTan, null)) {
+                            thumbPos = androidx.compose.ui.geometry.Offset(localPosTan[0], localPosTan[1])
+                        }
+                    }
+                    if (thumbPos != androidx.compose.ui.geometry.Offset.Unspecified && thumbPos != androidx.compose.ui.geometry.Offset.Zero) {
                         playheadPos = thumbPos
                         drawCircle(color = androidx.compose.ui.graphics.Color.White, radius = 8f, center = thumbPos)
+                    }
+                }
+                
+                if (abRepeatModeEnabled) {
+                    val getPosFromProgress = { progress: Float ->
+                        if (thumbnailShapeIdx == 0) {
+                            val angle = progress * 2 * Math.PI - Math.PI / 2
+                            androidx.compose.ui.geometry.Offset(center.x + rPx * kotlin.math.cos(angle).toFloat(), center.y + rPx * kotlin.math.sin(angle).toFloat())
+                        } else {
+                            val dMod = (progress * pathLength).coerceIn(0f, pathLength - 0.01f)
+                            val localPosTan = FloatArray(2)
+                            val success = androidPathMeasure.getPosTan(dMod, localPosTan, null)
+                            if (success) androidx.compose.ui.geometry.Offset(localPosTan[0], localPosTan[1]) else center
+                        }
+                    }
+                    val posA = getPosFromProgress(abPointA)
+                    val posB = getPosFromProgress(abPointB)
+                    val markerSize = 8.dp.toPx()
+                    
+                    if (thumbnailShapeIdx == 0) {
+                        drawCircle(color = colorVibrant, radius = markerSize, center = posA)
+                        drawCircle(color = colorVibrant.copy(alpha=0.3f), radius = markerSize * 2, center = posA)
+                        
+                        drawCircle(color = colorMuted, radius = markerSize, center = posB)
+                        drawCircle(color = colorMuted.copy(alpha=0.3f), radius = markerSize * 2, center = posB)
+                    } else {
+                        val cornerRadius = if (thumbnailShapeIdx == 2) 4.dp.toPx() else if (thumbnailShapeIdx == 3) 8.dp.toPx() else 0f
+                        
+                        drawRoundRect(color = colorVibrant, topLeft = androidx.compose.ui.geometry.Offset(posA.x - markerSize, posA.y - markerSize), size = androidx.compose.ui.geometry.Size(markerSize*2, markerSize*2), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius))
+                        drawRoundRect(color = colorVibrant.copy(alpha=0.3f), topLeft = androidx.compose.ui.geometry.Offset(posA.x - markerSize*2, posA.y - markerSize*2), size = androidx.compose.ui.geometry.Size(markerSize*4, markerSize*4), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius*2, cornerRadius*2))
+                        
+                        drawRoundRect(color = colorMuted, topLeft = androidx.compose.ui.geometry.Offset(posB.x - markerSize, posB.y - markerSize), size = androidx.compose.ui.geometry.Size(markerSize*2, markerSize*2), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius))
+                        drawRoundRect(color = colorMuted.copy(alpha=0.3f), topLeft = androidx.compose.ui.geometry.Offset(posB.x - markerSize*2, posB.y - markerSize*2), size = androidx.compose.ui.geometry.Size(markerSize*4, markerSize*4), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius*2, cornerRadius*2))
                     }
                 }
             }
@@ -1389,21 +1587,8 @@ fun PlayerScreen(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                    Text("Reproducción Aleatoria", color = Color.White)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        val context = androidx.compose.ui.platform.LocalContext.current
-                        androidx.compose.material3.IconToggleButton(
-                            checked = autoAnalyzeLyrics,
-                            onCheckedChange = { playerViewModel.toggleAutoAnalyze() }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.List,
-                                contentDescription = "Auto-Analyze Lyrics",
-                                tint = if (autoAnalyzeLyrics) colorVibrant else Color.Gray.copy(alpha = 0.5f),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                        var isShuffleEnabled by remember { mutableStateOf(exoPlayer?.shuffleModeEnabled == true) }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(0.7f)) {
+                        var isShuffleEnabled by remember { androidx.compose.runtime.mutableStateOf(exoPlayer?.shuffleModeEnabled == true) }
                         androidx.compose.material3.Switch(
                             checked = isShuffleEnabled,
                             onCheckedChange = { 
@@ -1412,21 +1597,26 @@ fun PlayerScreen(
                             },
                             colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorVibrant.copy(alpha=0.5f))
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Reproducción Aleatoria", color = Color.White)
                     }
-                }
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text("Modo de Repetición", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    val currentMode = exoPlayer?.repeatMode ?: androidx.media3.common.Player.REPEAT_MODE_OFF
-                    TextButton(onClick = { exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF }) {
-                        Text("Desactivado", color = if (currentMode == androidx.media3.common.Player.REPEAT_MODE_OFF) colorVibrant else Color.Gray)
-                    }
-                    TextButton(onClick = { exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ALL }) {
-                        Text("Lista", color = if (currentMode == androidx.media3.common.Player.REPEAT_MODE_ALL) colorVibrant else Color.Gray)
-                    }
-                    TextButton(onClick = { exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE }) {
-                        Text("Una", color = if (currentMode == androidx.media3.common.Player.REPEAT_MODE_ONE) colorVibrant else Color.Gray)
+                    
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.weight(0.3f)) {
+                        androidx.compose.material3.IconToggleButton(
+                            checked = autoAnalyzeLyrics,
+                            onCheckedChange = { playerViewModel.toggleAutoAnalyze() }
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.List,
+                                contentDescription = "Auto-Analyze Lyrics",
+                                tint = if (autoAnalyzeLyrics) colorVibrant else Color.Gray.copy(alpha = 0.5f),
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
@@ -1448,25 +1638,62 @@ fun PlayerScreen(
                         )
                     }
                 }
-                
                 Spacer(modifier = Modifier.height(16.dp))
-                
+
+                Text("Modo de Repetición", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                    val currentMode = exoPlayer?.repeatMode ?: androidx.media3.common.Player.REPEAT_MODE_OFF
+                    TextButton(onClick = { 
+                        exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
+                        abRepeatModeEnabled = false
+                    }) {
+                        Text("Desactivado", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_OFF) colorVibrant else Color.Gray)
+                    }
+                    TextButton(onClick = { 
+                        exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ALL
+                        abRepeatModeEnabled = false
+                    }) {
+                        Text("Lista", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_ALL) colorVibrant else Color.Gray)
+                    }
+                    TextButton(onClick = { 
+                        exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE
+                        abRepeatModeEnabled = false
+                    }) {
+                        Text("Una", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_ONE) colorVibrant else Color.Gray)
+                    }
+                    TextButton(onClick = { 
+                        exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
+                        abRepeatModeEnabled = true
+                        abPointA = 0f
+                        abPointB = 0.5f
+                        showSettingsMenu = false
+                    }) {
+                        Text("A y B", color = if (abRepeatModeEnabled) colorVibrant else Color.Gray)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Text("Arquetipo de Ondas", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     TextButton(onClick = {
                         visualizerManager.visualizerArchetype.value = 0
                         prefs.visualizerArchetype = 0
                     }) {
-                        Text("3 Ondas Superpuestas", color = if (visualizerArchetype == 0) colorVibrant else Color.Gray)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Waves, contentDescription = null, tint = if (visualizerArchetype == 0) colorVibrant else Color.Gray)
+                            Text("3 Ondas Superpuestas", color = if (visualizerArchetype == 0) colorVibrant else Color.Gray, fontSize = 12.sp)
+                        }
                     }
                     TextButton(onClick = {
                         visualizerManager.visualizerArchetype.value = 1
                         prefs.visualizerArchetype = 1
                     }) {
-                        Text("1 Onda Combinada", color = if (visualizerArchetype == 1) colorVibrant else Color.Gray)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.GraphicEq, contentDescription = null, tint = if (visualizerArchetype == 1) colorVibrant else Color.Gray)
+                            Text("1 Onda Combinada", color = if (visualizerArchetype == 1) colorVibrant else Color.Gray, fontSize = 12.sp)
+                        }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text("Modo de Cálculo (FFT)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
@@ -1475,32 +1702,24 @@ fun PlayerScreen(
                         visualizerManager.fftMode.value = "AVERAGE"
                         prefs.visualizerFftMode = "AVERAGE"
                     }) {
-                        Text("Promedio (Estable)", color = if (fftMode == "AVERAGE") colorVibrant else Color.Gray)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Equalizer, contentDescription = null, tint = if (fftMode == "AVERAGE") colorVibrant else Color.Gray)
+                            Text("Promedio (Estable)", color = if (fftMode == "AVERAGE") colorVibrant else Color.Gray, fontSize = 12.sp)
+                        }
                     }
                     TextButton(onClick = {
                         visualizerManager.fftMode.value = "MAX"
                         prefs.visualizerFftMode = "MAX"
                     }) {
-                        Text("Máximo (Dinámico)", color = if (fftMode == "MAX") colorVibrant else Color.Gray)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.ShowChart, contentDescription = null, tint = if (fftMode == "MAX") colorVibrant else Color.Gray)
+                            Text("Máximo (Dinámico)", color = if (fftMode == "MAX") colorVibrant else Color.Gray, fontSize = 12.sp)
+                        }
                     }
                 }
-
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("Sensibilidad General: ${String.format("%.1f", sensitivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                Slider(
-                    value = sensitivity,
-                    onValueChange = {
-                        visualizerManager.sensitivity.value = it
-                        prefs.sensitivity = it
-                    },
-                    valueRange = 0.5f..3.0f,
-                    colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text("Reactividad (Ghosts): ${String.format("%.2f", reactivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Text("Reactividad de Caos: ${String.format("%.2f", reactivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = reactivity,
                     onValueChange = {
@@ -1510,57 +1729,94 @@ fun PlayerScreen(
                     valueRange = 0.1f..1.5f,
                     colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
                 )
-
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorDominant, androidx.compose.foundation.shape.CircleShape))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Sensibilidad de Graves (Bajos): ${String.format("%.1f", bassMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                var isAdvancedMode by remember { androidx.compose.runtime.mutableStateOf(prefs.isAdvancedMode) }
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { 
+                    isAdvancedMode = !isAdvancedMode
+                    prefs.isAdvancedMode = isAdvancedMode
+                    visualizerManager.isAdvancedMode.value = isAdvancedMode
+                }) {
+                    Text(if (isAdvancedMode) "Sensibilidad Avanzada" else "Sensibilidad General", color = Color.Gray, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                    androidx.compose.material3.Switch(
+                        checked = isAdvancedMode,
+                        onCheckedChange = { 
+                            isAdvancedMode = it
+                            prefs.isAdvancedMode = it
+                            visualizerManager.isAdvancedMode.value = it
+                        },
+                        colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorVibrant.copy(alpha=0.5f))
+                    )
                 }
-                Slider(
-                    value = bassMult,
-                    onValueChange = {
-                        visualizerManager.bassMultiplier.value = it
-                        prefs.bassMultiplier = it
-                    },
-                    valueRange = 0.5f..3.0f,
-                    colors = SliderDefaults.colors(thumbColor = colorDominant, activeTrackColor = colorDominant)
-                )
+                
+                if (isAdvancedMode) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorDominant, androidx.compose.foundation.shape.CircleShape))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Sensibilidad de Graves (Bajos): ${String.format("%.1f", bassMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    }
+                    Slider(
+                        value = bassMult,
+                        onValueChange = {
+                            visualizerManager.bassMultiplier.value = it
+                            prefs.bassMultiplier = it
+                        },
+                        valueRange = 0.5f..3.0f,
+                        colors = SliderDefaults.colors(thumbColor = colorDominant, activeTrackColor = colorDominant)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Spacer(modifier = Modifier.height(16.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorVibrant, androidx.compose.foundation.shape.CircleShape))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Sensibilidad de Medios: ${String.format("%.1f", midMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    }
+                    Slider(
+                        value = midMult,
+                        onValueChange = {
+                            visualizerManager.midMultiplier.value = it
+                            prefs.midMultiplier = it
+                        },
+                        valueRange = 0.5f..3.0f,
+                        colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorVibrant, androidx.compose.foundation.shape.CircleShape))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Sensibilidad de Medios: ${String.format("%.1f", midMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorMuted, androidx.compose.foundation.shape.CircleShape))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Sensibilidad de Altos (Agudos): ${String.format("%.1f", trebleMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    }
+                    Slider(
+                        value = trebleMult,
+                        onValueChange = {
+                            visualizerManager.trebleMultiplier.value = it
+                            prefs.trebleMultiplier = it
+                        },
+                        valueRange = 0.5f..3.0f,
+                        colors = SliderDefaults.colors(thumbColor = colorMuted, activeTrackColor = colorMuted)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Sensibilidad General: ${String.format("%.1f", sensitivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Slider(
+                        value = sensitivity,
+                        onValueChange = {
+                            visualizerManager.sensitivity.value = it
+                            prefs.sensitivity = it
+                            // Keep advanced sync
+                            visualizerManager.bassMultiplier.value = it
+                            prefs.bassMultiplier = it
+                            visualizerManager.midMultiplier.value = it
+                            prefs.midMultiplier = it
+                            visualizerManager.trebleMultiplier.value = it
+                            prefs.trebleMultiplier = it
+                        },
+                        valueRange = 0.5f..3.0f,
+                        colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
+                    )
                 }
-                Slider(
-                    value = midMult,
-                    onValueChange = {
-                        visualizerManager.midMultiplier.value = it
-                        prefs.midMultiplier = it
-                    },
-                    valueRange = 0.5f..3.0f,
-                    colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorMuted, androidx.compose.foundation.shape.CircleShape))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Sensibilidad de Altos (Agudos): ${String.format("%.1f", trebleMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                }
-                Slider(
-                    value = trebleMult,
-                    onValueChange = {
-                        visualizerManager.trebleMultiplier.value = it
-                        prefs.trebleMultiplier = it
-                    },
-                    valueRange = 0.5f..3.0f,
-                    colors = SliderDefaults.colors(thumbColor = colorMuted, activeTrackColor = colorMuted)
-                )
 
                 Spacer(modifier = Modifier.height(24.dp))
             }

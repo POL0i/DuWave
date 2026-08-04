@@ -12,9 +12,12 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.foundation.clickable
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +37,8 @@ fun MiniPlayer(
     accentColor: Color,
     paletteColors: PaletteColors,
     bgStyle: Int,
+    exoPlayer: androidx.media3.common.Player?,
+    onClick: () -> Unit,
     onPlayPauseClick: () -> Unit
 ) {
     if (currentTrack == null) return
@@ -83,12 +88,14 @@ fun MiniPlayer(
             .padding(8.dp)
             .background(miniPlayerBg, miniPlayerShape)
             .border(miniPlayerBorder, miniPlayerShape)
-            .padding(8.dp)
+            .clip(miniPlayerShape)
+            .clickable { onClick() }
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
+        Column {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth().padding(8.dp)
+            ) {
             val albumArtBitmap = rememberFullAlbumArt(currentTrack)
             if (albumArtBitmap != null) {
                 Image(
@@ -133,6 +140,57 @@ fun MiniPlayer(
                     contentDescription = "Play/Pause",
                     tint = accentColor,
                     modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+
+            var currentPos by androidx.compose.runtime.remember { androidx.compose.runtime.mutableLongStateOf(0L) }
+            var duration by androidx.compose.runtime.remember { androidx.compose.runtime.mutableLongStateOf(1L) }
+            androidx.compose.runtime.LaunchedEffect(isPlaying, exoPlayer) {
+                while(true) {
+                    currentPos = exoPlayer?.currentPosition ?: 0L
+                    val d = exoPlayer?.duration ?: 1L
+                    duration = if (d > 0) d else 1L
+                    kotlinx.coroutines.delay(500)
+                }
+            }
+            val progress = (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+            
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                val formatTime = { ms: Long -> 
+                    val totalSeconds = ms / 1000
+                    val m = totalSeconds / 60
+                    val s = totalSeconds % 60
+                    String.format("%02d:%02d", m, s)
+                }
+                Text(
+                    text = formatTime(currentPos),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(modifier = Modifier
+                    .weight(1f)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.Black.copy(alpha=0.3f))
+                ) {
+                    Box(modifier = Modifier
+                        .fillMaxWidth(progress)
+                        .fillMaxHeight()
+                        .background(Brush.horizontalGradient(listOf(paletteColors.dominant, accentColor)))
+                    )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = formatTime(duration),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
             }
         }

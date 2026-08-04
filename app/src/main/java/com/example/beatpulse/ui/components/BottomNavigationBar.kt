@@ -42,6 +42,7 @@ fun BottomNavigationBar(
     paletteColors: PaletteColors,
     bgStyle: Int,
     prefs: PreferencesManager,
+    exoPlayer: androidx.media3.common.Player?,
     onPlayPauseClick: () -> Unit
 ) {
     var accumulatedDrag by remember { mutableFloatStateOf(0f) }
@@ -150,6 +151,8 @@ fun BottomNavigationBar(
                             accentColor = accentColor,
                             paletteColors = paletteColors,
                             bgStyle = bgStyle,
+                            exoPlayer = exoPlayer,
+                            onClick = { onPageChange(2) },
                             onPlayPauseClick = onPlayPauseClick
                         )
                     } else {

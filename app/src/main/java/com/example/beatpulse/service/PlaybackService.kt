@@ -247,7 +247,7 @@ class PlaybackService : MediaSessionService() {
         val intent1 = Intent(this, com.example.beatpulse.widget.MediaWidgetProvider::class.java).apply {
             action = com.example.beatpulse.widget.MediaWidgetProvider.ACTION_UPDATE_WIDGET
             putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_TITLE, metadata?.title?.toString() ?: "No playing")
-            putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_ARTIST, metadata?.artist?.toString() ?: "BeatPulse")
+            putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_ARTIST, metadata?.artist?.toString() ?: "DuWave")
             putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_IS_PLAYING, player.isPlaying)
             
             // Extract cover art path
@@ -262,7 +262,7 @@ class PlaybackService : MediaSessionService() {
         val intent2 = Intent(this, com.example.beatpulse.widget.MediaWidgetProvider4x1::class.java).apply {
             action = com.example.beatpulse.widget.MediaWidgetProvider.ACTION_UPDATE_WIDGET
             putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_TITLE, metadata?.title?.toString() ?: "No playing")
-            putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_ARTIST, metadata?.artist?.toString() ?: "BeatPulse")
+            putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_ARTIST, metadata?.artist?.toString() ?: "DuWave")
             putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_IS_PLAYING, player.isPlaying)
             
             val coverPath = metadata?.artworkUri?.toString()?.removePrefix("file://")

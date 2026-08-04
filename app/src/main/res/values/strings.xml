@@ -1,13 +1,13 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">BeatPulse</string>
+    <string name="app_name">DuWave</string>
     <string name="perm_mic_denied">Las animaciones rítmicas están desactivadas porque no hay permiso de micrófono.</string>
     <string name="perm_storage_denied">Se requiere permiso de almacenamiento para buscar tu música.</string>
     <string name="add_to_playlist">Añadir a Playlist</string>
     <string name="no_playlists">No tienes playlists creadas. Crea una desde la pestaña de Álbumes.</string>
     <string name="added_to_playlist">Añadida a %1$s</string>
     <string name="close">Cerrar</string>
-    <string name="welcome_title">¡Bienvenido a BeatPulse!</string>
+    <string name="welcome_title">¡Bienvenido a DuWave!</string>
     <string name="welcome_body">👋 Gestos Principales:\n\n• Desliza a los lados en el mini-reproductor para cambiar entre Inicio, Biblioteca y Reproductor.\n\n• Usa la lupa en Biblioteca para buscar y el botón de recargar para buscar música nueva.\n\n• Toca aquí para comenzar a escuchar.</string>
     <string name="tab_all">Todos</string>
     <string name="tab_browser">Navegador</string>

@@ -83,7 +83,7 @@ fun DarkAmbientBackground(
     LaunchedEffect(isPlayerScreen) {
         var smoothEnergy = 0f
         var lastTime = 0L
-        while(true) {
+        while (isPlayerScreen || dynamicEnergy > 0.01f) {
             withFrameMillis { time ->
                 if (lastTime == 0L) lastTime = time
                 val dt = ((time - lastTime) / 1000f).coerceAtMost(0.1f)

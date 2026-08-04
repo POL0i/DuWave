@@ -122,12 +122,22 @@ class MusicRepository(context: Context) {
                         }
 
                         val id = it.getLong(idColumn)
-                        val title = it.getString(titleColumn) ?: "Unknown Title"
-                        val artist = it.getString(artistColumn) ?: "Unknown Artist"
-                        val album = it.getString(albumColumn) ?: "Unknown Album"
+                        var title = it.getString(titleColumn) ?: "Unknown Title"
+                        var artist = it.getString(artistColumn) ?: "Unknown Artist"
+                        var album = it.getString(albumColumn) ?: "Unknown Album"
                         val dateAdded = it.getLong(dateAddedColumn) * 1000L // Convert seconds to ms
                         
                         val folderPath = File(dataPath).parent ?: ""
+
+                        if ((artist == "<unknown>" || artist == "Unknown Artist") && dataPath.contains("DuWave")) {
+                            val fileName = File(dataPath).name
+                            val parts = fileName.removeSuffix(".m4a").removeSuffix(".mp3").split("_-_")
+                            if (parts.size >= 2) {
+                                artist = parts[0].replace("_", " ")
+                                title = parts[1].replace("_", " ")
+                                album = "DuWave Downloads"
+                            }
+                        }
                         
                         var existingTrack = existingMap[id]
                         if (existingTrack == null) {
@@ -143,15 +153,19 @@ class MusicRepository(context: Context) {
                                 dao.updatePlaylistTrackId(oldId = onlineTrack.id, newId = id)
                             }
                         }
+
+                        val resolvedTitle = existingTrack?.customTitle ?: (if (existingTrack?.dataPath?.startsWith("youtube://") == true) existingTrack.title else null) ?: title
+                        val resolvedArtist = existingTrack?.customArtist ?: (if (existingTrack?.dataPath?.startsWith("youtube://") == true) existingTrack.artist else null) ?: artist
+                        val resolvedAlbum = existingTrack?.customAlbum ?: album
                         
                         foundIds.add(id)
 
                         currentChunk.add(
                             TrackEntity(
                                 id = id,
-                                title = title,
-                                artist = artist,
-                                album = album,
+                                title = resolvedTitle,
+                                artist = resolvedArtist,
+                                album = resolvedAlbum,
                                 duration = duration,
                                 dataPath = dataPath,
                                 folderPath = folderPath,
@@ -159,8 +173,8 @@ class MusicRepository(context: Context) {
                                 lastPlayedTime = existingTrack?.lastPlayedTime ?: 0,
                                 playCount = existingTrack?.playCount ?: 0,
                                 dateAdded = existingTrack?.dateAdded?.takeIf { d -> d > 0 } ?: dateAdded,
-                                customTitle = existingTrack?.customTitle ?: if (existingTrack?.dataPath?.startsWith("youtube://") == true) existingTrack.title else null,
-                                customArtist = existingTrack?.customArtist ?: if (existingTrack?.dataPath?.startsWith("youtube://") == true) existingTrack.artist else null,
+                                customTitle = existingTrack?.customTitle,
+                                customArtist = existingTrack?.customArtist,
                                 customAlbum = existingTrack?.customAlbum,
                                 customCoverPath = existingTrack?.customCoverPath
                             )

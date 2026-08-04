@@ -201,20 +201,23 @@ fun LibraryScreen(
                 }
             }
 
-            val currentList = remember(selectedTabIndex, allTracks, recentTracks, favoriteTracks, localSearchQuery, sortOrder) {
-                val list = when (selectedTabIndex) {
-                    0 -> allTracks
-                    1 -> recentTracks
-                    2 -> emptyList() // handled separately
-                    else -> allTracks
-                }.filter { it.title.contains(localSearchQuery, ignoreCase = true) || it.artist.contains(localSearchQuery, ignoreCase = true) }
-                
-                when (sortOrder) {
-                    "TITLE" -> list.sortedBy { it.title.lowercase() }
-                    "ARTIST" -> list.sortedBy { it.artist.lowercase() }
-                    "ALBUM" -> list.sortedBy { it.album.lowercase() }
-                    "DIRECTORY" -> list.sortedWith(compareBy<TrackEntity> { if (it.dataPath.startsWith("youtube://")) "1_Online" else "0_Locales" }.thenBy { it.folderPath }.thenBy { it.title })
-                    else -> list
+            val currentList by produceState(initialValue = emptyList<TrackEntity>(), selectedTabIndex, allTracks, recentTracks, favoriteTracks, localSearchQuery, sortOrder) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    val baseList = when (selectedTabIndex) {
+                        0 -> allTracks
+                        1 -> recentTracks
+                        2 -> emptyList() // handled separately
+                        else -> allTracks
+                    }
+                    val filteredList = if (localSearchQuery.isEmpty()) baseList else baseList.filter { it.title.contains(localSearchQuery, ignoreCase = true) || it.artist.contains(localSearchQuery, ignoreCase = true) }
+                    
+                    value = when (sortOrder) {
+                        "TITLE" -> filteredList.sortedBy { it.title.lowercase() }
+                        "ARTIST" -> filteredList.sortedBy { it.artist.lowercase() }
+                        "ALBUM" -> filteredList.sortedBy { it.album.lowercase() }
+                        "DIRECTORY" -> filteredList.sortedWith(compareBy<TrackEntity> { if (it.dataPath.startsWith("youtube://")) "1_Online" else "0_Locales" }.thenBy { it.folderPath }.thenBy { it.title })
+                        else -> filteredList
+                    }
                 }
             }
 

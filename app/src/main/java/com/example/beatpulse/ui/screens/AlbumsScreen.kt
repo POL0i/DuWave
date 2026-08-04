@@ -43,8 +43,10 @@ fun AlbumsScreen(
     val shapeIdx by prefs.thumbnailShapeFlow.collectAsState()
 
     // Group tracks by folder path
-    val tracksByFolder = remember(allTracks) {
-        allTracks.groupBy { it.folderPath }.toSortedMap()
+    val tracksByFolder by produceState(initialValue = emptyMap<String, List<TrackEntity>>(), allTracks) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            value = allTracks.groupBy { it.folderPath }.toSortedMap()
+        }
     }
 
     data class PlaylistViewData(val title: String, val tracks: List<TrackEntity>, val playlistId: Long? = null)
@@ -449,11 +451,13 @@ fun CreatePlaylistScreen(
     val selectedTracks = remember { androidx.compose.runtime.mutableStateMapOf<Long, Boolean>() }
     val coroutineScope = rememberCoroutineScope()
 
-    val filteredTracks = remember(searchQuery, allTracks) {
-        if (searchQuery.isEmpty()) allTracks
-        else allTracks.filter { 
-            it.title.contains(searchQuery, ignoreCase = true) || 
-            it.artist.contains(searchQuery, ignoreCase = true) 
+    val filteredTracks by produceState(initialValue = allTracks, searchQuery, allTracks) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            value = if (searchQuery.isEmpty()) allTracks
+            else allTracks.filter { 
+                it.title.contains(searchQuery, ignoreCase = true) || 
+                it.artist.contains(searchQuery, ignoreCase = true) 
+            }
         }
     }
 
@@ -558,12 +562,14 @@ fun AddTracksScreen(
     val existingTracks by viewModel.getTracksForPlaylist(playlistId).collectAsState(initial = emptyList())
     val existingTrackIds = remember(existingTracks) { existingTracks.map { it.id }.toSet() }
 
-    val filteredTracks = remember(searchQuery, allTracks, existingTrackIds) {
-        val list = allTracks.filter { it.id !in existingTrackIds }
-        if (searchQuery.isEmpty()) list
-        else list.filter { 
-            it.title.contains(searchQuery, ignoreCase = true) || 
-            it.artist.contains(searchQuery, ignoreCase = true) 
+    val filteredTracks by produceState(initialValue = emptyList<TrackEntity>(), searchQuery, allTracks, existingTrackIds) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val list = allTracks.filter { it.id !in existingTrackIds }
+            value = if (searchQuery.isEmpty()) list
+            else list.filter { 
+                it.title.contains(searchQuery, ignoreCase = true) || 
+                it.artist.contains(searchQuery, ignoreCase = true) 
+            }
         }
     }
 

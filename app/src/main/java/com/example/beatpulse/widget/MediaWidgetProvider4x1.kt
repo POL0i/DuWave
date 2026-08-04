@@ -95,7 +95,7 @@ class MediaWidgetProvider4x1 : AppWidgetProvider() {
 
             if (intent != null) {
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: "No playing"
-                val artist = intent.getStringExtra(EXTRA_ARTIST) ?: "BeatPulse"
+                val artist = intent.getStringExtra(EXTRA_ARTIST) ?: "DuWave"
                 val isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, false)
                 val coverPath = intent.getStringExtra(EXTRA_COVER_PATH)
 
