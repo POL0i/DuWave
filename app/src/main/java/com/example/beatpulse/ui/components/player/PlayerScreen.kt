@@ -85,6 +85,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.example.beatpulse.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
@@ -308,20 +310,20 @@ fun PlayerScreen(
     if (showFeedbackDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showFeedbackDialog = false },
-            title = { Text("Sugerir mejoras", color = colorVibrant) },
-            text = { Text("¿Deseas abrir el navegador para sugerir mejoras o reportar problemas en GitHub?", color = dynamicTextColor) },
+            title = { Text(stringResource(R.string.suggest_improvements), color = colorVibrant) },
+            text = { Text(stringResource(R.string.suggest_improvements_desc), color = dynamicTextColor) },
             confirmButton = {
                 TextButton(onClick = {
                     val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/POL0i/DuWave/issues"))
                     context.startActivity(intent)
                     showFeedbackDialog = false
                 }) {
-                    Text("Abrir", color = colorVibrant)
+                    Text(stringResource(R.string.open), color = colorVibrant)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showFeedbackDialog = false }) {
-                    Text("Cancelar", color = dynamicTextColor.copy(alpha=0.7f))
+                    Text(stringResource(R.string.cancel), color = dynamicTextColor.copy(alpha=0.7f))
                 }
             },
             containerColor = paletteColors.dominant
@@ -1323,7 +1325,7 @@ fun PlayerScreen(
     if (showTimerDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showTimerDialog = false },
-            title = { Text("Temporizador", color = colorVibrant) },
+            title = { Text(stringResource(R.string.sleep_timer), color = colorVibrant) },
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(modifier = Modifier.size(200.dp).padding(16.dp), contentAlignment = Alignment.Center) {
@@ -1365,7 +1367,7 @@ fun PlayerScreen(
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showTimerDialog = false }) { Text("Aceptar", color = colorVibrant) }
+                TextButton(onClick = { showTimerDialog = false }) { Text(stringResource(R.string.accept), color = colorVibrant) }
             },
             containerColor = colorDominant.copy(alpha = 0.95f)
         )
@@ -1383,7 +1385,7 @@ fun PlayerScreen(
 
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showEqDialog = false },
-            title = { Text("Ecualizador", color = colorVibrant, fontWeight = FontWeight.Bold) },
+            title = { Text(stringResource(R.string.equalizer), color = colorVibrant, fontWeight = FontWeight.Bold) },
             text = {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
@@ -1391,7 +1393,7 @@ fun PlayerScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Activar Ecualizador", color = Color.White)
+                        Text(stringResource(R.string.enable_equalizer), color = Color.White)
                         androidx.compose.material3.Switch(
                             checked = isEqEnabled,
                             onCheckedChange = { equalizerManager.setEnabled(it) },
@@ -1406,7 +1408,7 @@ fun PlayerScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text("Modo Auto (Loudness)", color = Color.White)
+                            Text(stringResource(R.string.auto_mode_loudness), color = Color.White)
                             androidx.compose.material3.Switch(
                                 checked = isAutoMode,
                                 onCheckedChange = { equalizerManager.setAutoMode(it) },
@@ -1416,7 +1418,7 @@ fun PlayerScreen(
 
                         if (!isAutoMode) {
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text("Preset:", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                            Text(stringResource(R.string.preset_label), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                             var expanded by remember { mutableStateOf(false) }
                             Box {
                                 androidx.compose.material3.OutlinedButton(
@@ -1432,7 +1434,7 @@ fun PlayerScreen(
                                     modifier = Modifier.background(Color.DarkGray)
                                 ) {
                                     androidx.compose.material3.DropdownMenuItem(
-                                        text = { Text("Personalizado", color = Color.White) },
+                                        text = { Text(stringResource(R.string.custom), color = Color.White) },
                                         onClick = { expanded = false }
                                     )
                                     presets.forEach { preset ->
@@ -1472,7 +1474,7 @@ fun PlayerScreen(
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { showEqDialog = false }) { Text("Cerrar", color = colorVibrant) } },
+            confirmButton = { TextButton(onClick = { showEqDialog = false }) { Text(stringResource(R.string.close), color = colorVibrant) } },
             containerColor = colorDominant.copy(alpha = 0.95f)
         )
     }
@@ -1511,27 +1513,27 @@ fun PlayerScreen(
 
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showEditorDialog = false },
-            title = { Text("Editar Etiqueta", color = colorVibrant) },
+            title = { Text(stringResource(R.string.edit_tag), color = colorVibrant) },
             text = {
                 Column {
                     androidx.compose.material3.OutlinedTextField(
                         value = editTitle,
                         onValueChange = { editTitle = it },
-                        label = { Text("Título", color = Color.Gray) },
+                        label = { Text(stringResource(R.string.title), color = Color.Gray) },
                         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = colorVibrant, cursorColor = colorVibrant)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     androidx.compose.material3.OutlinedTextField(
                         value = editArtist,
                         onValueChange = { editArtist = it },
-                        label = { Text("Artista", color = Color.Gray) },
+                        label = { Text(stringResource(R.string.artist), color = Color.Gray) },
                         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = colorVibrant, cursorColor = colorVibrant)
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     androidx.compose.material3.OutlinedTextField(
                         value = editAlbum,
                         onValueChange = { editAlbum = it },
-                        label = { Text("Álbum", color = Color.Gray) },
+                        label = { Text(stringResource(R.string.album), color = Color.Gray) },
                         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = colorVibrant, cursorColor = colorVibrant)
                     )
                     Spacer(modifier = Modifier.height(16.dp))
@@ -1539,10 +1541,10 @@ fun PlayerScreen(
                         onClick = { launcher.launch(arrayOf("image/*")) },
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = colorVibrant)
                     ) {
-                        Text("Elegir Portada")
+                        Text(stringResource(R.string.choose_cover))
                     }
                     if (editCoverPath != null) {
-                        Text("Portada personalizada seleccionada", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(R.string.custom_cover_selected), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                     }
                 }
             },
@@ -1550,10 +1552,10 @@ fun PlayerScreen(
                 TextButton(onClick = { 
                     onUpdateTrackMetadata(currentTrack.id, editTitle, editArtist, editAlbum, editCoverPath)
                     showEditorDialog = false 
-                }) { Text("Guardar", color = colorVibrant) }
+                }) { Text(stringResource(R.string.save), color = colorVibrant) }
             },
             dismissButton = {
-                TextButton(onClick = { showEditorDialog = false }) { Text("Cancelar", color = Color.Gray) }
+                TextButton(onClick = { showEditorDialog = false }) { Text(stringResource(R.string.cancel), color = Color.Gray) }
             },
             containerColor = colorDominant.copy(alpha = 0.95f)
         )
@@ -1580,7 +1582,7 @@ fun PlayerScreen(
             .padding(horizontal = 24.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                Text("Ajustes de Reproducción", color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.playback_settings), color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
@@ -1597,7 +1599,7 @@ fun PlayerScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Reproducción Aleatoria", color = Color.White)
+                        Text(stringResource(R.string.shuffle_playback), color = Color.White)
                     }
                     
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End, modifier = Modifier.weight(0.3f)) {
@@ -1616,7 +1618,7 @@ fun PlayerScreen(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("Estilo Visual", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.visualizer_style_opt), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     val styles = VisualizerStyle.values()
                     items(styles.size) { i ->
@@ -1635,26 +1637,26 @@ fun PlayerScreen(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("Modo de Repetición", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.repeat_method), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     val currentMode = exoPlayer?.repeatMode ?: androidx.media3.common.Player.REPEAT_MODE_OFF
                     TextButton(onClick = { 
                         exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
                         playerViewModel.abRepeatModeEnabled.value = false
                     }) {
-                        Text("Desactivado", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_OFF) colorVibrant else Color.Gray)
+                        Text(stringResource(R.string.off), color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_OFF) colorVibrant else Color.Gray)
                     }
                     TextButton(onClick = { 
                         exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ALL
                         playerViewModel.abRepeatModeEnabled.value = false
                     }) {
-                        Text("Lista", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_ALL) colorVibrant else Color.Gray)
+                        Text(stringResource(R.string.repeat_list), color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_ALL) colorVibrant else Color.Gray)
                     }
                     TextButton(onClick = { 
                         exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE
                         playerViewModel.abRepeatModeEnabled.value = false
                     }) {
-                        Text("Una", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_ONE) colorVibrant else Color.Gray)
+                        Text(stringResource(R.string.repeat_one), color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_ONE) colorVibrant else Color.Gray)
                     }
                     TextButton(onClick = { 
                         exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
@@ -1663,12 +1665,12 @@ fun PlayerScreen(
                         playerViewModel.abPointB.value = 0.5f
                         showSettingsMenu = false
                     }) {
-                        Text("A y B", color = if (abRepeatModeEnabled) colorVibrant else Color.Gray)
+                        Text(stringResource(R.string.repeat_ab), color = if (abRepeatModeEnabled) colorVibrant else Color.Gray)
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("Arquetipo de Ondas", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.wave_archetype), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     TextButton(onClick = {
                         visualizerManager.visualizerArchetype.value = 0
@@ -1676,7 +1678,7 @@ fun PlayerScreen(
                     }) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.Waves, contentDescription = null, tint = if (visualizerArchetype == 0) colorVibrant else Color.Gray)
-                            Text("3 Ondas Superpuestas", color = if (visualizerArchetype == 0) colorVibrant else Color.Gray, fontSize = 12.sp)
+                            Text(stringResource(R.string.waves_3_overlapping), color = if (visualizerArchetype == 0) colorVibrant else Color.Gray, fontSize = 12.sp)
                         }
                     }
                     TextButton(onClick = {
@@ -1685,13 +1687,13 @@ fun PlayerScreen(
                     }) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.GraphicEq, contentDescription = null, tint = if (visualizerArchetype == 1) colorVibrant else Color.Gray)
-                            Text("1 Onda Combinada", color = if (visualizerArchetype == 1) colorVibrant else Color.Gray, fontSize = 12.sp)
+                            Text(stringResource(R.string.wave_1_combined), color = if (visualizerArchetype == 1) colorVibrant else Color.Gray, fontSize = 12.sp)
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("Modo de Cálculo (FFT)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.calculation_mode_fft), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     TextButton(onClick = {
                         visualizerManager.fftMode.value = "AVERAGE"
@@ -1699,7 +1701,7 @@ fun PlayerScreen(
                     }) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.Equalizer, contentDescription = null, tint = if (fftMode == "AVERAGE") colorVibrant else Color.Gray)
-                            Text("Promedio (Estable)", color = if (fftMode == "AVERAGE") colorVibrant else Color.Gray, fontSize = 12.sp)
+                            Text(stringResource(R.string.fft_average), color = if (fftMode == "AVERAGE") colorVibrant else Color.Gray, fontSize = 12.sp)
                         }
                     }
                     TextButton(onClick = {
@@ -1708,13 +1710,13 @@ fun PlayerScreen(
                     }) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Icon(Icons.Default.ShowChart, contentDescription = null, tint = if (fftMode == "MAX") colorVibrant else Color.Gray)
-                            Text("Máximo (Dinámico)", color = if (fftMode == "MAX") colorVibrant else Color.Gray, fontSize = 12.sp)
+                            Text(stringResource(R.string.fft_maximum), color = if (fftMode == "MAX") colorVibrant else Color.Gray, fontSize = 12.sp)
                         }
                     }
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                Text("Reactividad de Caos: ${String.format("%.2f", reactivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.chaos_reactivity_format, String.format("%.2f", reactivity)), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = reactivity,
                     onValueChange = {
@@ -1749,7 +1751,7 @@ fun PlayerScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorDominant, androidx.compose.foundation.shape.CircleShape))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Sensibilidad de Graves (Bajos): ${String.format("%.1f", bassMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.bass_sensitivity_format, String.format("%.1f", bassMult)), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                     }
                     Slider(
                         value = bassMult,
@@ -1765,7 +1767,7 @@ fun PlayerScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorVibrant, androidx.compose.foundation.shape.CircleShape))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Sensibilidad de Medios: ${String.format("%.1f", midMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.mid_sensitivity_format, String.format("%.1f", midMult)), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                     }
                     Slider(
                         value = midMult,
@@ -1781,7 +1783,7 @@ fun PlayerScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorMuted, androidx.compose.foundation.shape.CircleShape))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Sensibilidad de Altos (Agudos): ${String.format("%.1f", trebleMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.treble_sensitivity_format, String.format("%.1f", trebleMult)), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                     }
                     Slider(
                         value = trebleMult,
@@ -1794,7 +1796,7 @@ fun PlayerScreen(
                     )
                 } else {
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Sensibilidad General: ${String.format("%.1f", sensitivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Text(stringResource(R.string.general_sensitivity_format, String.format("%.1f", sensitivity)), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                     Slider(
                         value = sensitivity,
                         onValueChange = {
@@ -1831,7 +1833,7 @@ fun PlayerScreen(
                 }
             }
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                Text("Cola de Reproducción", color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.playback_queue), color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 LazyColumn(state = listState) {
 
@@ -1863,11 +1865,11 @@ fun PlayerScreen(
     if (showEffectsDialog) {
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showEffectsDialog = false },
-            title = { Text("Efectos de Audio", color = colorVibrant) },
+            title = { Text(stringResource(R.string.audio_effects), color = colorVibrant) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Text("Slow Reverb", color = Color.White)
+                        Text(stringResource(R.string.slow_reverb), color = Color.White)
                         androidx.compose.material3.Switch(
                             checked = reverbEnabled,
                             onCheckedChange = { onSetReverb(it) },
@@ -1876,7 +1878,7 @@ fun PlayerScreen(
                     }
 
                     Column {
-                        Text("Velocidad: ${String.format("%.2f", playbackSpeed)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.speed_format, String.format("%.2f", playbackSpeed)), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                         Slider(
                             value = playbackSpeed,
                             onValueChange = { onSetSpeed(it) },
@@ -1886,7 +1888,7 @@ fun PlayerScreen(
                     }
 
                     Column {
-                        Text("Tono: ${String.format("%.2f", playbackPitch)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.pitch_format, String.format("%.2f", playbackPitch)), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                         Slider(
                             value = playbackPitch,
                             onValueChange = { onSetPitch(it) },
@@ -1896,7 +1898,7 @@ fun PlayerScreen(
                     }
 
                     Column {
-                        Text("Preajuste (Efectos)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Text(stringResource(R.string.preset_effects), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                         androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             val presets = listOf(
                                 "NORMAL" to "Normal",
@@ -1920,7 +1922,7 @@ fun PlayerScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showEffectsDialog = false }) {
-                    Text("Cerrar", color = colorVibrant)
+                    Text(stringResource(R.string.close), color = colorVibrant)
                 }
             },
             containerColor = colorDominant

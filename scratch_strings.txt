@@ -1,0 +1,20 @@
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Elegir Portada")
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                         DropdownMenuItem(text = { Text("Directorio (Por defecto)") }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                         DropdownMenuItem(text = { Text("Título (A-Z)") }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                         DropdownMenuItem(text = { Text("Artista (A-Z)") }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                         DropdownMenuItem(text = { Text("Álbum (A-Z)") }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                title = { Text("Añadir a Playlist") },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                        Text("No tienes playlists creadas. Crea una desde la pestaña de Álbumes.")
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                                text = { Text("Añadir a Playlist") },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                                text = { Text("Eliminar del dispositivo") },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                                text = { Text("Quitar de la Playlist") },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                                text = { Text("Descargar música") },
+app/src/main/java/com/example/beatpulse/ui/screens/AlbumsScreen.kt:                            Text("Crear Playlist")
+app/src/main/java/com/example/beatpulse/ui/screens/AlbumsScreen.kt:                Text("Guardar")
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                     DropdownMenuItem(text = { Text("Directorio (Por defecto)") }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                     DropdownMenuItem(text = { Text("Título (A-Z)") }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                     DropdownMenuItem(text = { Text("Artista (A-Z)") }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                     DropdownMenuItem(text = { Text("Álbum (A-Z)") }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                        title = { Text("Añadir a Playlist") },
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                Text("No tienes playlists creadas.")
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                Text("Crear Playlist")

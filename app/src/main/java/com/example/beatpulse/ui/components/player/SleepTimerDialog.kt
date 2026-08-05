@@ -5,6 +5,8 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.res.stringResource
+import com.example.beatpulse.R
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -29,7 +31,7 @@ fun AdvancedSleepTimerDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Temporizador Exacto", color = colorVibrant) },
+        title = { Text(stringResource(R.string.exact_timer), color = colorVibrant) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 // Digital Clock
@@ -117,7 +119,7 @@ fun AdvancedSleepTimerDialog(
                 
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     TextButton(onClick = { onSetSleepTimer(0) }) {
-                        Text("Apagar", color = colorVibrant)
+                        Text(stringResource(R.string.turn_off), color = colorVibrant)
                     }
                     TextButton(onClick = { onSetSleepTimer(sleepTimerSeconds + 300) }) {
                         Text("+5m", color = colorVibrant)
@@ -126,7 +128,7 @@ fun AdvancedSleepTimerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("Cerrar", color = colorVibrant) }
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close), color = colorVibrant) }
         },
         containerColor = colorDominant.copy(alpha = 0.95f)
     )

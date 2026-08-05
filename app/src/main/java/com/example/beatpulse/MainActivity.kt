@@ -486,10 +486,10 @@ fun MainScreen(
     trackToAddToPlaylist?.let { trackToAdd ->
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { trackToAddToPlaylist = null },
-            title = { androidx.compose.material3.Text("Añadir a Playlist", color = paletteColors.vibrant) },
+            title = { androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.add_to_playlist), color = paletteColors.vibrant) },
             text = {
                 if (playlists.isEmpty()) {
-                    androidx.compose.material3.Text("No tienes playlists creadas. Crea una desde la pestaña de Álbumes.", color = androidx.compose.ui.graphics.Color.White)
+                    androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.no_playlists_long), color = androidx.compose.ui.graphics.Color.White)
                 } else {
                     androidx.compose.foundation.lazy.LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
                         items(playlists) { pl ->
@@ -508,7 +508,7 @@ fun MainScreen(
             },
             confirmButton = {
                 androidx.compose.material3.TextButton(onClick = { trackToAddToPlaylist = null }) {
-                    androidx.compose.material3.Text("Cerrar", color = paletteColors.vibrant)
+                    androidx.compose.material3.Text(androidx.compose.ui.res.stringResource(R.string.close), color = paletteColors.vibrant)
                 }
             },
             containerColor = paletteColors.dominant.copy(alpha = 0.9f)

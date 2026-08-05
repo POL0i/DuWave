@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.res.stringResource
+import com.example.beatpulse.R
+import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material.icons.Icons
@@ -83,7 +86,8 @@ fun LibraryScreen(
     var trackPendingConfirmation by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingDownload by remember { mutableStateOf<TrackEntity?>(null) }
     var trackToDelete by remember { mutableStateOf<TrackEntity?>(null) }
-    
+    var trackPendingTrim by remember { mutableStateOf<TrackEntity?>(null) }
+
     val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
     ) { result ->
@@ -307,7 +311,8 @@ fun LibraryScreen(
                                                 isResolving = resolvingTracks.contains(track.id),
                                                 onDownloadTrack = if (track.dataPath.startsWith("youtube://")) {
                                                     { trackPendingDownload = track }
-                                                } else null
+                                                } else null,
+                                                onTrimTrack = { trackPendingTrim = track }
                                             )
                                         }
                                     }
@@ -333,7 +338,8 @@ fun LibraryScreen(
                                     isResolving = resolvingTracks.contains(track.id),
                                     onDownloadTrack = if (isSearchingOnline && track.dataPath.startsWith("youtube://")) {
                                         { trackPendingDownload = track }
-                                    } else null
+                                    } else null,
+                                    onTrimTrack = { trackPendingTrim = track }
                                 )
                             }
                         }
@@ -496,6 +502,16 @@ fun LibraryScreen(
             )
         }
 
+        trackPendingTrim?.let { track ->
+            com.example.beatpulse.ui.components.library.AudioTrimmerDialog(
+                track = track,
+                onDismiss = { trackPendingTrim = null },
+                onTrimSuccess = { newPath ->
+                    viewModel.copyMetadataForTrimmedTrack(track, newPath)
+                }
+            )
+        }
+
         trackPendingDownload?.let { track ->
             AlertDialog(
                 onDismissRequest = { trackPendingDownload = null },
@@ -533,6 +549,7 @@ fun TrackItem(
     onDeleteTrack: (() -> Unit)? = null,
     onRemoveFromPlaylist: (() -> Unit)? = null,
     onDownloadTrack: (() -> Unit)? = null,
+    onTrimTrack: (() -> Unit)? = null,
     isResolving: Boolean = false
 ) {
     // Usar la paleta global para evitar recalcular colores por cada pista, lo cual traba la lista
@@ -612,7 +629,7 @@ fun TrackItem(
                 tint = if (track.isFavorite) accentColor else Color.Gray
             )
         }
-        val hasMenuOptions = onAddToPlaylist != null || onDeleteTrack != null || onDownloadTrack != null || onRemoveFromPlaylist != null
+        val hasMenuOptions = onAddToPlaylist != null || onDeleteTrack != null || onDownloadTrack != null || onRemoveFromPlaylist != null || onTrimTrack != null
         if (isResolving) {
             androidx.compose.material3.CircularProgressIndicator(
                 modifier = Modifier.size(24.dp).padding(4.dp),
@@ -664,10 +681,19 @@ fun TrackItem(
                         }
                         if (onDownloadTrack != null) {
                             DropdownMenuItem(
-                                text = { Text("Descargar música") },
+                                text = { Text(stringResource(R.string.download_music)) },
                                 onClick = {
                                     isMenuExpanded = false
                                     onDownloadTrack()
+                                }
+                            )
+                        }
+                        if (onTrimTrack != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.trim_audio)) },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onTrimTrack()
                                 }
                             )
                         }

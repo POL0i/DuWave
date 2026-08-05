@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import com.example.beatpulse.R
 import androidx.compose.ui.draw.clip
 import androidx.activity.compose.BackHandler
 import androidx.compose.ui.text.input.TextFieldValue
@@ -77,7 +79,7 @@ fun AlbumsScreen(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     CircularProgressIndicator(color = paletteColors.vibrant)
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Buscando música...", color = dynamicTextColor)
+                    Text(stringResource(R.string.searching_music), color = dynamicTextColor)
                 }
             }
         } else if (isCreatingPlaylist) {
@@ -272,7 +274,7 @@ fun AlbumsScreen(
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Crear Playlist")
+                            Text(stringResource(R.string.create_playlist))
                         }
                     }
                     
@@ -469,7 +471,7 @@ fun CreatePlaylistScreen(
             IconButton(onClick = onClose) {
                 Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = dynamicTextColor)
             }
-            Text("Nueva Playlist", style = MaterialTheme.typography.titleLarge, color = dynamicTextColor, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.new_playlist), style = MaterialTheme.typography.titleLarge, color = dynamicTextColor, modifier = Modifier.weight(1f))
             Button(
                 onClick = {
                     if (name.isNotBlank()) {
@@ -488,14 +490,14 @@ fun CreatePlaylistScreen(
                 enabled = name.isNotBlank() && selectedTracks.values.any { it },
                 colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
             ) {
-                Text("Guardar")
+                Text(stringResource(R.string.save))
             }
         }
 
         OutlinedTextField(
             value = name,
             onValueChange = { name = it },
-            label = { Text("Nombre de la playlist", color = dynamicTextColor.copy(alpha=0.7f)) },
+            label = { Text(stringResource(R.string.playlist_name), color = dynamicTextColor.copy(alpha=0.7f)) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
             singleLine = true,
             colors = OutlinedTextFieldDefaults.colors(
@@ -509,7 +511,7 @@ fun CreatePlaylistScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Buscar canciones...", color = dynamicTextColor.copy(alpha=0.5f)) },
+            placeholder = { Text(stringResource(R.string.search_songs), color = dynamicTextColor.copy(alpha=0.5f)) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
             singleLine = true,
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = dynamicTextColor.copy(alpha=0.5f)) },
@@ -581,7 +583,7 @@ fun AddTracksScreen(
             IconButton(onClick = onClose) {
                 Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = dynamicTextColor)
             }
-            Text("Añadir Canciones", style = MaterialTheme.typography.titleLarge, color = dynamicTextColor, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.add_songs), style = MaterialTheme.typography.titleLarge, color = dynamicTextColor, modifier = Modifier.weight(1f))
             Button(
                 onClick = {
                     val tracksToAdd = filteredTracks.filter { selectedTracks[it.id] == true }
@@ -605,7 +607,7 @@ fun AddTracksScreen(
         OutlinedTextField(
             value = searchQuery,
             onValueChange = { searchQuery = it },
-            placeholder = { Text("Buscar canciones...", color = dynamicTextColor.copy(alpha=0.5f)) },
+            placeholder = { Text(stringResource(R.string.search_songs), color = dynamicTextColor.copy(alpha=0.5f)) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
             singleLine = true,
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = dynamicTextColor.copy(alpha=0.5f)) },

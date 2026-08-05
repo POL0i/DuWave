@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import android.content.IntentSender
 import android.content.Context
@@ -56,6 +57,34 @@ class LibraryViewModel @Inject constructor(
     fun scanMediaStore() {
         viewModelScope.launch {
             repository.scanMediaStore()
+        }
+    }
+
+    fun copyMetadataForTrimmedTrack(originalTrack: TrackEntity, newFilePath: String) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            // Escanear el archivo nuevo
+            android.media.MediaScannerConnection.scanFile(
+                context,
+                arrayOf(newFilePath),
+                arrayOf("audio/mp4")
+            ) { _, _ ->
+                viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    // Refrescar DB
+                    repository.scanMediaStore()
+                    // Buscar la nueva pista y actualizar su metadata
+                    val allTracksList = repository.allTracksFlow.first()
+                    val newTrack = allTracksList.find { it.dataPath == newFilePath }
+                    if (newTrack != null) {
+                        repository.updateTrackMetadata(
+                            id = newTrack.id,
+                            title = originalTrack.title + " (trim)",
+                            artist = originalTrack.artist,
+                            album = originalTrack.album,
+                            coverPath = originalTrack.customCoverPath ?: "embedded://${originalTrack.dataPath}"
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -245,7 +274,7 @@ class LibraryViewModel @Inject constructor(
                 val url = onlineRepository.getStreamUrl(videoId)
                 if (url != null) {
                     // Guardar en la base de datos para recordar la metadata (portada, título real) cuando MediaStore lo escanee
-                    var coverUrl = track.dataPath.substringAfter("|cover=", "").takeIf { it.isNotEmpty() }
+                    var coverUrl = track.customCoverPath
                     
                     // Descargar la miniatura offline
                     if (coverUrl != null && (coverUrl.startsWith("http://") || coverUrl.startsWith("https://"))) {
@@ -267,7 +296,7 @@ class LibraryViewModel @Inject constructor(
                     val trackToSave = track.copy(
                         customTitle = track.customTitle ?: track.title,
                         customArtist = track.customArtist ?: track.artist,
-                        customCoverPath = track.customCoverPath ?: coverUrl
+                        customCoverPath = coverUrl
                     )
                     repository.insertTrack(trackToSave)
                     

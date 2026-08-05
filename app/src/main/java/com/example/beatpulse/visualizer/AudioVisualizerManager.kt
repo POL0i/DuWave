@@ -162,9 +162,10 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
                 PhysicsMode.VIOLENTO -> 0.06f      // Fast ghost fade
             }
 
-            val bassMult = bassMultiplier.value
-            val midMult = midMultiplier.value
-            val trebleMult = trebleMultiplier.value
+            val isAdv = isAdvancedMode.value
+            val bassMult = if (isAdv) bassMultiplier.value else sensitivity.value
+            val midMult = if (isAdv) midMultiplier.value else sensitivity.value
+            val trebleMult = if (isAdv) trebleMultiplier.value else sensitivity.value
 
             for (i in 0 until BARS_COUNT) {
                 val startBin = binStartLUT[i]

@@ -87,6 +87,7 @@ fun UnifiedLibraryScreen(
     
     var trackToDelete by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingConfirmation by remember { mutableStateOf<TrackEntity?>(null) }
+    var trackPendingTrim by remember { mutableStateOf<TrackEntity?>(null) }
     var showStats by remember { mutableStateOf(false) }
     
     val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -556,7 +557,8 @@ fun UnifiedLibraryScreen(
                                         },
                                         onAddToPlaylist = { trackToAddToPlaylist = track },
                                         onDeleteTrack = if (currentViewData.playlistId == null) { { trackPendingConfirmation = track } } else null,
-                                        onRemoveFromPlaylist = if (currentViewData.playlistId != null) { { viewModel.removeTrackFromPlaylist(currentViewData.playlistId, track.id) } } else null
+                                        onRemoveFromPlaylist = if (currentViewData.playlistId != null) { { viewModel.removeTrackFromPlaylist(currentViewData.playlistId, track.id) } } else null,
+                                        onTrimTrack = { trackPendingTrim = track }
                                     )
                                 }
                                 if (currentViewData.playlistId != null) {
@@ -608,6 +610,16 @@ fun UnifiedLibraryScreen(
                     }
                 }
                 
+                trackPendingTrim?.let { track ->
+                    com.example.beatpulse.ui.components.library.AudioTrimmerDialog(
+                        track = track,
+                        onDismiss = { trackPendingTrim = null },
+                        onTrimSuccess = { newPath ->
+                            viewModel.copyMetadataForTrimmedTrack(track, newPath)
+                        }
+                    )
+                }
+
                 trackToAddToPlaylist?.let { trackToAdd ->
                     AlertDialog(
                         onDismissRequest = { trackToAddToPlaylist = null },

@@ -60,7 +60,7 @@ class PreferencesManager private constructor(context: Context) {
         set(value) = prefs.edit().putBoolean("filterWhatsAppShorts", value).apply()
 
     var sensitivity: Float
-        get() = prefs.getFloat("sensitivity", 0.9f)
+        get() = prefs.getFloat("sensitivity", 0.8f)
         set(value) = prefs.edit().putFloat("sensitivity", value).apply()
 
     var reactivity: Float
@@ -68,15 +68,15 @@ class PreferencesManager private constructor(context: Context) {
         set(value) = prefs.edit().putFloat("reactivity", value).apply()
 
     var bassMultiplier: Float
-        get() = prefs.getFloat("bassMultiplier", 1.0f)
+        get() = prefs.getFloat("bassMultiplier", 2.2f)
         set(value) = prefs.edit().putFloat("bassMultiplier", value).apply()
 
     var midMultiplier: Float
-        get() = prefs.getFloat("midMultiplier", 1.0f)
+        get() = prefs.getFloat("midMultiplier", 1.2f)
         set(value) = prefs.edit().putFloat("midMultiplier", value).apply()
 
     var trebleMultiplier: Float
-        get() = prefs.getFloat("trebleMultiplier", 1.0f)
+        get() = prefs.getFloat("trebleMultiplier", 0.8f)
         set(value) = prefs.edit().putFloat("trebleMultiplier", value).apply()
 
     var usePerBandMultiplier: Boolean

@@ -9,4 +9,4 @@ data object LibraryRoute
 data object UnifiedLibraryRoute
 
 @Serializable
-data object PlayerRoute 
+data object PlayerRoute

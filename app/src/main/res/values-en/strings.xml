@@ -49,6 +49,7 @@
     <string name="sort_directory">Default directory</string>
     <string name="sort_title">Title A-Z</string>
     <string name="sort_artist">Artist A-Z</string>
+    <string name="sort_album">Album A-Z</string>
     <string name="next_update_in_h_m">Next update in %1$dh %2$dm</string>
     <string name="updating_soon">Updating soon...</string>
     <string name="because_you_listened">Because you listened to %1$s</string>
@@ -102,5 +103,59 @@
     <string name="searching_recommendations">Searching recommendations based on your stats...</string>
     <string name="searching_online">Searching online...</string>
     <string name="search_lyrics">Lyrics</string>
+    <!-- Added strings for Player and Library screens -->
+    <string name="off">Off</string>
+    <string name="repeat_list">List</string>
+    <string name="repeat_one">One</string>
+    <string name="repeat_ab">A and B</string>
+    <string name="wave_archetype">Wave Archetype</string>
+    <string name="waves_3_overlapping">3 Overlapping Waves</string>
+    <string name="wave_1_combined">1 Combined Wave</string>
+    <string name="calculation_mode_fft">Calculation Mode (FFT)</string>
+    <string name="fft_average">Average (Stable)</string>
+    <string name="fft_maximum">Maximum (Dynamic)</string>
+    <string name="chaos_reactivity_format">Chaos Reactivity: %1$sx</string>
+    <string name="bass_sensitivity_format">Bass Sensitivity: %1$sx</string>
+    <string name="mid_sensitivity_format">Mid Sensitivity: %1$sx</string>
+    <string name="treble_sensitivity_format">Treble Sensitivity: %1$sx</string>
+    <string name="general_sensitivity_format">General Sensitivity: %1$sx</string>
+    <string name="choose_cover">Choose Cover</string>
+    <string name="custom_cover_selected">Custom cover selected</string>
+    <string name="audio_effects">Audio Effects</string>
+    <string name="preset_effects">Preset (Effects)</string>
+    <string name="slow_reverb">Slow Reverb</string>
+    <string name="auto_mode_loudness">Auto Mode (Loudness)</string>
+    <string name="preset_label">Preset:</string>
+    <string name="sleep_timer">Sleep Timer</string>
+    <string name="exact_timer">Exact Timer</string>
+    <string name="turn_off">Turn off</string>
+    <string name="suggest_improvements">Suggest improvements</string>
+    <string name="suggest_improvements_desc">Do you want to open the browser to suggest improvements or report issues on GitHub?</string>
+    <string name="playback_queue">Playback Queue</string>
+    <string name="accept">OK</string>
+    <string name="open">Open</string>
+    <string name="no_playlists_long">You don\'t have any playlists. Create one from the Albums tab.</string>
+    <string name="no_playlists_short">You don\'t have any playlists.</string>
+    <string name="new_playlist">New Playlist</string>
+    <string name="search_songs">Search songs...</string>
+    <string name="add_songs">Add Songs</string>
+    <string name="search_in_format">Search in %1$s...</string>
+    <string name="delete_song_title">Delete song</string>
+    <string name="delete_song_desc">Are you sure you want to permanently delete \'%1$s\' from the device?</string>
+    <string name="confirm_download">Confirm download</string>
+    <string name="confirm_download_desc">Do you want to download \'%1$s\' to your device for offline listening?</string>
+    <string name="download">Download</string>
+    <string name="remove_from_playlist">Remove from Playlist</string>
+    <string name="download_music">Download music</string>
 
+    <!-- Trimmer and Share Intent strings -->
+    <string name="trim_audio">Trim audio</string>
+    <string name="save_trim">Save Trim</string>
+    <string name="start_time">Start time: %1$s</string>
+    <string name="end_time">End time: %1$s</string>
+    <string name="trimming_audio">Trimming audio...</string>
+    <string name="trim_saved_success">Trim saved successfully</string>
+    <string name="trim_error">Error trimming audio</string>
+    <string name="confirm_link_download">Confirm link download</string>
+    <string name="download_from_youtube_desc">Download \"%1$s\" from YouTube?</string>
 </resources>

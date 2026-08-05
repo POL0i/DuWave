@@ -49,6 +49,7 @@
     <string name="sort_directory">Diretório padrão</string>
     <string name="sort_title">Título A-Z</string>
     <string name="sort_artist">Artista A-Z</string>
+    <string name="sort_album">Álbum A-Z</string>
     <string name="next_update_in_h_m">Próxima atualização em %1$dh %2$dm</string>
     <string name="updating_soon">Atualizando em breve...</string>
     <string name="because_you_listened">Porque você ouviu %1$s</string>
@@ -102,5 +103,59 @@
     <string name="searching_recommendations">Procurando recomendações com base nas suas estatísticas...</string>
     <string name="searching_online">Buscando online...</string>
     <string name="search_lyrics">Letras</string>
+    <!-- Added strings for Player and Library screens -->
+    <string name="off">Desativado</string>
+    <string name="repeat_list">Lista</string>
+    <string name="repeat_one">Uma</string>
+    <string name="repeat_ab">A e B</string>
+    <string name="wave_archetype">Arquétipo de Ondas</string>
+    <string name="waves_3_overlapping">3 Ondas Sobrepostas</string>
+    <string name="wave_1_combined">1 Onda Combinada</string>
+    <string name="calculation_mode_fft">Modo de Cálculo (FFT)</string>
+    <string name="fft_average">Média (Estável)</string>
+    <string name="fft_maximum">Máximo (Dinâmico)</string>
+    <string name="chaos_reactivity_format">Reatividade de Caos: %1$sx</string>
+    <string name="bass_sensitivity_format">Sensibilidade de Graves: %1$sx</string>
+    <string name="mid_sensitivity_format">Sensibilidade de Médios: %1$sx</string>
+    <string name="treble_sensitivity_format">Sensibilidade de Agudos: %1$sx</string>
+    <string name="general_sensitivity_format">Sensibilidade Geral: %1$sx</string>
+    <string name="choose_cover">Escolher Capa</string>
+    <string name="custom_cover_selected">Capa personalizada selecionada</string>
+    <string name="audio_effects">Efeitos de Áudio</string>
+    <string name="preset_effects">Predefinição (Efeitos)</string>
+    <string name="slow_reverb">Slow Reverb</string>
+    <string name="auto_mode_loudness">Modo Auto (Loudness)</string>
+    <string name="preset_label">Predefinição:</string>
+    <string name="sleep_timer">Temporizador</string>
+    <string name="exact_timer">Temporizador Exato</string>
+    <string name="turn_off">Desligar</string>
+    <string name="suggest_improvements">Sugerir melhorias</string>
+    <string name="suggest_improvements_desc">Deseja abrir o navegador para sugerir melhorias ou relatar problemas no GitHub?</string>
+    <string name="playback_queue">Fila de Reprodução</string>
+    <string name="accept">OK</string>
+    <string name="open">Abrir</string>
+    <string name="no_playlists_long">Você não tem playlists. Crie uma na aba de Álbuns.</string>
+    <string name="no_playlists_short">Você não tem playlists.</string>
+    <string name="new_playlist">Nova Playlist</string>
+    <string name="search_songs">Buscar músicas...</string>
+    <string name="add_songs">Adicionar Músicas</string>
+    <string name="search_in_format">Buscar em %1$s...</string>
+    <string name="delete_song_title">Excluir música</string>
+    <string name="delete_song_desc">Tem certeza de que deseja excluir permanentemente \'%1$s\' do dispositivo?</string>
+    <string name="confirm_download">Confirmar download</string>
+    <string name="confirm_download_desc">Deseja baixar \'%1$s\' no seu dispositivo para ouvir offline?</string>
+    <string name="download">Baixar</string>
+    <string name="remove_from_playlist">Remover da Playlist</string>
+    <string name="download_music">Baixar música</string>
 
+    <!-- Trimmer and Share Intent strings -->
+    <string name="trim_audio">Recortar áudio</string>
+    <string name="save_trim">Salvar Recorte</string>
+    <string name="start_time">Tempo de início: %1$s</string>
+    <string name="end_time">Tempo de fim: %1$s</string>
+    <string name="trimming_audio">Recortando áudio...</string>
+    <string name="trim_saved_success">Recorte salvo com sucesso</string>
+    <string name="trim_error">Erro ao recortar áudio</string>
+    <string name="confirm_link_download">Confirmar download do link</string>
+    <string name="download_from_youtube_desc">Baixar \"%1$s\" do YouTube?</string>
 </resources>

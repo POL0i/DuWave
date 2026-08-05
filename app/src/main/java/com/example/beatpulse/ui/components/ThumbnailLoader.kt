@@ -74,6 +74,13 @@ object ThumbnailCache {
                             if (connection.responseCode == java.net.HttpURLConnection.HTTP_OK) {
                                 return@withContext connection.inputStream.readBytes()
                             }
+                        } else if (track.customCoverPath.startsWith("embedded://")) {
+                            val realPath = track.customCoverPath.removePrefix("embedded://")
+                            val retriever = MediaMetadataRetriever()
+                            retriever.setDataSource(realPath)
+                            val art = retriever.embeddedPicture
+                            retriever.release()
+                            return@withContext art
                         } else {
                             val customFile = java.io.File(track.customCoverPath)
                             if (customFile.exists()) {

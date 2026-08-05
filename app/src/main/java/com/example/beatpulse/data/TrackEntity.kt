@@ -133,6 +133,9 @@ interface TrackDao {
     @Query("SELECT * FROM tracks WHERE id = :id")
     suspend fun getTrackById(id: Long): TrackEntity?
 
+    @Query("SELECT * FROM tracks WHERE dataPath = :path LIMIT 1")
+    suspend fun getTrackByPath(path: String): TrackEntity?
+
     // Statistics queries
     @Query("SELECT artist, SUM(playCount) as totalPlays FROM tracks WHERE playCount > 0 GROUP BY artist ORDER BY totalPlays DESC LIMIT 10")
     suspend fun getTopArtistsByPlayCount(): List<ArtistStats>
