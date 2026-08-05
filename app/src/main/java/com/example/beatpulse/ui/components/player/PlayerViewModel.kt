@@ -57,6 +57,10 @@ class PlayerViewModel @Inject constructor(
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
 
+    val abRepeatModeEnabled = MutableStateFlow(false)
+    val abPointA = MutableStateFlow(0f)
+    val abPointB = MutableStateFlow(0.5f)
+
     private val _currentQueue = MutableStateFlow<List<TrackEntity>>(emptyList())
     val currentQueue: StateFlow<List<TrackEntity>> = _currentQueue
 

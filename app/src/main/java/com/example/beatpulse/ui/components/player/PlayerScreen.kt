@@ -171,9 +171,10 @@ fun PlayerScreen(
     var duration by remember { androidx.compose.runtime.mutableLongStateOf(1L) }
     
     // A-B Repeat state
-    var abRepeatModeEnabled by remember { androidx.compose.runtime.mutableStateOf(false) }
-    var abPointA by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
-    var abPointB by remember { androidx.compose.runtime.mutableFloatStateOf(0.5f) }
+    val abRepeatModeEnabled by playerViewModel.abRepeatModeEnabled.collectAsState()
+    val abPointA by playerViewModel.abPointA.collectAsState()
+    val abPointB by playerViewModel.abPointB.collectAsState()
+    var activeDraggingHandle by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     var showRemainingTime by remember { androidx.compose.runtime.mutableStateOf(false) }
     val isFetchingLyrics by playerViewModel.isFetchingLyrics.collectAsState()
     val searchFailed by playerViewModel.searchFailed.collectAsState()
@@ -361,18 +362,26 @@ fun PlayerScreen(
                                 style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
                                 color = colorVibrant,
                                 maxLines = 1,
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
                             )
                             androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
-                            val dur = exoPlayer?.duration?.takeIf { it > 0 } ?: 0L
-                            val pos = exoPlayer?.currentPosition ?: 0L
+                            val dur = duration
+                            val pos = currentPosition
                             val formatTime = { ms: Long -> 
                                 val totalSeconds = ms / 1000
                                 val m = totalSeconds / 60
                                 val s = totalSeconds % 60
                                 String.format("%02d:%02d", m, s)
                             }
-                            val timeText = if (showRemainingTime) "-${formatTime(dur - pos)}" else formatTime(pos)
+                            val timeText = if (abRepeatModeEnabled) {
+                                val aTime = (abPointA * dur).toLong()
+                                val bTime = (abPointB * dur).toLong()
+                                val posStr = if (showRemainingTime) "-${formatTime(dur - pos)}" else formatTime(pos)
+                                "$posStr / A:${formatTime(aTime)} - B:${formatTime(bTime)}"
+                            } else {
+                                if (showRemainingTime) "-${formatTime(dur - pos)} / ${formatTime(dur)}" else "${formatTime(pos)} / ${formatTime(dur)}"
+                            }
                             Text(
                                 text = timeText,
                                 style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
@@ -448,7 +457,7 @@ fun PlayerScreen(
             modifier = Modifier
                 .then(if (isLandscape) Modifier.height(350.dp) else Modifier.weight(1f))
                 .fillMaxWidth()
-                .pointerInput(Unit) {
+                .pointerInput(abRepeatModeEnabled) {
                     detectDragGestures(
                         onDragStart = { 
                             currentDragAction = DragAction.NONE
@@ -527,7 +536,7 @@ fun PlayerScreen(
                         }
                     }
                 }
-                .pointerInput(Unit) {
+                .pointerInput(abRepeatModeEnabled) {
                     detectTapGestures(
                         onDoubleTap = { offset ->
                             if (offset.x < size.width / 2) {
@@ -630,30 +639,21 @@ fun PlayerScreen(
                             val rPx = 160.dp.toPx() / 2f
                             
                             val getProgressFromOffset = { offset: androidx.compose.ui.geometry.Offset ->
-                                if (thumbnailShapeIdx == 0) {
-                                    var angle = Math.atan2((offset.y - cy).toDouble(), (offset.x - cx).toDouble())
-                                    angle += Math.PI / 2
-                                    if (angle < 0) angle += 2 * Math.PI
-                                    (angle / (2 * Math.PI)).toFloat()
+                                val pLen = progressMeasure.length
+                                if (pLen <= 0f) {
+                                    0f
                                 } else {
-                                    val basePath = android.graphics.Path()
-                                    if (thumbnailShapeIdx == 1) {
-                                        basePath.addRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, android.graphics.Path.Direction.CW)
-                                    } else if (thumbnailShapeIdx == 2) {
-                                        basePath.addRoundRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, 16.dp.toPx(), 16.dp.toPx(), android.graphics.Path.Direction.CW)
-                                    } else {
-                                        basePath.addRoundRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, 32.dp.toPx(), 32.dp.toPx(), android.graphics.Path.Direction.CW)
-                                    }
-                                    val pm = android.graphics.PathMeasure(basePath, true)
-                                    val len = pm.length
                                     var minD = Float.MAX_VALUE
                                     var bestP = 0f
-                                    val pos = FloatArray(2)
-                                    for(i in 0..180) {
-                                        val p = i / 180f
-                                        if (pm.getPosTan(p * len, pos, null)) {
-                                            val dx = pos[0] - offset.x
-                                            val dy = pos[1] - offset.y
+                                    val startD = if (thumbnailShapeIdx == 0) pLen * 0.75f else pLen * 0.125f
+                                    
+                                    for(i in 0..360) {
+                                        val p = i / 360f
+                                        val dMod = (startD + p * pLen) % pLen
+                                        val pos = progressMeasure.getPosition(dMod)
+                                        if (pos != androidx.compose.ui.geometry.Offset.Unspecified) {
+                                            val dx = pos.x - offset.x
+                                            val dy = pos.y - offset.y
                                             val dSq = dx*dx + dy*dy
                                             if (dSq < minD) {
                                                 minD = dSq
@@ -666,27 +666,20 @@ fun PlayerScreen(
                             }
                             
                             val getPosFromProgress = { progress: Float ->
-                                if (thumbnailShapeIdx == 0) {
-                                    val angle = progress * 2 * Math.PI - Math.PI / 2
-                                    androidx.compose.ui.geometry.Offset(cx + rPx * kotlin.math.cos(angle).toFloat(), cy + rPx * kotlin.math.sin(angle).toFloat())
+                                val pLen = progressMeasure.length
+                                if (pLen <= 0f) {
+                                    androidx.compose.ui.geometry.Offset(cx, cy)
                                 } else {
-                                    val basePath = android.graphics.Path()
-                                    if (thumbnailShapeIdx == 1) {
-                                        basePath.addRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, android.graphics.Path.Direction.CW)
-                                    } else if (thumbnailShapeIdx == 2) {
-                                        basePath.addRoundRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, 16.dp.toPx(), 16.dp.toPx(), android.graphics.Path.Direction.CW)
-                                    } else {
-                                        basePath.addRoundRect(cx - rPx, cy - rPx, cx + rPx, cy + rPx, 32.dp.toPx(), 32.dp.toPx(), android.graphics.Path.Direction.CW)
-                                    }
-                                    val pm = android.graphics.PathMeasure(basePath, true)
-                                    val pos = FloatArray(2)
-                                    pm.getPosTan(progress * pm.length, pos, null)
-                                    androidx.compose.ui.geometry.Offset(pos[0], pos[1])
+                                    val startD = if (thumbnailShapeIdx == 0) pLen * 0.75f else pLen * 0.125f
+                                    val dMod = (startD + progress * pLen) % pLen
+                                    val pos = progressMeasure.getPosition(dMod)
+                                    if (pos != androidx.compose.ui.geometry.Offset.Unspecified) pos else androidx.compose.ui.geometry.Offset(cx, cy)
                                 }
                             }
 
+
                             var draggingHandle: String? = null
-                            val hitRadius = 24.dp.toPx()
+                            val hitRadius = 32.dp.toPx()
                             
                             awaitPointerEventScope {
                                 while (true) {
@@ -703,22 +696,25 @@ fun PlayerScreen(
 
                                             if (distA < hitRadius && distA <= distB) {
                                                 draggingHandle = "A"
+                                                activeDraggingHandle = "A"
                                                 change.consume()
                                             } else if (distB < hitRadius) {
                                                 draggingHandle = "B"
+                                                activeDraggingHandle = "B"
                                                 change.consume()
                                             }
                                         } else {
                                             val newProgress = getProgressFromOffset(change.position)
                                             if (draggingHandle == "A") {
-                                                abPointA = newProgress
+                                                playerViewModel.abPointA.value = newProgress.coerceAtMost(abPointB - 0.01f).coerceAtLeast(0f)
                                             } else {
-                                                abPointB = newProgress
+                                                playerViewModel.abPointB.value = newProgress.coerceAtLeast(abPointA + 0.01f).coerceAtMost(1f)
                                             }
                                             change.consume()
                                         }
                                     } else {
                                         draggingHandle = null
+                                        activeDraggingHandle = null
                                     }
                                 }
                             }
@@ -1046,34 +1042,35 @@ fun PlayerScreen(
                 
                 if (abRepeatModeEnabled) {
                     val getPosFromProgress = { progress: Float ->
-                        if (thumbnailShapeIdx == 0) {
-                            val angle = progress * 2 * Math.PI - Math.PI / 2
-                            androidx.compose.ui.geometry.Offset(center.x + rPx * kotlin.math.cos(angle).toFloat(), center.y + rPx * kotlin.math.sin(angle).toFloat())
+                        val pLen = progressMeasure.length
+                        if (pLen <= 0f) {
+                            center
                         } else {
-                            val dMod = (progress * pathLength).coerceIn(0f, pathLength - 0.01f)
-                            val localPosTan = FloatArray(2)
-                            val success = androidPathMeasure.getPosTan(dMod, localPosTan, null)
-                            if (success) androidx.compose.ui.geometry.Offset(localPosTan[0], localPosTan[1]) else center
+                            val startD = if (thumbnailShapeIdx == 0) pLen * 0.75f else pLen * 0.125f
+                            val dMod = (startD + progress * pLen) % pLen
+                            val pos = progressMeasure.getPosition(dMod)
+                            if (pos != androidx.compose.ui.geometry.Offset.Unspecified) pos else center
                         }
                     }
                     val posA = getPosFromProgress(abPointA)
                     val posB = getPosFromProgress(abPointB)
-                    val markerSize = 8.dp.toPx()
+                    val markerSizeA = if (activeDraggingHandle == "A") 16.dp.toPx() else 8.dp.toPx()
+                    val markerSizeB = if (activeDraggingHandle == "B") 16.dp.toPx() else 8.dp.toPx()
                     
                     if (thumbnailShapeIdx == 0) {
-                        drawCircle(color = colorVibrant, radius = markerSize, center = posA)
-                        drawCircle(color = colorVibrant.copy(alpha=0.3f), radius = markerSize * 2, center = posA)
+                        drawCircle(color = colorVibrant, radius = markerSizeA, center = posA)
+                        drawCircle(color = colorVibrant.copy(alpha=0.3f), radius = markerSizeA * 2, center = posA)
                         
-                        drawCircle(color = colorMuted, radius = markerSize, center = posB)
-                        drawCircle(color = colorMuted.copy(alpha=0.3f), radius = markerSize * 2, center = posB)
+                        drawCircle(color = colorMuted, radius = markerSizeB, center = posB)
+                        drawCircle(color = colorMuted.copy(alpha=0.3f), radius = markerSizeB * 2, center = posB)
                     } else {
                         val cornerRadius = if (thumbnailShapeIdx == 2) 4.dp.toPx() else if (thumbnailShapeIdx == 3) 8.dp.toPx() else 0f
                         
-                        drawRoundRect(color = colorVibrant, topLeft = androidx.compose.ui.geometry.Offset(posA.x - markerSize, posA.y - markerSize), size = androidx.compose.ui.geometry.Size(markerSize*2, markerSize*2), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius))
-                        drawRoundRect(color = colorVibrant.copy(alpha=0.3f), topLeft = androidx.compose.ui.geometry.Offset(posA.x - markerSize*2, posA.y - markerSize*2), size = androidx.compose.ui.geometry.Size(markerSize*4, markerSize*4), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius*2, cornerRadius*2))
+                        drawRoundRect(color = colorVibrant, topLeft = androidx.compose.ui.geometry.Offset(posA.x - markerSizeA, posA.y - markerSizeA), size = androidx.compose.ui.geometry.Size(markerSizeA*2, markerSizeA*2), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius))
+                        drawRoundRect(color = colorVibrant.copy(alpha=0.3f), topLeft = androidx.compose.ui.geometry.Offset(posA.x - markerSizeA*2, posA.y - markerSizeA*2), size = androidx.compose.ui.geometry.Size(markerSizeA*4, markerSizeA*4), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius*2, cornerRadius*2))
                         
-                        drawRoundRect(color = colorMuted, topLeft = androidx.compose.ui.geometry.Offset(posB.x - markerSize, posB.y - markerSize), size = androidx.compose.ui.geometry.Size(markerSize*2, markerSize*2), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius))
-                        drawRoundRect(color = colorMuted.copy(alpha=0.3f), topLeft = androidx.compose.ui.geometry.Offset(posB.x - markerSize*2, posB.y - markerSize*2), size = androidx.compose.ui.geometry.Size(markerSize*4, markerSize*4), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius*2, cornerRadius*2))
+                        drawRoundRect(color = colorMuted, topLeft = androidx.compose.ui.geometry.Offset(posB.x - markerSizeB, posB.y - markerSizeB), size = androidx.compose.ui.geometry.Size(markerSizeB*2, markerSizeB*2), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius, cornerRadius))
+                        drawRoundRect(color = colorMuted.copy(alpha=0.3f), topLeft = androidx.compose.ui.geometry.Offset(posB.x - markerSizeB*2, posB.y - markerSizeB*2), size = androidx.compose.ui.geometry.Size(markerSizeB*4, markerSizeB*4), cornerRadius = androidx.compose.ui.geometry.CornerRadius(cornerRadius*2, cornerRadius*2))
                     }
                 }
             }
@@ -1591,14 +1588,12 @@ fun PlayerScreen(
                         var isShuffleEnabled by remember { androidx.compose.runtime.mutableStateOf(exoPlayer?.shuffleModeEnabled == true) }
                         androidx.compose.material3.Switch(
                             checked = isShuffleEnabled,
-                            onCheckedChange = { 
+                            onCheckedChange = {
                                 isShuffleEnabled = it
                                 exoPlayer?.shuffleModeEnabled = it 
                             },
                             colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorVibrant.copy(alpha=0.5f))
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
@@ -1645,27 +1640,27 @@ fun PlayerScreen(
                     val currentMode = exoPlayer?.repeatMode ?: androidx.media3.common.Player.REPEAT_MODE_OFF
                     TextButton(onClick = { 
                         exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
-                        abRepeatModeEnabled = false
+                        playerViewModel.abRepeatModeEnabled.value = false
                     }) {
                         Text("Desactivado", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_OFF) colorVibrant else Color.Gray)
                     }
                     TextButton(onClick = { 
                         exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ALL
-                        abRepeatModeEnabled = false
+                        playerViewModel.abRepeatModeEnabled.value = false
                     }) {
                         Text("Lista", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_ALL) colorVibrant else Color.Gray)
                     }
                     TextButton(onClick = { 
                         exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE
-                        abRepeatModeEnabled = false
+                        playerViewModel.abRepeatModeEnabled.value = false
                     }) {
                         Text("Una", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_ONE) colorVibrant else Color.Gray)
                     }
                     TextButton(onClick = { 
                         exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
-                        abRepeatModeEnabled = true
-                        abPointA = 0f
-                        abPointB = 0.5f
+                        playerViewModel.abRepeatModeEnabled.value = true
+                        playerViewModel.abPointA.value = 0f
+                        playerViewModel.abPointB.value = 0.5f
                         showSettingsMenu = false
                     }) {
                         Text("A y B", color = if (abRepeatModeEnabled) colorVibrant else Color.Gray)
