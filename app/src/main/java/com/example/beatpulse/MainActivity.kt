@@ -10,6 +10,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
@@ -102,6 +103,9 @@ class MainActivity : ComponentActivity() {
                             val status = cursor.getInt(statusIndex)
                             if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
                                 prefs.showToast("✅ Descarga completada: $title")
+                                kotlinx.coroutines.GlobalScope.launch {
+                                    musicRepository.scanMediaStore()
+                                }
                             }
                         }
                         cursor.close()
@@ -372,12 +376,12 @@ fun MainScreen(
                     }.using(SizeTransform(clip = false))
                 },
                 modifier = Modifier
-                    .padding(innerPadding)
                     .fillMaxSize(),
                 label = "page_transition"
             ) { page ->
                 when (page) {
-                    0 -> UnifiedLibraryScreen(
+                    0 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                        UnifiedLibraryScreen(
                         viewModel = libraryViewModel,
                         paletteColors = paletteColors,
                         onTrackClick = { track: com.example.beatpulse.data.TrackEntity, queue: List<com.example.beatpulse.data.TrackEntity> ->
@@ -385,7 +389,9 @@ fun MainScreen(
                             currentPage = 2
                         }
                     )
-                    1 -> LibraryScreen(
+                    }
+                    1 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                        LibraryScreen(
                         viewModel = libraryViewModel,
                         paletteColors = paletteColors,
                         onTrackClick = { track, queue ->
@@ -393,7 +399,10 @@ fun MainScreen(
                             currentPage = 2
                         }
                     )
-                    2 -> PlayerScreen(
+                    }
+                    2 -> Box(modifier = Modifier.fillMaxSize()) {
+                        PlayerScreen(
+                        bottomPadding = innerPadding.calculateBottomPadding(),
                         playerViewModel = playerViewModel,
                         visualizerManager = visualizerManager,
                         equalizerManager = equalizerManager,
@@ -422,6 +431,7 @@ fun MainScreen(
                         onSetReverb = { playerViewModel.setReverb(it) },
                         onApplyPreset = { playerViewModel.applyPreset(it) }
                     )
+                    }
                 }
             }
         }

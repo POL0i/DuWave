@@ -15,18 +15,23 @@ import androidx.compose.ui.unit.dp
 import com.example.beatpulse.data.OnlineMusicRepository
 import com.example.beatpulse.utils.DownloadHelper
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.schabi.newpipe.extractor.ServiceList
 import org.schabi.newpipe.extractor.stream.StreamInfo
 import javax.inject.Inject
+import com.example.beatpulse.data.MusicRepository
+import com.example.beatpulse.data.TrackEntity
 
 @AndroidEntryPoint
 class ShareActivity : ComponentActivity() {
 
     @Inject
     lateinit var onlineMusicRepository: OnlineMusicRepository
+    
+    @Inject
+    lateinit var musicRepository: MusicRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,16 +64,18 @@ class ShareActivity : ComponentActivity() {
         var videoTitle by remember { mutableStateOf<String?>(null) }
         var videoAuthor by remember { mutableStateOf<String?>(null) }
         var streamUrl by remember { mutableStateOf<String?>(null) }
+        var streamInfo by remember { mutableStateOf<StreamInfo?>(null) }
         var isLoading by remember { mutableStateOf(true) }
         var error by remember { mutableStateOf<String?>(null) }
 
         LaunchedEffect(url) {
             withContext(Dispatchers.IO) {
                 try {
-                    val streamInfo = StreamInfo.getInfo(ServiceList.YouTube, url)
-                    videoTitle = streamInfo.name
-                    videoAuthor = streamInfo.uploaderName
-                    val bestAudio = streamInfo.audioStreams.maxByOrNull { it.bitrate }
+                    val info = StreamInfo.getInfo(org.schabi.newpipe.extractor.ServiceList.YouTube, url)
+                    streamInfo = info
+                    videoTitle = info.name
+                    videoAuthor = info.uploaderName
+                    val bestAudio = info.audioStreams.maxByOrNull { it.bitrate }
                     streamUrl = bestAudio?.content
                     
                     if (streamUrl == null) {
@@ -102,6 +109,39 @@ class ShareActivity : ComponentActivity() {
                 TextButton(
                     onClick = {
                         if (!isLoading && error == null && videoTitle != null && streamUrl != null) {
+                            val highResThumb = streamInfo?.thumbnails?.firstOrNull()?.url?.replace(Regex("=w\\d+-h\\d+[^&]*"), "=w600-h600-l90-rj") ?: ""
+                            
+                            // Guardar el thumbnail y metadatos preliminares para que se asimilen al descargar
+                            kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) {
+                                var localCover = ""
+                                try {
+                                    val coversDir = java.io.File(this@ShareActivity.filesDir, "covers")
+                                    if (!coversDir.exists()) coversDir.mkdirs()
+                                    val destFile = java.io.File(coversDir, "cover_${System.currentTimeMillis()}.jpg")
+                                    
+                                    java.net.URL(highResThumb).openStream().use { input ->
+                                        destFile.outputStream().use { output ->
+                                            input.copyTo(output)
+                                        }
+                                    }
+                                    localCover = destFile.absolutePath
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                }
+                                
+                                val trackToSave = TrackEntity(
+                                    id = url.hashCode().toLong(),
+                                    title = videoTitle!!,
+                                    artist = videoAuthor ?: "YouTube",
+                                    album = "YouTube Downloads",
+                                    duration = streamInfo?.duration?.times(1000L) ?: 0L,
+                                    dataPath = "youtube://${url.hashCode()}",
+                                    folderPath = "Online",
+                                    customCoverPath = localCover.takeIf { it.isNotEmpty() }
+                                )
+                                musicRepository.insertOrUpdateTrack(trackToSave)
+                            }
+                            
                             DownloadHelper.downloadTrack(
                                 context = this@ShareActivity,
                                 streamUrl = streamUrl!!,

@@ -66,14 +66,21 @@ class LibraryViewModel @Inject constructor(
             android.media.MediaScannerConnection.scanFile(
                 context,
                 arrayOf(newFilePath),
-                arrayOf("audio/mp4")
+                null // Auto-detect mime type (supports .opus, .m4a, etc)
             ) { _, _ ->
                 viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     // Refrescar DB
                     repository.scanMediaStore()
                     // Buscar la nueva pista y actualizar su metadata
-                    val allTracksList = repository.allTracksFlow.first()
-                    val newTrack = allTracksList.find { it.dataPath == newFilePath }
+                    var newTrack: TrackEntity? = null
+                    // Room's Flow might take a moment to emit the new list, retry up to 3 times
+                    for (i in 0 until 3) {
+                        val allTracksList = repository.allTracksFlow.first()
+                        newTrack = allTracksList.find { it.dataPath == newFilePath }
+                        if (newTrack != null) break
+                        kotlinx.coroutines.delay(300)
+                    }
+                    
                     if (newTrack != null) {
                         repository.updateTrackMetadata(
                             id = newTrack.id,

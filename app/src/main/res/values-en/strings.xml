@@ -70,6 +70,11 @@
     <string name="style_ring">Ring</string>
     <string name="style_waves">Waves</string>
     <string name="style_slime">Slime</string>
+    <string name="style_bands">Bands</string>
+    <string name="style_dots">Dots</string>
+    <string name="style_particles">Particles</string>
+    <string name="style_rings">Rings</string>
+    <string name="style_aura">Aura</string>
     <string name="tab_artists">Artists</string>
     <string name="playback_settings">Playback settings</string>
     <string name="edit_tag">Edit tag</string>
@@ -119,6 +124,7 @@
     <string name="mid_sensitivity_format">Mid Sensitivity: %1$sx</string>
     <string name="treble_sensitivity_format">Treble Sensitivity: %1$sx</string>
     <string name="general_sensitivity_format">General Sensitivity: %1$sx</string>
+    <string name="advanced_sensitivity">Advanced Sensitivity</string>
     <string name="choose_cover">Choose Cover</string>
     <string name="custom_cover_selected">Custom cover selected</string>
     <string name="audio_effects">Audio Effects</string>

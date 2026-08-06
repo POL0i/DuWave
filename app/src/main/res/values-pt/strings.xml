@@ -70,6 +70,11 @@
     <string name="style_ring">Anel</string>
     <string name="style_waves">Ondas</string>
     <string name="style_slime">Slime</string>
+    <string name="style_bands">Bandas</string>
+    <string name="style_dots">Pontos</string>
+    <string name="style_particles">Partículas</string>
+    <string name="style_rings">Anéis</string>
+    <string name="style_aura">Aura</string>
     <string name="tab_artists">Artistas</string>
     <string name="playback_settings">Configurações de reprodução</string>
     <string name="edit_tag">Editar tag</string>
@@ -119,6 +124,7 @@
     <string name="mid_sensitivity_format">Sensibilidade de Médios: %1$sx</string>
     <string name="treble_sensitivity_format">Sensibilidade de Agudos: %1$sx</string>
     <string name="general_sensitivity_format">Sensibilidade Geral: %1$sx</string>
+    <string name="advanced_sensitivity">Sensibilidade Avançada</string>
     <string name="choose_cover">Escolher Capa</string>
     <string name="custom_cover_selected">Capa personalizada selecionada</string>
     <string name="audio_effects">Efeitos de Áudio</string>

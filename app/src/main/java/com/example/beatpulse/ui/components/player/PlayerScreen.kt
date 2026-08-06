@@ -20,10 +20,18 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.animation.core.Spring
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.ui.draw.drawBehind
+import android.app.Activity
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
@@ -115,10 +123,16 @@ import kotlinx.coroutines.delay
 class Spark(var x: Float, var y: Float, var vx: Float, var vy: Float, var alpha: Float, val color: Color)
 
 enum class VisualizerStyle {
-    WAVE, SLIME, BARS, DOTS, PARTICLES, RINGS, AURA
+    WAVE, SLIME, BARS, DOTS, PARTICLES, RINGS, AURA, BANDS
 }
 
 enum class DragAction { NONE, DJ_SEEK, OPEN_QUEUE }
+
+fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -133,6 +147,7 @@ fun PlayerScreen(
     
     paletteColors: com.example.beatpulse.theme.PaletteColors,
     modifier: Modifier = Modifier,
+    bottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
     prefs: com.example.beatpulse.data.PreferencesManager,
     repeatModeState: Int = 0,
     shuffleModeState: Boolean = false,
@@ -147,8 +162,24 @@ fun PlayerScreen(
     sleepTimerSeconds: Int = 0,
     onSetSleepTimer: (Int) -> Unit = {},
     onUpdateTrackMetadata: (Long, String?, String?, String?, String?) -> Unit = { _, _, _, _, _ -> },
-    onAddToPlaylist: ((TrackEntity) -> Unit)? = null
+    onAddToPlaylist: (TrackEntity) -> Unit = {}
 ) {
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        val window = view.context.findActivity()?.window
+        if (window != null) {
+            val insetsController = WindowCompat.getInsetsController(window, view)
+            insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            insetsController.hide(WindowInsetsCompat.Type.statusBars())
+        }
+        onDispose {
+            if (window != null) {
+                val insetsController = WindowCompat.getInsetsController(window, view)
+                insetsController.show(WindowInsetsCompat.Type.statusBars())
+            }
+        }
+    }
+
     val albumArtBitmap = currentTrack?.let { com.example.beatpulse.ui.components.rememberFullAlbumArt(it) }
     val bassAmplitudesState = visualizerManager.bassAmplitudes.collectAsState()
     val midAmplitudesState = visualizerManager.midAmplitudes.collectAsState()
@@ -330,8 +361,55 @@ fun PlayerScreen(
         )
     }
 
-    Column(modifier = modifier
+    Box(modifier = modifier
         .fillMaxSize()
+        .drawBehind {
+            if (currentStyle == VisualizerStyle.BANDS) {
+                val w = size.width
+                val h = size.height
+                val bassOpacity = (0.4f + bassMult * 0.4f + reactivity * 0.2f).coerceIn(0f, 1f)
+                val midOpacity = (0.5f + midMult * 0.3f + reactivity * 0.2f).coerceIn(0f, 1f)
+                val highOpacity = (0.6f + trebleMult * 0.2f + reactivity * 0.2f).coerceIn(0f, 1f)
+
+                fun drawBandsEdge(amps: FloatArray, color: Color, widthMult: Float, isLeft: Boolean) {
+                    val count = amps.size
+                    if (count == 0) return
+                    val stepY = h / count.coerceAtLeast(1).toFloat()
+                    val strokeW = 4f
+                    
+                    for (i in 0 until count) {
+                        val amp = amps[i]
+                        val bandWidth = amp * w * 0.45f * widthMult // Up to 45% of width
+                        if (bandWidth <= 1f) continue
+                        val startX = if (isLeft) 0f else w - bandWidth
+                        
+                        drawRect(
+                            color = color,
+                            topLeft = androidx.compose.ui.geometry.Offset(startX, i * stepY),
+                            size = androidx.compose.ui.geometry.Size(bandWidth, stepY),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeW)
+                        )
+                    }
+                }
+                
+                val drawBandLayer = { amps: FloatArray, color: Color, widthMult: Float ->
+                    drawBandsEdge(amps, color, widthMult, true)
+                    drawBandsEdge(amps, color, widthMult, false)
+                }
+
+                if (visualizerArchetype == 1) {
+                    drawBandLayer(combinedAmplitudesState.value, paletteColors.vibrant.copy(alpha = maxOf(bassOpacity, midOpacity, highOpacity)), 1.5f)
+                } else {
+                    drawBandLayer(bassAmplitudesState.value, paletteColors.dominant.copy(alpha = bassOpacity * 0.7f), 0.9f)
+                    drawBandLayer(midAmplitudesState.value, paletteColors.vibrant.copy(alpha = midOpacity), 1.3f)
+                    drawBandLayer(highAmplitudesState.value, paletteColors.muted.copy(alpha = highOpacity), 0.7f)
+                }
+            }
+        }
+    ) {
+    Column(modifier = Modifier
+        .fillMaxSize()
+        .padding(bottom = bottomPadding)
         .then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
     ) {
         
@@ -768,7 +846,7 @@ fun PlayerScreen(
 
                 fun drawLayer(amps: FloatArray, layerColor: Color, opacity: Float, isBassLayer: Boolean) {
                     val numBars = amps.size
-                    if (numBars == 0 || currentStyle == VisualizerStyle.RINGS || currentStyle == VisualizerStyle.AURA) return
+                    if (numBars == 0 || currentStyle == VisualizerStyle.RINGS || currentStyle == VisualizerStyle.AURA || currentStyle == VisualizerStyle.BANDS) return
                     val distStep = (pathLength / 2f) / (numBars - 1).coerceAtLeast(1).toFloat()
                     var outPx = 0f; var outPy = 0f; var outNx = 0f; var outNy = 0f
                     
@@ -933,7 +1011,7 @@ fun PlayerScreen(
                     }
                 }
 
-                if (currentStyle == VisualizerStyle.RINGS || currentStyle == VisualizerStyle.AURA) {
+                if (currentStyle == VisualizerStyle.RINGS || currentStyle == VisualizerStyle.AURA || currentStyle == VisualizerStyle.BANDS) {
                     when (currentStyle) {
                         VisualizerStyle.RINGS -> {
                             val dynamicRotation = rotationAngle + (bassAvg * 90f)
@@ -993,6 +1071,9 @@ fun PlayerScreen(
                                     style = androidx.compose.ui.graphics.drawscope.Stroke(width = 15f + trebleAvg * 50f, join = androidx.compose.ui.graphics.StrokeJoin.Round)
                                 )
                             }
+                        }
+                        VisualizerStyle.BANDS -> {
+                            // BANDS are drawn in the background Column's drawBehind
                         }
                         else -> {}
                     }
@@ -1387,8 +1468,12 @@ fun PlayerScreen(
             onDismissRequest = { showEqDialog = false },
             title = { Text(stringResource(R.string.equalizer), color = colorVibrant, fontWeight = FontWeight.Bold) },
             text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
+                Column(modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.navigationBars)
+        ) {
+            // Header
+            Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
@@ -1562,13 +1647,14 @@ fun PlayerScreen(
     }
 
     val styleNames = mapOf(
-        VisualizerStyle.WAVE to "Onda",
-        VisualizerStyle.SLIME to "Slime",
-        VisualizerStyle.BARS to "Barras",
-        VisualizerStyle.DOTS to "Puntos",
-        VisualizerStyle.PARTICLES to "Partículas",
-        VisualizerStyle.RINGS to "Anillos",
-        VisualizerStyle.AURA to "Aura"
+        VisualizerStyle.WAVE to stringResource(R.string.style_waves),
+        VisualizerStyle.SLIME to stringResource(R.string.style_slime),
+        VisualizerStyle.BARS to stringResource(R.string.style_bars),
+        VisualizerStyle.DOTS to stringResource(R.string.style_dots),
+        VisualizerStyle.PARTICLES to stringResource(R.string.style_particles),
+        VisualizerStyle.RINGS to stringResource(R.string.style_rings),
+        VisualizerStyle.AURA to stringResource(R.string.style_aura),
+        VisualizerStyle.BANDS to stringResource(R.string.style_bands)
     )
 
     if (showSettingsMenu) {
@@ -1579,7 +1665,9 @@ fun PlayerScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-            .padding(horizontal = 24.dp)
+                    .fillMaxHeight(0.9f)
+                    .padding(horizontal = 24.dp)
+                    .animateContentSize()
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(stringResource(R.string.playback_settings), color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
@@ -1734,7 +1822,7 @@ fun PlayerScreen(
                     prefs.isAdvancedMode = isAdvancedMode
                     visualizerManager.isAdvancedMode.value = isAdvancedMode
                 }) {
-                    Text(if (isAdvancedMode) "Sensibilidad Avanzada" else "Sensibilidad General", color = Color.Gray, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                    Text(if (isAdvancedMode) stringResource(R.string.advanced_sensitivity) else stringResource(R.string.visualizer_sensitivity), color = Color.Gray, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
                     androidx.compose.material3.Switch(
                         checked = isAdvancedMode,
                         onCheckedChange = { 
@@ -1802,13 +1890,7 @@ fun PlayerScreen(
                         onValueChange = {
                             visualizerManager.sensitivity.value = it
                             prefs.sensitivity = it
-                            // Keep advanced sync
-                            visualizerManager.bassMultiplier.value = it
-                            prefs.bassMultiplier = it
-                            visualizerManager.midMultiplier.value = it
-                            prefs.midMultiplier = it
-                            visualizerManager.trebleMultiplier.value = it
-                            prefs.trebleMultiplier = it
+                            // Do NOT sync advanced settings to prevent overwriting user preferences
                         },
                         valueRange = 0.5f..3.0f,
                         colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
@@ -1927,5 +2009,6 @@ fun PlayerScreen(
             },
             containerColor = colorDominant
         )
+    }
     }
 }
