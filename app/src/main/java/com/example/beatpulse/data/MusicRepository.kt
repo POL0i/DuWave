@@ -142,10 +142,12 @@ class MusicRepository(context: Context) {
                         var existingTrack = existingMap[id]
                         if (existingTrack == null) {
                             // Check if this new local file matches an existing online track
+                            val normalizedDataPath = dataPath.replace(Regex("[^a-zA-Z0-9]"), "").lowercase()
                             val onlineTrack = existingMap.values.find {
+                                val normalizedTitle = it.title.replace(Regex("[^a-zA-Z0-9]"), "").lowercase()
                                 it.dataPath.startsWith("youtube://") &&
                                 (it.title.equals(title, ignoreCase = true) || title.contains(it.title, ignoreCase = true) ||
-                                 dataPath.contains(it.title.replace(Regex("[^a-zA-Z0-9.\\- ]"), "_"), ignoreCase = true))
+                                 normalizedDataPath.contains(normalizedTitle))
                             }
                             if (onlineTrack != null) {
                                 existingTrack = onlineTrack

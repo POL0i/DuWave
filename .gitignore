@@ -77,3 +77,8 @@ Thumbs.db
 keys_backup.zip
 get_key_hash.sh
 app/src/main/assets/youtube_config.json
+
+*.py
+scratch/
+
+*.patch

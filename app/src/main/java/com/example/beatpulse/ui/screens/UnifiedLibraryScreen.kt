@@ -43,7 +43,7 @@ import com.example.beatpulse.theme.PaletteColors
 import com.example.beatpulse.ui.components.PixelIcons
 import com.example.beatpulse.ui.screens.LibraryViewModel
 
-data class PlaylistViewData(val title: String, val tracks: List<TrackEntity>, val playlistId: Long? = null)
+data class PlaylistViewData(val title: String, val tracks: List<TrackEntity>, val playlistId: Long? = null, val filterType: Int? = null, val filterValue: String? = null)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -86,6 +86,7 @@ fun UnifiedLibraryScreen(
     var trackToAddToPlaylist by remember { mutableStateOf<TrackEntity?>(null) }
     
     var trackToDelete by remember { mutableStateOf<TrackEntity?>(null) }
+    var trackToChangeCover by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingConfirmation by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingTrim by remember { mutableStateOf<TrackEntity?>(null) }
     var showStats by remember { mutableStateOf(false) }
@@ -97,6 +98,7 @@ fun UnifiedLibraryScreen(
             trackToDelete?.let { track ->
                 viewModel.completeDeletion(track.id)
                 prefs.showToast("Canción eliminada")
+                viewModel.scanMediaStore()
             }
         }
         trackToDelete = null
@@ -294,10 +296,10 @@ fun UnifiedLibraryScreen(
                             val newShape = (shapeIdx + 1) % 4
                             prefs.thumbnailShape = newShape
                             prefs.showToast(when(newShape) {
-                                0 -> "Forma: Círculo"
-                                1 -> "Forma: Cuadrado"
-                                2 -> "Forma: Redondeado"
-                                3 -> "Forma: Squircle"
+                                0 -> context.getString(com.example.beatpulse.R.string.shape_circle)
+                                1 -> context.getString(com.example.beatpulse.R.string.shape_square)
+                                2 -> context.getString(com.example.beatpulse.R.string.shape_rounded)
+                                3 -> context.getString(com.example.beatpulse.R.string.shape_squircle)
                                 else -> "Forma"
                             })
                         }) {
@@ -318,15 +320,15 @@ fun UnifiedLibraryScreen(
                             val newStyle = (bgStyle + 1) % 9
                             prefs.backgroundStyle = newStyle
                             prefs.showToast(when(newStyle) {
-                                0 -> "Estilo: Clásico"
-                                1 -> "Estilo: Cyberpunk"
-                                2 -> "Estilo: Anime Pastel"
-                                3 -> "Estilo: Luminoso"
-                                4 -> "Estilo: Y2K Kawaii"
-                                5 -> "Estilo: Black Metal"
-                                6 -> "Estilo: Dark Fantasy"
-                                7 -> "Estilo: Catedral"
-                                8 -> "Estilo: Corazones"
+                                0 -> context.getString(com.example.beatpulse.R.string.style_classic)
+                                1 -> context.getString(com.example.beatpulse.R.string.style_cyberpunk)
+                                2 -> context.getString(com.example.beatpulse.R.string.style_anime)
+                                3 -> context.getString(com.example.beatpulse.R.string.style_luminous)
+                                4 -> context.getString(com.example.beatpulse.R.string.style_kawaii)
+                                5 -> context.getString(com.example.beatpulse.R.string.style_black_metal)
+                                6 -> context.getString(com.example.beatpulse.R.string.style_dark_fantasy)
+                                7 -> context.getString(com.example.beatpulse.R.string.style_cathedral)
+                                8 -> context.getString(com.example.beatpulse.R.string.style_hearts)
                                 else -> "Estilo Modificado"
                             })
                         }) {
@@ -338,8 +340,6 @@ fun UnifiedLibraryScreen(
                         }
                     }
                 }
-
-                // Removed global search bar as per user request
 
                 val prefs = remember { com.example.beatpulse.data.PreferencesManager.getInstance(context) }
                 val initialPage = (Int.MAX_VALUE / 2) - ((Int.MAX_VALUE / 2) % 4) + prefs.lastLibraryTab
@@ -441,7 +441,20 @@ fun UnifiedLibraryScreen(
                 remember { mutableStateOf(emptyList()) }
             }
             
-            val tracksToDisplayRaw = if (currentViewData.playlistId != null) dbTracks else currentViewData.tracks
+            val tracksToDisplayRaw = if (currentViewData.playlistId != null) {
+                dbTracks
+            } else if (currentViewData.filterType != null && currentViewData.filterValue != null) {
+                allTracks.filter { track ->
+                    when (currentViewData.filterType) {
+                        0 -> track.artist == currentViewData.filterValue
+                        1 -> track.album == currentViewData.filterValue
+                        2 -> track.folderPath == currentViewData.filterValue
+                        else -> false
+                    }
+                }
+            } else {
+                currentViewData.tracks
+            }
             
             // Search and sorting for detailed view
             var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -485,6 +498,10 @@ fun UnifiedLibraryScreen(
                         modifier = Modifier.weight(1f)
                     )
                     
+                    IconButton(onClick = { viewModel.reloadMissingCoversForList(tracksToDisplay) }) {
+                        Icon(Icons.Default.ImageSearch, contentDescription = context.getString(com.example.beatpulse.R.string.reload_covers), tint = paletteColors.vibrant)
+                    }
+
                     if (currentViewData.playlistId == null) {
                         Box {
                              IconButton(onClick = { isSortMenuExpanded = true }) {
@@ -500,10 +517,10 @@ fun UnifiedLibraryScreen(
                                      expanded = isSortMenuExpanded,
                                      onDismissRequest = { isSortMenuExpanded = false }
                                  ) {
-                                     DropdownMenuItem(text = { Text("Directorio (Por defecto)") }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
-                                     DropdownMenuItem(text = { Text("Título (A-Z)") }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
-                                     DropdownMenuItem(text = { Text("Artista (A-Z)") }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
-                                     DropdownMenuItem(text = { Text("Álbum (A-Z)") }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
+                                     DropdownMenuItem(text = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.sort_directory)) }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
+                                     DropdownMenuItem(text = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.sort_title)) }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
+                                     DropdownMenuItem(text = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.sort_artist)) }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
+                                     DropdownMenuItem(text = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.sort_album)) }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
                                  }
                              }
                         }
@@ -555,10 +572,11 @@ fun UnifiedLibraryScreen(
                                         onToggleFavorite = {
                                             viewModel.toggleFavorite(track, !track.isFavorite)
                                         },
+                                        onChangeCover = { trackToChangeCover = track },
                                         onAddToPlaylist = { trackToAddToPlaylist = track },
                                         onDeleteTrack = if (currentViewData.playlistId == null) { { trackPendingConfirmation = track } } else null,
                                         onRemoveFromPlaylist = if (currentViewData.playlistId != null) { { viewModel.removeTrackFromPlaylist(currentViewData.playlistId, track.id) } } else null,
-                                        onTrimTrack = { trackPendingTrim = track }
+                                        onTrimTrack = if (!track.dataPath.startsWith("http")) { { trackPendingTrim = track } } else null
                                     )
                                 }
                                 if (currentViewData.playlistId != null) {
@@ -620,10 +638,23 @@ fun UnifiedLibraryScreen(
                     )
                 }
 
+                trackToChangeCover?.let { track ->
+                    com.example.beatpulse.ui.screens.ChangeCoverDialog(
+                        track = track,
+                        viewModel = viewModel,
+                        paletteColors = paletteColors,
+                        onDismiss = { trackToChangeCover = null },
+                        onCoverSelected = { newPath ->
+                            viewModel.updateTrackCover(track, newPath)
+                            trackToChangeCover = null
+                        }
+                    )
+                }
+
                 trackToAddToPlaylist?.let { trackToAdd ->
                     AlertDialog(
                         onDismissRequest = { trackToAddToPlaylist = null },
-                        title = { Text("Añadir a Playlist") },
+                        title = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.add_to_playlist)) },
                         text = {
                             if (playlists.isEmpty()) {
                                 Text("No tienes playlists creadas.")
@@ -671,6 +702,7 @@ fun UnifiedLibraryScreen(
                                         deleteLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
                                     } else {
                                         prefs.showToast("Canción eliminada")
+                                        viewModel.scanMediaStore()
                                     }
                                 }
                             }) {
@@ -856,7 +888,16 @@ fun CategorySubPage(
                     icon = icon,
                     tint = paletteColors.vibrant,
                     textColor = dynamicTextColor,
-                    onClick = { onCategorySelected(PlaylistViewData(displayTitle.ifEmpty { "Desconocido" }, categoryTracks)) }
+                    onClick = { 
+                        onCategorySelected(
+                            PlaylistViewData(
+                                title = displayTitle.ifEmpty { "Desconocido" }, 
+                                tracks = categoryTracks,
+                                filterType = categoryType,
+                                filterValue = key
+                            )
+                        ) 
+                    }
                 )
             }
         }

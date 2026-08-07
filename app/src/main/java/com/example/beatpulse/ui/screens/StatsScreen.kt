@@ -84,7 +84,7 @@ fun StatsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "📊 Tus Estadísticas",
+                        text = "📊 ${androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_title)}",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Bold
                         ),
@@ -139,7 +139,7 @@ fun StatsScreen(
                 StaggeredEntry(visible = visible, delayMs = 300) {
                     SectionTitle(
                         icon = Icons.Default.Person,
-                        title = "Artistas Más Escuchados",
+                        title = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_top_artists),
                         paletteColors = paletteColors
                     )
                 }
@@ -160,7 +160,7 @@ fun StatsScreen(
                 StaggeredEntry(visible = visible, delayMs = 400) {
                     SectionTitle(
                         icon = Icons.Default.MusicNote,
-                        title = "Canciones Más Escuchadas",
+                        title = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_top_songs),
                         paletteColors = paletteColors
                     )
                 }
@@ -183,7 +183,7 @@ fun StatsScreen(
                 StaggeredEntry(visible = visible, delayMs = 700) {
                     SectionTitle(
                         icon = Icons.Default.Album,
-                        title = "Álbumes Más Escuchados",
+                        title = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_top_albums),
                         paletteColors = paletteColors
                     )
                 }
@@ -204,7 +204,7 @@ fun StatsScreen(
                 StaggeredEntry(visible = visible, delayMs = 850) {
                     SectionTitle(
                         icon = Icons.Default.Favorite,
-                        title = "Tus Favoritas",
+                        title = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_your_favorites),
                         paletteColors = paletteColors
                     )
                 }
@@ -271,7 +271,7 @@ private fun EmptyStatsCard(paletteColors: PaletteColors) {
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    text = "¡Aún no hay datos!",
+                    text = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_no_data),
                     style = MaterialTheme.typography.titleLarge,
                     color = Color.White,
                     fontWeight = FontWeight.Bold
@@ -326,7 +326,7 @@ private fun HeroListeningCard(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Has escuchado",
+                    text = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_you_listened),
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White.copy(alpha = 0.85f)
                 )
@@ -339,7 +339,7 @@ private fun HeroListeningCard(
                     color = Color.White
                 )
                 Text(
-                    text = "de música",
+                    text = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_of_music),
                     style = MaterialTheme.typography.titleMedium,
                     color = Color.White.copy(alpha = 0.85f)
                 )
@@ -361,7 +361,7 @@ private fun HeroListeningCard(
                         tint = Color.White.copy(alpha = 0.9f)
                     )
                     Text(
-                        text = "${formatter.format(totalPlayCount)} reproducciones totales",
+                        text = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_total_plays, formatter.format(totalPlayCount)),
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = Color.White.copy(alpha = 0.95f)
                     )
@@ -388,21 +388,21 @@ private fun QuickStatsRow(
             modifier = Modifier.weight(1f),
             icon = Icons.Default.LibraryMusic,
             value = formatter.format(tracksPlayed),
-            label = "Canciones",
+            label = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_songs),
             paletteColors = paletteColors
         )
         QuickStatCard(
             modifier = Modifier.weight(1f),
             icon = Icons.Default.Person,
             value = formatter.format(uniqueArtists),
-            label = "Artistas",
+            label = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_artists),
             paletteColors = paletteColors
         )
         QuickStatCard(
             modifier = Modifier.weight(1f),
             icon = Icons.Default.Album,
             value = formatter.format(uniqueAlbums),
-            label = "Álbumes",
+            label = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_albums),
             paletteColors = paletteColors
         )
     }
@@ -576,7 +576,7 @@ private fun ArtistBarItem(
                 )
             }
             Text(
-                text = "${formatter.format(plays)} rep.",
+                text = androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.stats_plays_short, formatter.format(plays)),
                 style = MaterialTheme.typography.labelMedium,
                 color = paletteColors.lightVibrant
             )

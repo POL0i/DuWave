@@ -75,6 +75,7 @@
     <string name="style_particles">Partículas</string>
     <string name="style_rings">Anillos</string>
     <string name="style_aura">Aura</string>
+    <string name="style_duwave">DuWave</string>
     <string name="tab_artists">Artistas</string>
     <string name="playback_settings">Ajustes de reproducción</string>
     <string name="edit_tag">Editar etiqueta</string>
@@ -108,7 +109,7 @@
     <string name="searching_recommendations">Buscando recomendaciones basadas en tus estadísticas...</string>
     <string name="searching_online">Buscando online...</string>
     <string name="search_lyrics">Letras</string>
-    <!-- Added strings for Player and Library screens -->
+    
     <string name="off">Desactivado</string>
     <string name="repeat_list">Lista</string>
     <string name="repeat_one">Una</string>
@@ -154,7 +155,7 @@
     <string name="remove_from_playlist">Quitar de la Playlist</string>
     <string name="download_music">Descargar música</string>
 
-    <!-- Trimmer and Share Intent strings -->
+    
     <string name="trim_audio">Recortar audio</string>
     <string name="save_trim">Guardar Recorte</string>
     <string name="start_time">Tiempo de inicio: %1$s</string>
@@ -165,4 +166,35 @@
     <string name="playback_progress">Progreso: %1$s</string>
     <string name="confirm_link_download">Confirmar descarga de enlace</string>
     <string name="download_from_youtube_desc">¿Descargar \"%1$s\" de YouTube?</string>
+    <string name="stats_title">Tus Estadísticas</string>
+    <string name="stats_no_data">¡Aún no hay datos!</string>
+    <string name="stats_you_listened">Has escuchado</string>
+    <string name="stats_of_music">de música</string>
+    <string name="stats_total_plays">%1$s reproducciones totales</string>
+    <string name="stats_songs">Canciones</string>
+    <string name="stats_artists">Artistas</string>
+    <string name="stats_albums">Álbumes</string>
+    <string name="stats_top_artists">Artistas Más Escuchados</string>
+    <string name="stats_top_songs">Canciones Más Escuchadas</string>
+    <string name="stats_top_albums">Álbumes Más Escuchados</string>
+    <string name="stats_your_favorites">Tus Favoritas</string>
+    <string name="stats_plays_short">%1$s rep.</string>
+    <string name="based_on">Basado en: %1$s</string>
+    <string name="for_you">Para ti</string>
+    <string name="search_dots">Buscar...</string>
+    <string name="shape_squircle">Forma: Squircle</string>
+    <string name="change_cover_title">Cambiar Portada</string>
+    <string name="style_classic">Estilo: Clásico</string>
+    <string name="style_cyberpunk">Estilo: Cyberpunk</string>
+    <string name="style_anime">Estilo: Anime Pastel</string>
+    <string name="style_luminous">Estilo: Luminoso</string>
+    <string name="style_kawaii">Estilo: Kawaii</string>
+    <string name="style_black_metal">Estilo: Black Metal</string>
+    <string name="style_dark_fantasy">Estilo: Dark Fantasy</string>
+    <string name="style_cathedral">Estilo: Catedral</string>
+    <string name="style_hearts">Estilo: Corazones</string>
+    <string name="style_tale_legend">Estilo: Leyenda Cuento</string>
+    <string name="reload_covers">Recargar Portadas</string>
+    <string name="reloading_covers_progress">Recargando %1$d de %2$d...</string>
+    <string name="covers_reloaded">Portadas recargadas</string>
 </resources>

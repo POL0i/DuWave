@@ -86,6 +86,7 @@ fun CathedralFantasyBackground(
     paletteColors: PaletteColors,
     visualizerManager: AudioVisualizerManager,
     isPlayerScreen: Boolean,
+    isLibraryScreen: Boolean = false,
     content: @Composable () -> Unit
 ) {
     val tintColorState = animateColorAsState(targetValue = paletteColors.dominant.copy(alpha = 0.5f), animationSpec = tween(2000), label = "cathedral_tint")
@@ -94,13 +95,13 @@ fun CathedralFantasyBackground(
     val mutedState = animateColorAsState(targetValue = paletteColors.muted, animationSpec = tween(2000), label = "cathedral_m")
 
     val amplitudesState = visualizerManager.amplitudes.collectAsState()
-    val reactFactor = if (isPlayerScreen) 0.8f else 0.2f
+    val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(isPlayerScreen) {
+    LaunchedEffect(Unit) {
         var smoothEnergy = 0f
         var lastTime = 0L
-        while (isPlayerScreen || dynamicEnergy > 0.01f) {
+        while (true) {
             withFrameMillis { time ->
                 if (lastTime == 0L) lastTime = time
                 val dt = ((time - lastTime) / 1000f).coerceAtMost(0.1f)
@@ -115,7 +116,7 @@ fun CathedralFantasyBackground(
                 val rawEnergy = if (limit > 0) sumAmps / limit else 0f
 
                 smoothEnergy += (rawEnergy - smoothEnergy) * (1f - kotlin.math.exp(-15f * dt))
-                dynamicEnergy = smoothEnergy * reactFactor
+                dynamicEnergy = smoothEnergy * 0.8f // Keep it dynamic on both screens!
             }
         }
     }
@@ -230,7 +231,7 @@ fun CathedralFantasyBackground(
         }
 
         // Capa de cenizas (por encima del shader para que se vean)
-        if (!isPlayerScreen) {
+        if (isLibraryScreen) {
             Canvas(modifier = Modifier.fillMaxSize()
                 .graphicsLayer {
                     scaleX = 1f + dynamicEnergy * 0.15f
@@ -256,11 +257,12 @@ fun CathedralFantasyBackground(
 
                     val ampIndex = index % 120
                     val localAmp = if (currentAmps.size > ampIndex) currentAmps[ampIndex] else 0f
-                    val flare = if (localAmp > 0.2f) (localAmp - 0.2f) * 15f else 0f
+                    // Lower threshold and increase multiplier for much more visible pulsing
+                    val flare = if (localAmp > 0.1f) (localAmp - 0.1f) * 40f else 0f
 
                     drawCircle(
-                        color = lightVibrant.copy(alpha = (alpha * 0.6f + flare * 0.2f).coerceIn(0f, 1f)),
-                        radius = (alpha * 1.5f) + (flare * 3f),
+                        color = lightVibrant.copy(alpha = (alpha * 0.6f + flare * 0.3f).coerceIn(0f, 1f)),
+                        radius = (alpha * 1f) + (flare * 1.5f),
                         center = Offset(currentX, currentY)
                     )
                 }

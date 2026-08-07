@@ -51,7 +51,7 @@ fun AlbumsScreen(
         }
     }
 
-    data class PlaylistViewData(val title: String, val tracks: List<TrackEntity>, val playlistId: Long? = null)
+    data class PlaylistViewData(val title: String, val tracks: List<TrackEntity>, val playlistId: Long? = null, val filterType: Int? = null, val filterValue: String? = null)
     var selectedPlaylist by remember { mutableStateOf<PlaylistViewData?>(null) }
     var isCreatingPlaylist by remember { mutableStateOf(false) }
     var addingTracksToPlaylistId by remember { mutableStateOf<Long?>(null) }
@@ -72,6 +72,7 @@ fun AlbumsScreen(
     }
 
     val isScanning by viewModel.isScanning.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (isScanning && allTracks.isEmpty()) {
@@ -145,10 +146,10 @@ fun AlbumsScreen(
                             val newShape = (shapeIdx + 1) % 4
                             prefs.thumbnailShape = newShape
                             prefs.showToast(when(newShape) {
-                                0 -> "Forma: Círculo"
-                                1 -> "Forma: Cuadrado"
-                                2 -> "Forma: Redondeado"
-                                3 -> "Forma: Squircle"
+                                0 -> context.getString(com.example.beatpulse.R.string.shape_circle)
+                                1 -> context.getString(com.example.beatpulse.R.string.shape_square)
+                                2 -> context.getString(com.example.beatpulse.R.string.shape_rounded)
+                                3 -> context.getString(com.example.beatpulse.R.string.shape_squircle)
                                 else -> "Forma"
                             })
                         }) {
@@ -169,15 +170,16 @@ fun AlbumsScreen(
                             val newStyle = (bgStyle + 1) % 9
                             prefs.backgroundStyle = newStyle
                             prefs.showToast(when(newStyle) {
-                                0 -> "Estilo: Clásico"
-                                1 -> "Estilo: Cyberpunk"
-                                2 -> "Estilo: Anime Pastel"
-                                3 -> "Estilo: Luminoso"
-                                4 -> "Estilo: Y2K Kawaii"
-                                5 -> "Estilo: Black Metal"
-                                6 -> "Estilo: Dark Fantasy"
-                                7 -> "Estilo: Catedral"
-                                8 -> "Estilo: Corazones"
+                                0 -> context.getString(com.example.beatpulse.R.string.style_classic)
+                                1 -> context.getString(com.example.beatpulse.R.string.style_cyberpunk)
+                                2 -> context.getString(com.example.beatpulse.R.string.style_anime)
+                                3 -> context.getString(com.example.beatpulse.R.string.style_luminous)
+                                4 -> context.getString(com.example.beatpulse.R.string.style_kawaii)
+                                5 -> context.getString(com.example.beatpulse.R.string.style_black_metal)
+                                6 -> context.getString(com.example.beatpulse.R.string.style_dark_fantasy)
+                                7 -> context.getString(com.example.beatpulse.R.string.style_cathedral)
+                                8 -> context.getString(com.example.beatpulse.R.string.style_hearts)
+                                9 -> context.getString(com.example.beatpulse.R.string.style_tale_legend)
                                 else -> "Estilo Modificado"
                             })
                         }) {
@@ -296,7 +298,7 @@ fun AlbumsScreen(
                             icon = if (bgStyle == 8) PixelIcons.Folder else Icons.Default.Folder,
                             tint = paletteColors.vibrant,
                             textColor = dynamicTextColor,
-                            onClick = { selectedPlaylist = PlaylistViewData(folder.substringAfterLast("/"), folderTracks) }
+                            onClick = { selectedPlaylist = PlaylistViewData(folder.substringAfterLast("/"), folderTracks, null, 2, folder) }
                         )
                     }
                 }
@@ -314,7 +316,20 @@ fun AlbumsScreen(
                     remember { mutableStateOf(emptyList()) }
                 }
             
-            val tracksToDisplay = if (currentViewData.playlistId != null) dbTracks else currentViewData.tracks
+            val tracksToDisplay = if (currentViewData.playlistId != null) {
+                dbTracks
+            } else if (currentViewData.filterType != null && currentViewData.filterValue != null) {
+                allTracks.filter { track ->
+                    when (currentViewData.filterType) {
+                        0 -> track.artist == currentViewData.filterValue
+                        1 -> track.album == currentViewData.filterValue
+                        2 -> track.folderPath == currentViewData.filterValue
+                        else -> false
+                    }
+                }
+            } else {
+                currentViewData.tracks
+            }
 
             Column(modifier = Modifier.fillMaxSize()) {
                 // Header with Back Button

@@ -109,6 +109,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -165,6 +166,7 @@ fun PlayerScreen(
     onAddToPlaylist: (TrackEntity) -> Unit = {}
 ) {
     val view = LocalView.current
+    
     DisposableEffect(Unit) {
         val window = view.context.findActivity()?.window
         if (window != null) {

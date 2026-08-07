@@ -425,13 +425,18 @@ class PlayerViewModel @Inject constructor(
                             // fallback
                         }
                     } else {
-                        val uri = android.net.Uri.parse(track.customCoverPath)
-                        try {
-                            val inputStream = context.contentResolver.openInputStream(uri)
-                            bitmap = BitmapFactory.decodeStream(inputStream)
-                            inputStream?.close()
-                        } catch (e: Exception) {
-                            // fallback
+                        val customFile = java.io.File(track.customCoverPath)
+                        if (customFile.exists()) {
+                            bitmap = BitmapFactory.decodeFile(customFile.absolutePath)
+                        } else {
+                            val uri = android.net.Uri.parse(track.customCoverPath)
+                            try {
+                                val inputStream = context.contentResolver.openInputStream(uri)
+                                bitmap = BitmapFactory.decodeStream(inputStream)
+                                inputStream?.close()
+                            } catch (e: Exception) {
+                                // fallback
+                            }
                         }
                     }
                 }

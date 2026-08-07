@@ -30,11 +30,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+import androidx.compose.ui.window.Dialog
+
 @Composable
 fun AudioTrimmerDialog(
     track: TrackEntity,
     onDismiss: () -> Unit,
-    onTrimSuccess: (String) -> Unit = {}
+    onTrimSuccess: (String) -> Unit = {},
+    playerViewModel: com.example.beatpulse.ui.components.player.PlayerViewModel = 
+        androidx.hilt.navigation.compose.hiltViewModel()
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -46,6 +50,17 @@ fun AudioTrimmerDialog(
     
     var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
     var isPlaying by remember { mutableStateOf(false) }
+
+    val paletteColors by playerViewModel.paletteColors.collectAsState()
+    val isDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val surfaceColor = if (isDark) {
+        val color = paletteColors.darkMuted
+        if (color == Color.Black) Color(0xFF1E1E1E) else color
+    } else {
+        val color = paletteColors.lightVibrant
+        if (color == Color.White) Color(0xFFF5F5F5) else color
+    }
+    val textColor = if (isDark) Color.White else Color.Black
 
     DisposableEffect(Unit) {
         val player = MediaPlayer().apply {
@@ -88,11 +103,21 @@ fun AudioTrimmerDialog(
         String.format("%02d:%02d", minutes, seconds)
     }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.trim_audio)) },
-        text = {
-            Column(modifier = Modifier.fillMaxWidth()) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = surfaceColor,
+            contentColor = textColor,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                Text(stringResource(R.string.trim_audio), style = MaterialTheme.typography.headlineSmall)
+                Spacer(modifier = Modifier.height(16.dp))
+                
                 Text(track.title, style = MaterialTheme.typography.titleMedium)
                 Spacer(modifier = Modifier.height(16.dp))
                 
@@ -100,7 +125,6 @@ fun AudioTrimmerDialog(
                 Text(stringResource(R.string.end_time, formatTime(sliderValues.endInclusive.toLong())))
                 
                 Spacer(modifier = Modifier.height(16.dp))
-                              Spacer(modifier = Modifier.height(16.dp))
 
                 Text(stringResource(R.string.playback_progress, formatTime(currentPos.toLong())), style = MaterialTheme.typography.labelMedium)
                 
@@ -113,7 +137,6 @@ fun AudioTrimmerDialog(
                         sliderValues = newStart..newEnd
                         mediaPlayer?.let { player ->
                             if (!isPlaying) {
-                                // optional: update currentPos when trim start changes if currentPos is outside bounds
                                 if (currentPos < newStart) {
                                     player.seekTo(newStart.toInt())
                                     currentPos = newStart
@@ -121,11 +144,13 @@ fun AudioTrimmerDialog(
                             }
                         }
                     },
-                    onSeek = { newCurr ->
+                    onSeek = { newCurr, isFinished ->
                         currentPos = newCurr
-                        mediaPlayer?.seekTo(newCurr.toInt())
+                        if (isFinished) {
+                            mediaPlayer?.seekTo(newCurr.toInt())
+                        }
                     },
-                    color = MaterialTheme.colorScheme.primary
+                    color = paletteColors.vibrant
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -140,64 +165,73 @@ fun AudioTrimmerDialog(
                                 if (currentPos < sliderValues.start || currentPos > sliderValues.endInclusive) {
                                     player.seekTo(sliderValues.start.toInt())
                                     currentPos = sliderValues.start
+                                } else {
+                                    player.seekTo(currentPos.toInt()) // Ensure player seeks to currentPos before playing
                                 }
+                                playerViewModel.playerState.value?.pause()
                                 player.start()
                                 isPlaying = true
                             }
                         }
                     },
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
                 ) {
-                    Text(if (isPlaying) "Pausar" else "Reproducir Recorte")
+                    Text(if (isPlaying) "Pausar" else "Reproducir Recorte", color = if (isDark) Color.Black else Color.White)
                 }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    isProcessing = true
-                    coroutineScope.launch {
-                        val result = withContext(Dispatchers.IO) {
-                            val originalFile = File(track.dataPath)
-                            val parentDir = originalFile.parentFile ?: context.filesDir
-                            val newFileNameBase = "${originalFile.nameWithoutExtension} (trim)"
-                            
-                            val finalPath = AudioTrimmer.trimAudio(
-                                inputPath = track.dataPath,
-                                outputDir = parentDir.absolutePath,
-                                outputFileNameBase = newFileNameBase,
-                                startMs = sliderValues.start.toLong(),
-                                endMs = sliderValues.endInclusive.toLong()
-                            )
-                            Pair(finalPath != null, finalPath)
-                        }
-                        
-                        isProcessing = false
-                        if (result.first) {
-                            Toast.makeText(context, context.getString(R.string.trim_saved_success), Toast.LENGTH_SHORT).show()
-                            onTrimSuccess(result.second!!)
-                            onDismiss()
+
+                Spacer(modifier = Modifier.height(24.dp))
+                
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    TextButton(onClick = onDismiss, enabled = !isProcessing) {
+                        Text(stringResource(R.string.cancel), color = textColor.copy(alpha=0.7f))
+                    }
+                    
+                    Button(
+                        onClick = {
+                            isProcessing = true
+                            coroutineScope.launch {
+                                val result = withContext(Dispatchers.IO) {
+                                    val originalFile = File(track.dataPath)
+                                    val parentDir = originalFile.parentFile ?: context.filesDir
+                                    val newFileNameBase = "${originalFile.nameWithoutExtension} (trim)"
+                                    
+                                    val finalPath = AudioTrimmer.trimAudio(
+                                        inputPath = track.dataPath,
+                                        outputDir = parentDir.absolutePath,
+                                        outputFileNameBase = newFileNameBase,
+                                        startMs = sliderValues.start.toLong(),
+                                        endMs = sliderValues.endInclusive.toLong()
+                                    )
+                                    Pair(finalPath != null, finalPath)
+                                }
+                                
+                                isProcessing = false
+                                if (result.first) {
+                                    Toast.makeText(context, context.getString(R.string.trim_saved_success), Toast.LENGTH_SHORT).show()
+                                    onTrimSuccess(result.second!!)
+                                    onDismiss()
+                                } else {
+                                    Toast.makeText(context, context.getString(R.string.trim_error), Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        enabled = !isProcessing,
+                        colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
+                    ) {
+                        if (isProcessing) {
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), color = if (isDark) Color.Black else Color.White)
                         } else {
-                            Toast.makeText(context, context.getString(R.string.trim_error), Toast.LENGTH_SHORT).show()
+                            Text(stringResource(R.string.save_trim), color = if (isDark) Color.Black else Color.White)
                         }
                     }
-                },
-                enabled = !isProcessing
-            ) {
-                if (isProcessing) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
-                } else {
-                    Text(stringResource(R.string.save_trim))
                 }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !isProcessing) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-        shape = RoundedCornerShape(16.dp)
-    )
+        }
+    }
 }
 
 @Composable
@@ -207,33 +241,34 @@ fun TrimSlider(
     currentMs: Float,
     totalMs: Float,
     onTrimChange: (Float, Float) -> Unit,
-    onSeek: (Float) -> Unit,
+    onSeek: (Float, Boolean) -> Unit,
     color: Color
 ) {
     var dragging by remember { mutableStateOf<String?>(null) }
     
-    Canvas(modifier = Modifier.fillMaxWidth().height(64.dp).pointerInput(totalMs, startMs, endMs, currentMs) {
+    val currentStart by rememberUpdatedState(startMs)
+    val currentEnd by rememberUpdatedState(endMs)
+    val currentCurr by rememberUpdatedState(currentMs)
+    
+    Canvas(modifier = Modifier.fillMaxWidth().height(64.dp).pointerInput(totalMs) {
+        var localDragValue = 0f
         detectDragGestures(
             onDragStart = { offset ->
                 val width = size.width.toFloat()
-                val cy = size.height * 0.7f // Bar is in the lower part of the canvas
+                val cy = size.height * 0.7f
                 
-                val startX = (startMs / totalMs) * width
-                val endX = (endMs / totalMs) * width
-                val currX = (currentMs / totalMs) * width
+                val startX = (currentStart / totalMs) * width
+                val endX = (currentEnd / totalMs) * width
                 
-                // If they touch in the upper half, target the progress pin
                 if (offset.y < cy - 20f) {
-                    // Clickeo en la mitad superior: siempre mueve el marcador de progreso
-                    val newCurr = ((offset.x / width) * totalMs).coerceIn(0f, totalMs)
-                    onSeek(newCurr)
+                    localDragValue = ((offset.x / width) * totalMs).coerceIn(0f, totalMs)
+                    onSeek(localDragValue, false)
                     dragging = "current"
                 } else {
-                    // Mitad inferior: siempre mueve el pulgar de recorte más cercano
                     val dStart = abs(offset.x - startX)
                     val dEnd = abs(offset.x - endX)
-                    
                     dragging = if (dStart < dEnd) "start" else "end"
+                    localDragValue = if (dragging == "start") currentStart else currentEnd
                 }
             },
             onDrag = { change, dragAmount ->
@@ -243,25 +278,31 @@ fun TrimSlider(
                 
                 when (dragging) {
                     "start" -> {
-                        val snapDistance = 2500f // Ampliado para mayor restricción magnética
-                        var newStart = (startMs + deltaMs).coerceIn(0f, endMs - 1000f)
-                        if (abs(newStart - currentMs) < snapDistance) newStart = currentMs
-                        onTrimChange(newStart, endMs)
+                        localDragValue = (localDragValue + deltaMs).coerceIn(0f, currentEnd - 1000f)
+                        onTrimChange(localDragValue, currentEnd)
                     }
                     "end" -> {
-                        val snapDistance = 2500f // Ampliado para mayor restricción magnética
-                        var newEnd = (endMs + deltaMs).coerceIn(startMs + 1000f, totalMs)
-                        if (abs(newEnd - currentMs) < snapDistance) newEnd = currentMs
-                        onTrimChange(startMs, newEnd)
+                        localDragValue = (localDragValue + deltaMs).coerceIn(currentStart + 1000f, totalMs)
+                        onTrimChange(currentStart, localDragValue)
                     }
                     "current" -> {
-                        val newCurr = (currentMs + deltaMs).coerceIn(0f, totalMs)
-                        onSeek(newCurr)
+                        localDragValue = (localDragValue + deltaMs).coerceIn(0f, totalMs)
+                        onSeek(localDragValue, false)
                     }
                 }
             },
-            onDragEnd = { dragging = null },
-            onDragCancel = { dragging = null }
+            onDragEnd = { 
+                if (dragging == "current") {
+                    onSeek(localDragValue, true)
+                }
+                dragging = null 
+            },
+            onDragCancel = { 
+                if (dragging == "current") {
+                    onSeek(localDragValue, true)
+                }
+                dragging = null 
+            }
         )
     }) {
         val width = size.width

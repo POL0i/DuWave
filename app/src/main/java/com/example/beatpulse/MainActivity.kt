@@ -178,10 +178,8 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         playerViewModel.isUiVisible = true
         if (::visualizerManager.isInitialized) {
-            visualizerManager.isEnabled = prefs.lastMainScreenPage == 2
-            if (visualizerManager.isEnabled) {
-                visualizerManager.start(0)
-            }
+            visualizerManager.isEnabled = true
+            visualizerManager.start(0)
         }
     }
 
@@ -309,12 +307,10 @@ fun MainScreen(
     var currentPage by remember { mutableIntStateOf(prefs.lastMainScreenPage) } // 0: Home, 1: Library, 2: Player
     LaunchedEffect(currentPage) {
         prefs.lastMainScreenPage = currentPage
-        if (currentPage == 2) {
+        // Always keep visualizer enabled so background animations work across all screens
+        if (!visualizerManager.isEnabled) {
             visualizerManager.isEnabled = true
             visualizerManager.start(0)
-        } else {
-            visualizerManager.isEnabled = false
-            visualizerManager.stop(decay = true)
         }
     }
     var sortOrder by remember { mutableStateOf(prefs.librarySortOrder) }
@@ -477,7 +473,8 @@ fun MainScreen(
             7 -> CathedralFantasyBackground(
                 paletteColors = paletteColors,
                 visualizerManager = visualizerManager,
-                isPlayerScreen = currentPage == 2
+                isPlayerScreen = currentPage == 2,
+                isLibraryScreen = currentPage == 1
             ) { content() }
             8 -> TaleLegendBackground(
                 paletteColors = paletteColors,

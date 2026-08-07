@@ -365,11 +365,11 @@ fun rememberFullAlbumArt(track: TrackEntity): ImageBitmap? {
 @Composable
 fun rememberTrackPalette(track: TrackEntity): PaletteColors {
     val context = androidx.compose.ui.platform.LocalContext.current
-    var colors by remember(track.id) {
+    var colors by remember(track) {
         mutableStateOf(PaletteCache.get(context, track.id) ?: PaletteColors())
     }
 
-    LaunchedEffect(track.id) {
+    LaunchedEffect(track) {
         if (PaletteCache.get(context, track.id) == null) {
             if (ThumbnailCache.noArtSet.contains(track.id)) {
                 PaletteCache.put(context, track.id, PaletteColors())

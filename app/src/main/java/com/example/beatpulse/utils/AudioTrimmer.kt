@@ -37,6 +37,41 @@ object AudioTrimmer {
             }
 
             val mime = format.getString(MediaFormat.KEY_MIME) ?: ""
+            
+            if (mime == "audio/mpeg") {
+                // MP3 does not need a muxer container; we can write elementary frames directly.
+                val outputPath = java.io.File(outputDir, "$outputFileNameBase.mp3").absolutePath
+                val fos = java.io.FileOutputStream(outputPath)
+                
+                val maxChunkSize = 1024 * 1024 // 1 MB buffer
+                val buffer = ByteBuffer.allocateDirect(maxChunkSize)
+
+                extractor.seekTo(startMs * 1000, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+
+                while (true) {
+                    buffer.clear()
+                    val size = extractor.readSampleData(buffer, 0)
+                    if (size < 0) {
+                        break // EOF
+                    }
+
+                    val timeUs = extractor.sampleTime
+                    if (timeUs > endMs * 1000) {
+                        break // Reached end time
+                    }
+
+                    val bytes = ByteArray(size)
+                    buffer.get(bytes)
+                    fos.write(bytes)
+
+                    extractor.advance()
+                }
+                
+                fos.close()
+                return outputPath
+            }
+
+            // For other formats (AAC, Opus, Vorbis), use MediaMuxer
             val isOpusOrVorbis = mime == "audio/opus" || mime == "audio/vorbis"
             
             val outputFormat = if (isOpusOrVorbis) {

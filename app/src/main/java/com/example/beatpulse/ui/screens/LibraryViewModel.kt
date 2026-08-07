@@ -107,8 +107,18 @@ class LibraryViewModel @Inject constructor(
     }
 
     fun completeDeletion(trackId: Long) {
-        viewModelScope.launch {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             repository.completeDeletion(trackId)
+        }
+    }
+
+    fun updateTrackCover(track: TrackEntity, newCoverPath: String?) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            repository.updateTrackMetadata(track.id, track.title, track.artist, track.album, newCoverPath)
+            // Invalidar el caché actual del thumbnail viejo
+            com.example.beatpulse.ui.components.ThumbnailCache.invalidateTrack(context, track)
+            // Hacer un rescan para forzar la actualización en la interfaz
+            scanMediaStore()
         }
     }
 
@@ -150,6 +160,23 @@ class LibraryViewModel @Inject constructor(
     val recommendations = MutableStateFlow<Map<String, List<TrackEntity>>>(emptyMap())
     val isRecommendationsLoading = MutableStateFlow(false)
     val selectedViewData = androidx.compose.runtime.mutableStateOf<PlaylistViewData?>(null)
+
+    val changeCoverSearchResults = MutableStateFlow<List<TrackEntity>>(emptyList())
+    val isChangeCoverLoading = MutableStateFlow(false)
+
+    fun searchCoversForTrack(track: TrackEntity) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            isChangeCoverLoading.value = true
+            try {
+                val results = searchOnlineMusic("${track.title} ${track.artist}")
+                changeCoverSearchResults.value = results.filter { !it.customCoverPath.isNullOrEmpty() }.take(3)
+            } catch (e: Exception) {
+                changeCoverSearchResults.value = emptyList()
+            } finally {
+                isChangeCoverLoading.value = false
+            }
+        }
+    }
 
     fun loadRecommendations(forceUpdate: Boolean = false) {
         if (!forceUpdate && recommendations.value.isNotEmpty()) return
@@ -224,7 +251,7 @@ class LibraryViewModel @Inject constructor(
                 
                 val newMap: Map<String, List<TrackEntity>> = mapOf(
                     (if (artistName != null) context.getString(com.example.beatpulse.R.string.because_you_listened, artistName) else context.getString(com.example.beatpulse.R.string.top_artists)) to artistResults,
-                    (if (trackName != null) "Basado en: $trackName" else "Para ti") to similarResults,
+                    (if (trackName != null) context.getString(com.example.beatpulse.R.string.based_on, trackName) else context.getString(com.example.beatpulse.R.string.for_you)) to similarResults,
                     context.getString(com.example.beatpulse.R.string.trending_music) to trendingResults
                 )
                 recommendations.value = newMap
@@ -324,6 +351,75 @@ class LibraryViewModel @Inject constructor(
                 prefs.showToast("Error al procesar descarga de ${track.title}")
             } finally {
                 resolvingTracks.value -= track.id
+            }
+        }
+    }
+
+    fun reloadMissingCoversForList(list: List<TrackEntity>) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            var processed = 0
+            val tracksWithoutCover = list.filter { 
+                it.customCoverPath.isNullOrEmpty() || 
+                it.customCoverPath == "null" || 
+                it.customCoverPath?.startsWith("embedded://") == true ||
+                (!it.customCoverPath!!.startsWith("/") && !it.customCoverPath!!.startsWith("http"))
+            }
+
+            if (tracksWithoutCover.isEmpty()) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    prefs.showToast(context.getString(com.example.beatpulse.R.string.covers_reloaded))
+                }
+                return@launch
+            }
+
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                prefs.showToast(context.getString(com.example.beatpulse.R.string.reloading_covers_progress, 0, tracksWithoutCover.size))
+            }
+
+            for (track in tracksWithoutCover) {
+                try {
+                    val minutes = track.duration / 60000
+                    val query = "${track.title} ${track.artist} $minutes min"
+                    val results = onlineRepository.searchOnlineMusic(query)
+                    
+                    val bestResult = results.firstOrNull { !it.customCoverPath.isNullOrEmpty() }
+                    
+                    if (bestResult != null && bestResult.customCoverPath != null) {
+                        var coverUrl = bestResult.customCoverPath!!
+                        // Descargar portada para guardarla localmente
+                        if (coverUrl.startsWith("http://") || coverUrl.startsWith("https://")) {
+                            try {
+                                val coversDir = java.io.File(context.filesDir, "covers")
+                                if (!coversDir.exists()) coversDir.mkdirs()
+                                val destFile = java.io.File(coversDir, "cover_reloaded_${System.currentTimeMillis()}.jpg")
+                                java.net.URL(coverUrl).openStream().use { input ->
+                                    destFile.outputStream().use { output ->
+                                        input.copyTo(output)
+                                    }
+                                }
+                                coverUrl = destFile.absolutePath
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
+                        }
+                        
+                        repository.updateTrackMetadata(
+                            id = track.id,
+                            title = track.customTitle,
+                            artist = track.customArtist,
+                            album = track.customAlbum,
+                            coverPath = coverUrl
+                        )
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+                processed++
+                if (processed % 5 == 0 || processed == tracksWithoutCover.size) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        prefs.showToast(context.getString(com.example.beatpulse.R.string.reloading_covers_progress, processed, tracksWithoutCover.size))
+                    }
+                }
             }
         }
     }

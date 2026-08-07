@@ -77,13 +77,13 @@ fun DarkAmbientBackground(
     val vibrantColorState = animateColorAsState(targetValue = paletteColors.vibrant, animationSpec = tween(1500), label = "vibrant_color")
 
     val amplitudesState = visualizerManager.amplitudes.collectAsState()
-    val reactFactor = if (isPlayerScreen) 0.8f else 0.2f
+    val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
     
-    LaunchedEffect(isPlayerScreen) {
+    LaunchedEffect(Unit) {
         var smoothEnergy = 0f
         var lastTime = 0L
-        while (isPlayerScreen || dynamicEnergy > 0.01f) {
+        while (true) {
             withFrameMillis { time ->
                 if (lastTime == 0L) lastTime = time
                 val dt = ((time - lastTime) / 1000f).coerceAtMost(0.1f)
@@ -98,6 +98,7 @@ fun DarkAmbientBackground(
                 val rawEnergy = if (limit > 0) sumAmps / limit else 0f
                 
                 smoothEnergy += (rawEnergy - smoothEnergy) * (1f - kotlin.math.exp(-15f * dt))
+                val reactFactor = if (currentIsPlayerScreen) 0.8f else 0.2f
                 dynamicEnergy = smoothEnergy * reactFactor
             }
         }

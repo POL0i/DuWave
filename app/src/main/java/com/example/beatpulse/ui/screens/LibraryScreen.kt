@@ -67,7 +67,7 @@ fun LibraryScreen(
     LaunchedEffect(selectedTabIndex) {
         prefs.lastLibraryGeneralTab = selectedTabIndex
     }
-    val tabs = listOf("Todos", "Navegador", "Recomendaciones")
+    val tabs = listOf(stringResource(R.string.tab_all), stringResource(R.string.tab_browser), stringResource(R.string.tab_recommendations))
 
     val allTracks by viewModel.allTracks.collectAsState()
     val recentTracks by viewModel.recentTracks.collectAsState()
@@ -84,6 +84,7 @@ fun LibraryScreen(
     val playlists by viewModel.playlists.collectAsState()
     var trackToAddToPlaylist by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingConfirmation by remember { mutableStateOf<TrackEntity?>(null) }
+    var trackToChangeCover by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingDownload by remember { mutableStateOf<TrackEntity?>(null) }
     var trackToDelete by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingTrim by remember { mutableStateOf<TrackEntity?>(null) }
@@ -95,6 +96,7 @@ fun LibraryScreen(
             trackToDelete?.let { track ->
                 viewModel.completeDeletion(track.id)
                 prefs.showToast("Canción eliminada")
+                viewModel.scanMediaStore()
             }
         }
         trackToDelete = null
@@ -312,7 +314,7 @@ fun LibraryScreen(
                                                 onDownloadTrack = if (track.dataPath.startsWith("youtube://")) {
                                                     { trackPendingDownload = track }
                                                 } else null,
-                                                onTrimTrack = { trackPendingTrim = track }
+                                                onTrimTrack = null
                                             )
                                         }
                                     }
@@ -339,7 +341,7 @@ fun LibraryScreen(
                                     onDownloadTrack = if (isSearchingOnline && track.dataPath.startsWith("youtube://")) {
                                         { trackPendingDownload = track }
                                     } else null,
-                                    onTrimTrack = { trackPendingTrim = track }
+                                    onTrimTrack = if (selectedTabIndex == 0) { { trackPendingTrim = track } } else null
                                 )
                             }
                         }
@@ -439,7 +441,7 @@ fun LibraryScreen(
         trackToAddToPlaylist?.let { trackToAdd ->
             AlertDialog(
                 onDismissRequest = { trackToAddToPlaylist = null },
-                title = { Text("Añadir a Playlist") },
+                title = { Text(context.getString(R.string.add_to_playlist)) },
                 text = {
                     if (playlists.isEmpty()) {
                         Text("No tienes playlists creadas. Crea una desde la pestaña de Álbumes.")
@@ -487,6 +489,7 @@ fun LibraryScreen(
                                 deleteLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
                             } else {
                                 prefs.showToast("Canción eliminada")
+                                viewModel.scanMediaStore()
                             }
                         }
                     }) {
@@ -534,6 +537,19 @@ fun LibraryScreen(
                 containerColor = paletteColors.dominant
             )
         }
+
+        trackToChangeCover?.let { track ->
+            ChangeCoverDialog(
+                track = track,
+                viewModel = viewModel,
+                paletteColors = paletteColors,
+                onDismiss = { trackToChangeCover = null },
+                onCoverSelected = { newPath ->
+                    viewModel.updateTrackCover(track, newPath)
+                    trackToChangeCover = null
+                }
+            )
+        }
     }
 }
 
@@ -550,6 +566,7 @@ fun TrackItem(
     onRemoveFromPlaylist: (() -> Unit)? = null,
     onDownloadTrack: (() -> Unit)? = null,
     onTrimTrack: (() -> Unit)? = null,
+    onChangeCover: (() -> Unit)? = null,
     isResolving: Boolean = false
 ) {
     // Usar la paleta global para evitar recalcular colores por cada pista, lo cual traba la lista
@@ -629,7 +646,7 @@ fun TrackItem(
                 tint = if (track.isFavorite) accentColor else Color.Gray
             )
         }
-        val hasMenuOptions = onAddToPlaylist != null || onDeleteTrack != null || onDownloadTrack != null || onRemoveFromPlaylist != null || onTrimTrack != null
+        val hasMenuOptions = onAddToPlaylist != null || onDeleteTrack != null || onDownloadTrack != null || onRemoveFromPlaylist != null || onTrimTrack != null || onChangeCover != null
         if (isResolving) {
             androidx.compose.material3.CircularProgressIndicator(
                 modifier = Modifier.size(24.dp).padding(4.dp),
@@ -654,7 +671,7 @@ fun TrackItem(
                     ) {
                         if (onAddToPlaylist != null) {
                             DropdownMenuItem(
-                                text = { Text("Añadir a Playlist") },
+                                text = { Text(stringResource(R.string.add_to_playlist)) },
                                 onClick = {
                                     isMenuExpanded = false
                                     onAddToPlaylist()
@@ -663,7 +680,7 @@ fun TrackItem(
                         }
                         if (onDeleteTrack != null) {
                             DropdownMenuItem(
-                                text = { Text("Eliminar del dispositivo") },
+                                text = { Text(stringResource(R.string.delete_from_device)) },
                                 onClick = {
                                     isMenuExpanded = false
                                     onDeleteTrack()
@@ -697,9 +714,81 @@ fun TrackItem(
                                 }
                             )
                         }
+                        if (onChangeCover != null) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.change_cover_title)) },
+                                onClick = {
+                                    isMenuExpanded = false
+                                    onChangeCover()
+                                }
+                            )
+                        }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+fun ChangeCoverDialog(
+    track: TrackEntity,
+    viewModel: LibraryViewModel,
+    paletteColors: com.example.beatpulse.theme.PaletteColors,
+    onDismiss: () -> Unit,
+    onCoverSelected: (String) -> Unit
+) {
+    val searchResults by viewModel.changeCoverSearchResults.collectAsState()
+    val isLoading by viewModel.isChangeCoverLoading.collectAsState()
+
+    LaunchedEffect(track) {
+        viewModel.searchCoversForTrack(track)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.change_cover_title), color = paletteColors.vibrant) },
+        text = {
+            if (isLoading) {
+                Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
+                    androidx.compose.material3.CircularProgressIndicator(color = paletteColors.vibrant)
+                }
+            } else if (searchResults.isEmpty()) {
+                Text("No se encontraron portadas.", color = paletteColors.dominant)
+            } else {
+                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
+                    modifier = Modifier.heightIn(max = 300.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(searchResults.size) { index ->
+                        val result = searchResults[index]
+                        val path = result.customCoverPath
+                        if (path != null) {
+                            Box(
+                                modifier = Modifier
+                                    .aspectRatio(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .clickable { onCoverSelected(path) }
+                            ) {
+                                coil.compose.AsyncImage(
+                                    model = path,
+                                    contentDescription = "Cover option",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cerrar", color = paletteColors.vibrant)
+            }
+        },
+        containerColor = paletteColors.dominant
+    )
 }
