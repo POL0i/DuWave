@@ -57,6 +57,7 @@ import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.theme.BeatPulseTheme
 import com.example.beatpulse.theme.PaletteColors
 import com.example.beatpulse.ui.components.player.PlayerScreen
+import com.example.beatpulse.ui.components.backgrounds.VisualizerState
 import com.example.beatpulse.ui.screens.AlbumsScreen
 import com.example.beatpulse.ui.screens.LibraryScreen
 import com.example.beatpulse.visualizer.AudioVisualizerManager
@@ -149,6 +150,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        val cachedCenterY = prefs.albumArtCenterY
+        if (cachedCenterY > 0f) {
+            VisualizerState.albumArtCenterY = cachedCenterY
+        }
         
         ContextCompat.registerReceiver(
             this,
@@ -380,6 +386,8 @@ fun MainScreen(
                         UnifiedLibraryScreen(
                         viewModel = libraryViewModel,
                         paletteColors = paletteColors,
+                        currentPlayingTrack = currentTrack,
+                        isPlaying = isPlaying,
                         onTrackClick = { track: com.example.beatpulse.data.TrackEntity, queue: List<com.example.beatpulse.data.TrackEntity> ->
                             playerViewModel.playTrack(track, queue)
                             currentPage = 2
@@ -390,6 +398,8 @@ fun MainScreen(
                         LibraryScreen(
                         viewModel = libraryViewModel,
                         paletteColors = paletteColors,
+                        currentPlayingTrack = currentTrack,
+                        isPlaying = isPlaying,
                         onTrackClick = { track, queue ->
                             playerViewModel.playTrack(track, queue)
                             currentPage = 2

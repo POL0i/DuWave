@@ -147,6 +147,10 @@ class PreferencesManager private constructor(context: Context) {
         get() = prefs.getBoolean("hasUsedPlaylistGesture", false)
         set(value) = prefs.edit().putBoolean("hasUsedPlaylistGesture", value).apply()
 
+    var albumArtCenterY: Float
+        get() = prefs.getFloat("albumArtCenterY", -1f)
+        set(value) = prefs.edit().putFloat("albumArtCenterY", value).apply()
+
     var showGestureFeedback: Boolean
         get() = prefs.getBoolean("showGestureFeedback", true)
         set(value) = prefs.edit().putBoolean("showGestureFeedback", value).apply()

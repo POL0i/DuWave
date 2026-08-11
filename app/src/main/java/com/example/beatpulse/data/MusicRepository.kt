@@ -121,6 +121,13 @@ class MusicRepository(context: Context) {
                             continue
                         }
 
+                        // Check if file physically exists (MediaStore might be out of sync)
+                        if (dataPath.isNotEmpty() && !dataPath.startsWith("http") && !dataPath.startsWith("youtube://")) {
+                            if (!File(dataPath).exists()) {
+                                continue
+                            }
+                        }
+
                         val id = it.getLong(idColumn)
                         var title = it.getString(titleColumn) ?: "Unknown Title"
                         var artist = it.getString(artistColumn) ?: "Unknown Artist"
@@ -193,8 +200,9 @@ class MusicRepository(context: Context) {
                     dao.insertTracks(currentChunk)
                 }
                 
-                // Delete tracks that no longer exist on the device
-                val missingIds = existingMap.keys - foundIds
+                // Delete local tracks that no longer exist on the device
+                val localExistingIds = existingMap.values.filter { !it.dataPath.startsWith("youtube://") && !it.dataPath.startsWith("http") }.map { it.id }.toSet()
+                val missingIds = localExistingIds - foundIds
                 if (missingIds.isNotEmpty()) {
                     missingIds.chunked(500).forEach { chunk ->
                         dao.deleteTracksById(chunk)

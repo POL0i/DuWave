@@ -1,6 +1,7 @@
 package com.example.beatpulse.ui.components.player
 
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.animation.animateContentSize
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
@@ -110,6 +111,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.layout.positionInRoot
+import com.example.beatpulse.ui.components.backgrounds.VisualizerState
+import kotlin.math.abs
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -336,26 +340,56 @@ fun PlayerScreen(
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val scrollState = rememberScrollState()
 
-    var showFeedbackDialog by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    var showSupportDialog by remember { mutableStateOf(false) }
     val dynamicTextColor = if (paletteColors.dominant.luminance() < 0.5f) Color.White else Color.Black
 
-    if (showFeedbackDialog) {
+    if (showSupportDialog) {
         androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showFeedbackDialog = false },
-            title = { Text(stringResource(R.string.suggest_improvements), color = colorVibrant) },
-            text = { Text(stringResource(R.string.suggest_improvements_desc), color = dynamicTextColor) },
-            confirmButton = {
-                TextButton(onClick = {
-                    val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/POL0i/DuWave/issues"))
-                    context.startActivity(intent)
-                    showFeedbackDialog = false
-                }) {
-                    Text(stringResource(R.string.open), color = colorVibrant)
+            onDismissRequest = { showSupportDialog = false },
+            title = { Text("Apoyar y Sugerencias", color = colorVibrant) },
+            text = { 
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    androidx.compose.material3.Card(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/POL0i/DuWave/issues"))
+                            context.startActivity(intent)
+                            showSupportDialog = false
+                        },
+                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = colorVibrant.copy(alpha = 0.15f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("¿Quieres aportar ideas?", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = colorVibrant)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Escríbelo en las issues de GitHub.", color = dynamicTextColor, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    
+                    androidx.compose.material3.Card(
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.patreon.com/c/aldearius/membership"))
+                            context.startActivity(intent)
+                            showSupportDialog = false
+                        },
+                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                            containerColor = colorVibrant.copy(alpha = 0.15f)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text("Apoya el proyecto", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = colorVibrant)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text("Para que siga creciendo con más estilos, más tipos de onda y beneficios personales.", color = dynamicTextColor, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                        }
+                    }
                 }
             },
+            confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showFeedbackDialog = false }) {
+                TextButton(onClick = { showSupportDialog = false }) {
                     Text(stringResource(R.string.cancel), color = dynamicTextColor.copy(alpha=0.7f))
                 }
             },
@@ -473,15 +507,15 @@ fun PlayerScreen(
                     }
                     Row(modifier = Modifier.align(Alignment.CenterStart)) {
                         IconButton(
-                            onClick = { showFeedbackDialog = true },
+                            onClick = { showSupportDialog = true },
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
                                 .background(paletteColors.dominant.copy(alpha = 0.5f))
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Feedback,
-                                contentDescription = "Sugerir mejoras",
+                                imageVector = Icons.Default.Favorite,
+                                contentDescription = "Apoyo y Sugerencias",
                                 tint = colorVibrant,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -828,10 +862,10 @@ fun PlayerScreen(
                     } else if (thumbnailShapeIdx == 2) {
                         basePath.addRoundRect(androidx.compose.ui.geometry.RoundRect(
                             left = center.x - rPx, top = center.y - rPx, right = center.x + rPx, bottom = center.y + rPx,
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(32.dp.toPx(), 32.dp.toPx())
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(16.dp.toPx(), 16.dp.toPx())
                         ))
                     } else if (thumbnailShapeIdx == 3) {
-                        val squircleRadius = 64.dp.toPx()
+                        val squircleRadius = 32.dp.toPx()
                         basePath.addRoundRect(androidx.compose.ui.geometry.RoundRect(
                             left = center.x - rPx, top = center.y - rPx, right = center.x + rPx, bottom = center.y + rPx,
                             cornerRadius = androidx.compose.ui.geometry.CornerRadius(squircleRadius, squircleRadius)
@@ -860,7 +894,7 @@ fun PlayerScreen(
                             outPx = center.x + rPx * outNx
                             outPy = center.y + rPx * outNy
                         } else {
-                            val dMod = d % pathLength
+                            val dMod = (d + pathLength * 0.125f) % pathLength
                             val localPosTan = FloatArray(2)
                             val localPosTanTan = FloatArray(2)
                             val success = androidPathMeasure.getPosTan(dMod, localPosTan, localPosTanTan)
@@ -924,9 +958,6 @@ fun PlayerScreen(
                         VisualizerStyle.DOTS -> {
                             for (i in 0 until numBars) {
                                 val amplitude = amps[i]
-                                val dist = 30f + (amplitude * 180f)
-                                val capLen = 8f + (amplitude * 30f)
-
                                 val dRight = 0f + i * distStep
                                 val dLeft = pathLength - i * distStep
 
@@ -935,13 +966,16 @@ fun PlayerScreen(
                                 computePointAndNormal(dLeft)
                                 val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
 
-                                drawLine(color = colorVibrantLayer, start = androidx.compose.ui.geometry.Offset(pxR + nxR * dist, pyR + nyR * dist),
-                                         end = androidx.compose.ui.geometry.Offset(pxR + nxR * (dist + capLen), pyR + nyR * (dist + capLen)), strokeWidth = 6f + amplitude*4f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                                drawLine(color = colorVibrantLayer, start = androidx.compose.ui.geometry.Offset(pxL + nxL * dist, pyL + nyL * dist),
-                                         end = androidx.compose.ui.geometry.Offset(pxL + nxL * (dist + capLen), pyL + nyL * (dist + capLen)), strokeWidth = 6f + amplitude*4f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
-
-                                drawCircle(color = colorVibrantLayer, radius = 3f + amplitude*2f, center = androidx.compose.ui.geometry.Offset(pxR + nxR * (dist + capLen), pyR + nyR * (dist + capLen)))
-                                drawCircle(color = colorVibrantLayer, radius = 3f + amplitude*2f, center = androidx.compose.ui.geometry.Offset(pxL + nxL * (dist + capLen), pyL + nyL * (dist + capLen)))
+                                val dotCount = (1 + (amplitude * 7).toInt()).coerceAtMost(8)
+                                val dotSpacing = 16f
+                                val dotRadius = 5f
+                                
+                                for (j in 0 until dotCount) {
+                                    val currentDist = 30f + (j * dotSpacing)
+                                    val alphaVal = opacity * (1f - (j.toFloat() / 8f)).coerceAtLeast(0.3f)
+                                    drawCircle(color = layerColor.copy(alpha = alphaVal), radius = dotRadius, center = androidx.compose.ui.geometry.Offset(pxR + nxR * currentDist, pyR + nyR * currentDist))
+                                    drawCircle(color = layerColor.copy(alpha = alphaVal), radius = dotRadius, center = androidx.compose.ui.geometry.Offset(pxL + nxL * currentDist, pyL + nyL * currentDist))
+                                }
                             }
                         }
                         VisualizerStyle.SLIME -> {
@@ -997,16 +1031,30 @@ fun PlayerScreen(
                                 val boostedAmplitude = amplitude * multiplicador
 
                                 val extrude = 20f + (boostedAmplitude * 300f)
-                                val size = 2f + (boostedAmplitude * 15f)
+                                val size = 1f + (boostedAmplitude * 6f)
 
                                 val dRight = 0f + i * distStep
                                 val dLeft = pathLength - i * distStep
+                                
+                                val timeMs = System.currentTimeMillis()
 
                                 computePointAndNormal(dRight)
                                 drawCircle(color = colorVibrantLayer, radius = size, center = androidx.compose.ui.geometry.Offset(outPx + outNx * extrude, outPy + outNy * extrude))
+                                if (boostedAmplitude > 0.1f) {
+                                    val sparkOffset = ((timeMs + i * 40) % 800) / 800f
+                                    val sparkExtrude = extrude - (sparkOffset * 50f)
+                                    val sparkSize = size * 0.5f
+                                    drawCircle(color = colorVibrantLayer.copy(alpha = opacity * (1f - sparkOffset)), radius = sparkSize, center = androidx.compose.ui.geometry.Offset(outPx + outNx * sparkExtrude, outPy + outNy * sparkExtrude))
+                                }
                                 
                                 computePointAndNormal(dLeft)
                                 drawCircle(color = colorVibrantLayer, radius = size, center = androidx.compose.ui.geometry.Offset(outPx + outNx * extrude, outPy + outNy * extrude))
+                                if (boostedAmplitude > 0.1f) {
+                                    val sparkOffset = ((timeMs + i * 40 + 400) % 800) / 800f
+                                    val sparkExtrude = extrude - (sparkOffset * 50f)
+                                    val sparkSize = size * 0.5f
+                                    drawCircle(color = colorVibrantLayer.copy(alpha = opacity * (1f - sparkOffset)), radius = sparkSize, center = androidx.compose.ui.geometry.Offset(outPx + outNx * sparkExtrude, outPy + outNy * sparkExtrude))
+                                }
                             }
                         }
                         else -> {}
@@ -1192,6 +1240,15 @@ fun PlayerScreen(
                                 }
                             }
                         )
+                    }
+                    .onGloballyPositioned { coordinates ->
+                        val yOffset = coordinates.positionInRoot().y
+                        val height = coordinates.size.height
+                        val centerY = yOffset + (height / 2f)
+                        if (abs((VisualizerState.albumArtCenterY ?: 0f) - centerY) > 5f) {
+                            VisualizerState.albumArtCenterY = centerY
+                            prefs.albumArtCenterY = centerY
+                        }
                     },
                 contentAlignment = Alignment.Center
             ) {
@@ -1729,7 +1786,7 @@ fun PlayerScreen(
 
                 Text(stringResource(R.string.repeat_method), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                    val currentMode = exoPlayer?.repeatMode ?: androidx.media3.common.Player.REPEAT_MODE_OFF
+                    val currentMode by playerViewModel.repeatMode.collectAsState()
                     TextButton(onClick = { 
                         exoPlayer?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
                         playerViewModel.abRepeatModeEnabled.value = false

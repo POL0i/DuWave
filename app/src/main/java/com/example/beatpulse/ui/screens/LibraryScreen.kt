@@ -55,10 +55,18 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.isSystemInDarkTheme
 
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+
 @Composable
 fun LibraryScreen(
     viewModel: LibraryViewModel,
     paletteColors: com.example.beatpulse.theme.PaletteColors,
+    currentPlayingTrack: TrackEntity?,
+    isPlaying: Boolean,
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
 ) {
     val prefs = viewModel.prefs
@@ -314,7 +322,9 @@ fun LibraryScreen(
                                                 onDownloadTrack = if (track.dataPath.startsWith("youtube://")) {
                                                     { trackPendingDownload = track }
                                                 } else null,
-                                                onTrimTrack = null
+                                                onTrimTrack = null,
+                                                isPlaying = currentPlayingTrack?.id == track.id,
+                                                isActuallyPlaying = currentPlayingTrack?.id == track.id && isPlaying
                                             )
                                         }
                                     }
@@ -341,7 +351,9 @@ fun LibraryScreen(
                                     onDownloadTrack = if (isSearchingOnline && track.dataPath.startsWith("youtube://")) {
                                         { trackPendingDownload = track }
                                     } else null,
-                                    onTrimTrack = if (selectedTabIndex == 0) { { trackPendingTrim = track } } else null
+                                    onTrimTrack = if (selectedTabIndex == 0) { { trackPendingTrim = track } } else null,
+                                    isPlaying = currentPlayingTrack?.id == track.id,
+                                    isActuallyPlaying = currentPlayingTrack?.id == track.id && isPlaying
                                 )
                             }
                         }
@@ -567,7 +579,9 @@ fun TrackItem(
     onDownloadTrack: (() -> Unit)? = null,
     onTrimTrack: (() -> Unit)? = null,
     onChangeCover: (() -> Unit)? = null,
-    isResolving: Boolean = false
+    isResolving: Boolean = false,
+    isPlaying: Boolean = false,
+    isActuallyPlaying: Boolean = false
 ) {
     // Usar la paleta global para evitar recalcular colores por cada pista, lo cual traba la lista
     val accentColor = paletteColors.vibrant
@@ -622,13 +636,19 @@ fun TrackItem(
         Spacer(modifier = Modifier.width(14.dp))
         
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = track.customTitle ?: track.title,
-                style = MaterialTheme.typography.bodyLarge,
-                color = textColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isPlaying) {
+                    AnimatedEqualizer(isActuallyPlaying = isActuallyPlaying, color = accentColor)
+                    Spacer(modifier = Modifier.width(8.dp))
+                }
+                Text(
+                    text = track.customTitle ?: track.title,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (isPlaying) accentColor else textColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             val displayArtist = track.customArtist ?: track.artist
             val displayAlbum = track.customAlbum ?: track.album
             Text(
@@ -791,4 +811,34 @@ fun ChangeCoverDialog(
         },
         containerColor = paletteColors.dominant
     )
+}
+
+@Composable
+fun AnimatedEqualizer(isActuallyPlaying: Boolean, color: Color) {
+    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "eq")
+    
+    val bar1 = if (isActuallyPlaying) infiniteTransition.animateFloat(
+        initialValue = 0.3f, targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(animation = androidx.compose.animation.core.tween(400, easing = androidx.compose.animation.core.LinearEasing), repeatMode = androidx.compose.animation.core.RepeatMode.Reverse), label = "b1"
+    ) else remember { mutableStateOf(0.3f) }
+    
+    val bar2 = if (isActuallyPlaying) infiniteTransition.animateFloat(
+        initialValue = 0.6f, targetValue = 0.2f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(animation = androidx.compose.animation.core.tween(300, easing = androidx.compose.animation.core.LinearEasing), repeatMode = androidx.compose.animation.core.RepeatMode.Reverse), label = "b2"
+    ) else remember { mutableStateOf(0.6f) }
+    
+    val bar3 = if (isActuallyPlaying) infiniteTransition.animateFloat(
+        initialValue = 0.4f, targetValue = 0.9f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(animation = androidx.compose.animation.core.tween(500, easing = androidx.compose.animation.core.LinearEasing), repeatMode = androidx.compose.animation.core.RepeatMode.Reverse), label = "b3"
+    ) else remember { mutableStateOf(0.4f) }
+    
+    Row(
+        verticalAlignment = Alignment.Bottom,
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.height(14.dp)
+    ) {
+        listOf(bar1, bar2, bar3).forEach { anim ->
+            Box(modifier = Modifier.width(3.dp).fillMaxHeight(anim.value).clip(RoundedCornerShape(1.dp)).background(color))
+        }
+    }
 }

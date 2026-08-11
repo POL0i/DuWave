@@ -42,16 +42,21 @@ private const val TALE_LEGEND_SHADER_SRC = """
     }
     
     half4 main(in float2 fragCoord) {
-        float2 uv = (fragCoord - 0.5 * iResolution.xy + float2(0.0, iOffsetY * iResolution.y)) / iResolution.y;
+        // Screen-centered UV for the Battle Box so it doesn't shift
+        float2 uv_screen = (fragCoord - 0.5 * iResolution.xy) / iResolution.y;
+        float2 puv_screen = floor(uv_screen * pixelate) / pixelate;
         
-        // Quantize UV to create automatic pixel art
+        // Offset UV for the bullets and soul so they center on the cover art
+        float2 uv = (fragCoord - 0.5 * iResolution.xy + float2(0.0, iOffsetY * iResolution.y)) / iResolution.y;
         float2 puv = floor(uv * pixelate) / pixelate;
         
         float time = iTime * 0.4 * iSpeed;
         
-        // 1. The Battle Box
-        float boxSize = 0.4 + iEnergy * 0.02;
-        float dBox = max(abs(puv.x), abs(puv.y)) - boxSize;
+        // 1. The Battle Box (anchored to screen)
+        float aspect = iResolution.x / iResolution.y;
+        float boxSizeX = (aspect / 2.0) * 0.95; // 95% of screen width
+        float boxSizeY = 0.46 + iEnergy * 0.01; // 92% of screen height (near the very edges)
+        float dBox = max(abs(puv_screen.x) - boxSizeX, abs(puv_screen.y) - boxSizeY);
         float boxLine = step(abs(abs(dBox) - 0.01), 0.005);
         
         // 2. The Bullet Hell Rings (Omega Flowey / Sans style)

@@ -50,6 +50,8 @@ data class PlaylistViewData(val title: String, val tracks: List<TrackEntity>, va
 fun UnifiedLibraryScreen(
     viewModel: LibraryViewModel,
     paletteColors: PaletteColors,
+    currentPlayingTrack: TrackEntity?,
+    isPlaying: Boolean,
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
 ) {
     val prefs = viewModel.prefs
@@ -576,7 +578,9 @@ fun UnifiedLibraryScreen(
                                         onAddToPlaylist = { trackToAddToPlaylist = track },
                                         onDeleteTrack = if (currentViewData.playlistId == null) { { trackPendingConfirmation = track } } else null,
                                         onRemoveFromPlaylist = if (currentViewData.playlistId != null) { { viewModel.removeTrackFromPlaylist(currentViewData.playlistId, track.id) } } else null,
-                                        onTrimTrack = if (!track.dataPath.startsWith("http")) { { trackPendingTrim = track } } else null
+                                        onTrimTrack = if (!track.dataPath.startsWith("http")) { { trackPendingTrim = track } } else null,
+                                        isPlaying = currentPlayingTrack?.id == track.id,
+                                        isActuallyPlaying = currentPlayingTrack?.id == track.id && isPlaying
                                     )
                                 }
                                 if (currentViewData.playlistId != null) {
