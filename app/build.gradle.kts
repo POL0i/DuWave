@@ -146,7 +146,3 @@ dependencies {
   // NewPipeExtractor for native YouTube streaming
   implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.4")
 }
-
-kotlin {
-    jvmToolchain(17)
-}
