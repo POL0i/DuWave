@@ -1,5 +1,7 @@
 # 🎵 DuWave (formerly BeatPulse)
 
+[![F-Droid](https://img.shields.io/badge/F--Droid-Available-blue.svg?logo=f-droid)](https://f-droid.org/es/packages/com.polonio.duwave/)
+[![Appteka](https://img.shields.io/badge/Appteka-5_Stars-orange.svg)](https://appteka.store/app/ea7r296015)
 [![VirusTotal](https://img.shields.io/badge/Security-VirusTotal_Clean-brightgreen.svg?logo=virustotal)](https://www.virustotal.com/) 
 [![License](https://img.shields.io/badge/License-Open_Source-blue.svg)](#-license)
 
