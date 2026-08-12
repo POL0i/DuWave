@@ -16,8 +16,8 @@ android {
         applicationId = "com.polonio.duwave"
         minSdk = 24
         targetSdk = 35
-        versionCode = 7
-        versionName = "1.4.3"
+        versionCode = 8
+        versionName = "2.0"
     }
 
     val keystoreFile = file("../release.keystore")
