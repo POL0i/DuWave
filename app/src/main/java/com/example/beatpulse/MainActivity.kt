@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.animation.*
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
@@ -168,14 +170,49 @@ class MainActivity : ComponentActivity() {
         setContent {
             val bgStyle by prefs.backgroundStyleFlow.collectAsState(initial = 0)
             
-            BeatPulseTheme(isPixelArt = bgStyle == 8) {
-                MainScreen(
-                    visualizerManager = visualizerManager,
-                    equalizerManager = equalizerManager,
-                    prefs = prefs,
-                    libraryViewModel = libraryViewModel,
-                    playerViewModel = playerViewModel
-                )
+            var localeCode by remember { mutableStateOf(prefs.appLanguage) }
+            val sharedPrefsListener = remember {
+                android.content.SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
+                    if (key == "appLanguage") {
+                        localeCode = sharedPreferences.getString(key, "es") ?: "es"
+                    }
+                }
+            }
+            androidx.compose.runtime.DisposableEffect(Unit) {
+                val sp = getSharedPreferences("beatpulse_prefs", android.content.Context.MODE_PRIVATE)
+                sp.registerOnSharedPreferenceChangeListener(sharedPrefsListener)
+                onDispose {
+                    sp.unregisterOnSharedPreferenceChangeListener(sharedPrefsListener)
+                }
+            }
+            
+            val currentConfig = androidx.compose.ui.platform.LocalConfiguration.current
+            val context = androidx.compose.ui.platform.LocalContext.current
+            val updatedConfig = remember(localeCode, currentConfig) {
+                val newConfig = android.content.res.Configuration(currentConfig).apply {
+                    setLocale(java.util.Locale(localeCode))
+                }
+                val res = context.resources
+                val resConfig = android.content.res.Configuration(res.configuration).apply {
+                    setLocale(java.util.Locale(localeCode))
+                }
+                @Suppress("DEPRECATION")
+                res.updateConfiguration(resConfig, res.displayMetrics)
+                newConfig
+            }
+            
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalConfiguration provides updatedConfig
+            ) {
+                BeatPulseTheme(isPixelArt = bgStyle == 8) {
+                    MainScreen(
+                        visualizerManager = visualizerManager,
+                        equalizerManager = equalizerManager,
+                        prefs = prefs,
+                        libraryViewModel = libraryViewModel,
+                        playerViewModel = playerViewModel
+                    )
+                }
             }
         }
     }
@@ -533,6 +570,8 @@ fun MainScreen(
     }
 
     var showTutorial by remember { mutableStateOf(!prefs.hasSeenTutorial) }
+    var showSwipeHint by remember { mutableStateOf(false) }
+
     if (showTutorial) {
         Box(
             modifier = Modifier
@@ -541,6 +580,7 @@ fun MainScreen(
                 .clickable {
                     prefs.hasSeenTutorial = true
                     showTutorial = false
+                    showSwipeHint = true
                 },
             contentAlignment = androidx.compose.ui.Alignment.Center
         ) {
@@ -549,18 +589,70 @@ fun MainScreen(
                 modifier = Modifier.padding(32.dp)
             ) {
                 androidx.compose.material3.Text(
-                    text = "¡Bienvenido a DuWave!",
+                    text = androidx.compose.ui.res.stringResource(id = R.string.welcome_title),
                     color = Color.White,
                     style = MaterialTheme.typography.headlineMedium,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 Spacer(modifier = Modifier.height(24.dp))
                 androidx.compose.material3.Text(
-                    text = "👋 Gestos Principales:\n\n• Desliza a los lados en el mini-reproductor para cambiar entre Inicio, Biblioteca y Reproductor.\n\n• Usa la lupa en Biblioteca para buscar y el botón de recargar para buscar música nueva.\n\n• Toca aquí para comenzar a escuchar.",
+                    text = androidx.compose.ui.res.stringResource(id = R.string.welcome_body),
                     color = Color.White,
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
+                Spacer(modifier = Modifier.height(32.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            prefs.appLanguage = "es"
+                        },
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = if (prefs.appLanguage == "es") paletteColors.vibrant else Color.DarkGray
+                        )
+                    ) { Text("🇲🇽 ES") }
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            prefs.appLanguage = "en"
+                        },
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = if (prefs.appLanguage == "en") paletteColors.vibrant else Color.DarkGray
+                        )
+                    ) { Text("🇬🇧 EN") }
+                    androidx.compose.material3.Button(
+                        onClick = {
+                            prefs.appLanguage = "pt"
+                        },
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = if (prefs.appLanguage == "pt") paletteColors.vibrant else Color.DarkGray
+                        )
+                    ) { Text("🇧🇷 PT") }
+                }
+            }
+        }
+    }
+    
+    if (showSwipeHint) {
+        val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
+        val offsetX by infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = -100f,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                animation = androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.LinearEasing),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+            )
+        )
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.6f)).clickable { showSwipeHint = false },
+            contentAlignment = androidx.compose.ui.Alignment.BottomCenter
+        ) {
+            Column(
+                horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+                modifier = Modifier.padding(bottom = 160.dp).padding(horizontal = 24.dp)
+            ) {
+                Box(modifier = Modifier.offset(x = offsetX.dp).size(24.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape))
+                Spacer(modifier = Modifier.height(16.dp))
+                androidx.compose.material3.Text("¡Desliza el minirreproductor a la derecha para elegir una canción!", color = Color.White, style = MaterialTheme.typography.titleLarge, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
             }
         }
     }

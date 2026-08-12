@@ -77,12 +77,22 @@ class PlaybackService : MediaSessionService() {
             .setConstantBitrateSeekingEnabled(true)
         val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(resolvingDataSourceFactory, extractorsFactory)
 
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                2500, // min buffer
+                50000, // max buffer
+                250, // buffer for playback
+                500 // buffer for playback after rebuffer
+            )
+            .build()
+
         exoPlayer = ExoPlayer.Builder(this)
             .setAudioAttributes(audioAttributes, true)
             .setHandleAudioBecomingNoisy(true)
             .setWakeMode(C.WAKE_MODE_LOCAL)
             .setRenderersFactory(renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
+            .setLoadControl(loadControl)
             .build()
 
         exoPlayer?.addListener(object : androidx.media3.common.Player.Listener {
@@ -93,6 +103,10 @@ class PlaybackService : MediaSessionService() {
                 updateWidget()
             }
             override fun onIsPlayingChanged(isPlaying: Boolean) {
+                updateWidget()
+            }
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                isBufferingFlow.value = (playbackState == androidx.media3.common.Player.STATE_BUFFERING)
                 updateWidget()
             }
             override fun onRepeatModeChanged(repeatMode: Int) {
@@ -193,6 +207,7 @@ class PlaybackService : MediaSessionService() {
         val playbackSpeedFlow = MutableStateFlow(1.0f)
         val playbackPitchFlow = MutableStateFlow(1.0f)
         val reverbEnabledFlow = MutableStateFlow(false)
+        val isBufferingFlow = MutableStateFlow(false)
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {

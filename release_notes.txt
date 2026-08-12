@@ -1,0 +1,11 @@
+Release 2.0
+
+Novedades y mejoras de esta gran actualización:
+- ✂️ Nueva función integrada para recortar audio (Trim audio).
+- 🔍 Búsqueda online de música enormemente mejorada, controlada y optimizada con inicio rápido (ExoPlayer fast-start) e indicador visual de carga integrado en la carátula.
+- 🌍 Internacionalización completa con recuperación y adición de soporte nativo para los idiomas Inglés y Portugués, además de selector de idiomas.
+- ❤️ Nueva sección de "Apoyo y Sugerencias" en la pantalla de bienvenida con redirección a GitHub (para reportar problemas) y Patreon (para apoyar el proyecto) con colores dinámicos.
+- 🌊 Nuevos y espectaculares estilos de visualización de audio añadidos (Wave, Slime, Dots, Particles, Bars) y corrección de artefactos visuales en los bordes.
+- 🎛️ Rediseño completo de la interfaz del Ecualizador, abandonando los selectores verticales apretados por espaciosos controles deslizantes horizontales.
+- 🐛 Corrección del "rebote" elástico infinito en la sección inferior de Ajustes de Reproducción.
+- 🎵 Mejoras generales en la fluidez, carga de carátulas dinámicas y estabilidad del reproductor.

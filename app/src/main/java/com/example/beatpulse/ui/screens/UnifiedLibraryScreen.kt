@@ -233,7 +233,6 @@ fun UnifiedLibraryScreen(
                                                     .clickable {
                                                         prefs.appLanguage = code
                                                         showLanguageDialog = false
-                                                        (context as? android.app.Activity)?.recreate()
                                                     }
                                                     .padding(16.dp),
                                                 fontSize = 18.sp,
@@ -281,6 +280,14 @@ fun UnifiedLibraryScreen(
                                         onClick = {
                                             showSettingsMenu = false
                                             showLanguageDialog = true
+                                        }
+                                    )
+                                    val showGestures = prefs.showGestureConfirmations
+                                    DropdownMenuItem(
+                                        text = { Text(androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.gesture_confirmations_toggle) + ": " + if(showGestures) "ON" else "OFF") },
+                                        onClick = {
+                                            prefs.showGestureConfirmations = !showGestures
+                                            showSettingsMenu = false
                                         }
                                     )
                                     DropdownMenuItem(

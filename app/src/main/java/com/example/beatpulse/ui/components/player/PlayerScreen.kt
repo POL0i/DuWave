@@ -16,6 +16,8 @@ import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateColor
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.animation.core.*
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
@@ -170,7 +172,8 @@ fun PlayerScreen(
     onAddToPlaylist: (TrackEntity) -> Unit = {}
 ) {
     val view = LocalView.current
-    
+    val isBuffering by com.example.beatpulse.service.PlaybackService.isBufferingFlow.collectAsState(initial = false)
+
     DisposableEffect(Unit) {
         val window = view.context.findActivity()?.window
         if (window != null) {
@@ -342,12 +345,34 @@ fun PlayerScreen(
 
     val context = LocalContext.current
     var showSupportDialog by remember { mutableStateOf(false) }
+    
+    // Gesture tutorial states
+    var showNextPrevTutorial by remember { mutableStateOf(!prefs.hasUsedNextPrevGesture) }
+    var showSeek10sTutorial by remember { mutableStateOf(!prefs.hasUsedSeek10sGesture) }
+    var showVinylSeekTutorial by remember { mutableStateOf(!prefs.hasUsedVinylSeekGesture) }
+    var showPlaylistSwipeTutorial by remember { mutableStateOf(!prefs.hasUsedPlaylistSwipeGesture) }
+    
+    // Visual feedback states
+    var feedbackSeekLeft by remember { mutableStateOf(false) }
+    var feedbackSeekRight by remember { mutableStateOf(false) }
+    var feedbackPrevTrack by remember { mutableStateOf(false) }
+    var feedbackNextTrack by remember { mutableStateOf(false) }
+
     val dynamicTextColor = if (paletteColors.dominant.luminance() < 0.5f) Color.White else Color.Black
 
     if (showSupportDialog) {
+        val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
+        val animatedColor by infiniteTransition.animateColor(
+            initialValue = paletteColors.vibrant,
+            targetValue = paletteColors.dominant,
+            animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                animation = androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.LinearEasing),
+                repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+            )
+        )
         androidx.compose.material3.AlertDialog(
             onDismissRequest = { showSupportDialog = false },
-            title = { Text("Apoyar y Sugerencias", color = colorVibrant) },
+            title = { Text(stringResource(id = R.string.support_dialog_title), color = animatedColor) },
             text = { 
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     androidx.compose.material3.Card(
@@ -361,10 +386,19 @@ fun PlayerScreen(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("¿Quieres aportar ideas?", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = colorVibrant)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Escríbelo en las issues de GitHub.", color = dynamicTextColor, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Icon(
+                                painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_github),
+                                contentDescription = null,
+                                tint = animatedColor,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column {
+                                Text(stringResource(id = R.string.support_ideas_title), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = animatedColor)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(stringResource(id = R.string.support_ideas_desc), color = dynamicTextColor, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                            }
                         }
                     }
                     
@@ -379,10 +413,19 @@ fun PlayerScreen(
                         ),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
-                            Text("Apoya el proyecto", fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = colorVibrant)
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text("Para que siga creciendo con más estilos, más tipos de onda y beneficios personales.", color = dynamicTextColor, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Icon(
+                                painter = androidx.compose.ui.res.painterResource(id = R.drawable.ic_patreon),
+                                contentDescription = null,
+                                tint = animatedColor,
+                                modifier = Modifier.size(32.dp)
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column {
+                                Text(stringResource(id = R.string.support_patreon_title), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = animatedColor)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(stringResource(id = R.string.support_patreon_desc), color = dynamicTextColor, style = androidx.compose.material3.MaterialTheme.typography.bodyMedium)
+                            }
                         }
                     }
                 }
@@ -606,6 +649,10 @@ fun PlayerScreen(
                             if (dragAmount.y < -15f && kotlin.math.abs(dragAmount.x) < 20f && touchPos.y > center.y) {
                                 currentDragAction = DragAction.OPEN_QUEUE
                                 showQueue = true
+                                if (showPlaylistSwipeTutorial) {
+                                    showPlaylistSwipeTutorial = false
+                                    prefs.hasUsedPlaylistSwipeGesture = true
+                                }
                             } else if (kotlin.math.abs(dragAmount.x) > 5f || kotlin.math.abs(dragAmount.y) > 5f) {
                                 currentDragAction = DragAction.DJ_SEEK
                                 val dx = touchPos.x - center.x
@@ -636,7 +683,13 @@ fun PlayerScreen(
                                 val seekMs = (deltaAngle / 360f) * 120000f // 2 minutos por vuelta
                                 exoPlayer?.let { player ->
                                     val current = dragSeekTimeMs ?: player.currentPosition
-                                    dragSeekTimeMs = (current + seekMs.toLong()).coerceIn(0, player.duration)
+                                    val maxDuration = if (player.duration > 0) player.duration else Long.MAX_VALUE
+                                    dragSeekTimeMs = (current + seekMs.toLong()).coerceIn(0L, maxDuration)
+                                    
+                                    if (showVinylSeekTutorial) {
+                                        showVinylSeekTutorial = false
+                                        prefs.hasUsedVinylSeekGesture = true
+                                    }
                                 }
                                 coroutineScope.launch { coverRotationAnim.snapTo(coverRotationAnim.value + deltaAngle) }
                                 
@@ -655,10 +708,28 @@ fun PlayerScreen(
                 .pointerInput(abRepeatModeEnabled) {
                     detectTapGestures(
                         onDoubleTap = { offset ->
+                            if (showNextPrevTutorial) {
+                                showNextPrevTutorial = false
+                                prefs.hasUsedNextPrevGesture = true
+                            }
                             if (offset.x < size.width / 2) {
                                 exoPlayer?.seekToPrevious()
+                                if (prefs.showGestureConfirmations) {
+                                    coroutineScope.launch {
+                                        feedbackPrevTrack = true
+                                        delay(400)
+                                        feedbackPrevTrack = false
+                                    }
+                                }
                             } else {
                                 exoPlayer?.seekToNext()
+                                if (prefs.showGestureConfirmations) {
+                                    coroutineScope.launch {
+                                        feedbackNextTrack = true
+                                        delay(400)
+                                        feedbackNextTrack = false
+                                    }
+                                }
                             }
                         },
                         onPress = {
@@ -914,13 +985,7 @@ fun PlayerScreen(
                     val colorVibrantLayer = layerColor.copy(alpha = opacity)
 
                     when (currentStyle) {
-                        VisualizerStyle.BARS, VisualizerStyle.WAVE -> {
-                            val isWave = currentStyle == VisualizerStyle.WAVE
-                            if (isWave) {
-                                wavePathR.reset()
-                                wavePathL.reset()
-                            }
-
+                        VisualizerStyle.BARS -> {
                             for (i in 0 until numBars) {
                                 val amplitude = amps[i]
                                 val dist = 30f + (amplitude * 180f)
@@ -934,26 +999,28 @@ fun PlayerScreen(
                                 computePointAndNormal(dLeft)
                                 val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
                                 
-                                if (isWave) {
-                                    val rX = pxR + nxR * dist; val rY = pyR + nyR * dist
-                                    val lX = pxL + nxL * dist; val lY = pyL + nyL * dist
-                                    if (i == 0) {
-                                        wavePathR.moveTo(rX, rY); wavePathL.moveTo(lX, lY)
-                                    } else {
-                                        wavePathR.lineTo(rX, rY); wavePathL.lineTo(lX, lY)
-                                    }
-                                } else {
-                                    drawLine(color = colorVibrantLayer, start = androidx.compose.ui.geometry.Offset(pxR + nxR * dist, pyR + nyR * dist),
-                                             end = androidx.compose.ui.geometry.Offset(pxR + nxR * (dist + barLength), pyR + nyR * (dist + barLength)), strokeWidth = 8f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                drawLine(color = colorVibrantLayer, start = androidx.compose.ui.geometry.Offset(pxR + nxR * dist, pyR + nyR * dist),
+                                         end = androidx.compose.ui.geometry.Offset(pxR + nxR * (dist + barLength), pyR + nyR * (dist + barLength)), strokeWidth = 8f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                if (i != 0 && i != numBars - 1) {
                                     drawLine(color = colorVibrantLayer, start = androidx.compose.ui.geometry.Offset(pxL + nxL * dist, pyL + nyL * dist),
                                              end = androidx.compose.ui.geometry.Offset(pxL + nxL * (dist + barLength), pyL + nyL * (dist + barLength)), strokeWidth = 8f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
                                 }
                             }
-
-                            if (isWave) {
-                                drawPath(wavePathR, color = colorVibrantLayer, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
-                                drawPath(wavePathL, color = colorVibrantLayer, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                        }
+                        VisualizerStyle.WAVE -> {
+                            val totalPoints = (numBars * 2 - 2).coerceAtLeast(0)
+                            wavePathR.reset()
+                            for (i in 0 until totalPoints) {
+                                val ampIndex = if (i < numBars) i else (totalPoints - i)
+                                val dDist = if (i < numBars) i * distStep else pathLength - ampIndex * distStep
+                                val amplitude = amps[ampIndex]
+                                val dist = 30f + (amplitude * 180f)
+                                computePointAndNormal(dDist)
+                                val px = outPx + outNx * dist; val py = outPy + outNy * dist
+                                if (i == 0) wavePathR.moveTo(px, py) else wavePathR.lineTo(px, py)
                             }
+                            wavePathR.close()
+                            drawPath(wavePathR, color = colorVibrantLayer, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = androidx.compose.ui.graphics.StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
                         }
                         VisualizerStyle.DOTS -> {
                             for (i in 0 until numBars) {
@@ -963,10 +1030,7 @@ fun PlayerScreen(
 
                                 computePointAndNormal(dRight)
                                 val pxR = outPx; val pyR = outPy; val nxR = outNx; val nyR = outNy
-                                computePointAndNormal(dLeft)
-                                val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
-
-                                val dotCount = (1 + (amplitude * 7).toInt()).coerceAtMost(8)
+                                val dotCount = 1 + (amplitude * 8).toInt()
                                 val dotSpacing = 16f
                                 val dotRadius = 5f
                                 
@@ -974,21 +1038,27 @@ fun PlayerScreen(
                                     val currentDist = 30f + (j * dotSpacing)
                                     val alphaVal = opacity * (1f - (j.toFloat() / 8f)).coerceAtLeast(0.3f)
                                     drawCircle(color = layerColor.copy(alpha = alphaVal), radius = dotRadius, center = androidx.compose.ui.geometry.Offset(pxR + nxR * currentDist, pyR + nyR * currentDist))
-                                    drawCircle(color = layerColor.copy(alpha = alphaVal), radius = dotRadius, center = androidx.compose.ui.geometry.Offset(pxL + nxL * currentDist, pyL + nyL * currentDist))
+                                }
+                                if (i != 0 && i != numBars - 1) {
+                                    computePointAndNormal(dLeft)
+                                    val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
+                                    for (j in 0 until dotCount) {
+                                        val currentDist = 30f + (j * dotSpacing)
+                                        val alphaVal = opacity * (1f - (j.toFloat() / 8f)).coerceAtLeast(0.3f)
+                                        drawCircle(color = layerColor.copy(alpha = alphaVal), radius = dotRadius, center = androidx.compose.ui.geometry.Offset(pxL + nxL * currentDist, pyL + nyL * currentDist))
+                                    }
                                 }
                             }
                         }
                         VisualizerStyle.SLIME -> {
-                            val totalPoints = numBars * 2
+                            val totalPoints = (numBars * 2 - 2).coerceAtLeast(0)
                             val slimeX = FloatArray(totalPoints)
                             val slimeY = FloatArray(totalPoints)
                             
                             for (i in 0 until totalPoints) {
-                                val isRightSide = i < numBars
-                                val ampIndex = if (isRightSide) i else (totalPoints - 1 - i)
+                                val ampIndex = if (i < numBars) i else (totalPoints - i)
                                 val amplitude = amps[ampIndex]
-
-                                val offsetDist = if (isRightSide) {
+                                val offsetDist = if (i < numBars) {
                                     0f + ampIndex * distStep
                                 } else {
                                     pathLength - ampIndex * distStep
@@ -1047,13 +1117,15 @@ fun PlayerScreen(
                                     drawCircle(color = colorVibrantLayer.copy(alpha = opacity * (1f - sparkOffset)), radius = sparkSize, center = androidx.compose.ui.geometry.Offset(outPx + outNx * sparkExtrude, outPy + outNy * sparkExtrude))
                                 }
                                 
-                                computePointAndNormal(dLeft)
-                                drawCircle(color = colorVibrantLayer, radius = size, center = androidx.compose.ui.geometry.Offset(outPx + outNx * extrude, outPy + outNy * extrude))
-                                if (boostedAmplitude > 0.1f) {
-                                    val sparkOffset = ((timeMs + i * 40 + 400) % 800) / 800f
-                                    val sparkExtrude = extrude - (sparkOffset * 50f)
-                                    val sparkSize = size * 0.5f
-                                    drawCircle(color = colorVibrantLayer.copy(alpha = opacity * (1f - sparkOffset)), radius = sparkSize, center = androidx.compose.ui.geometry.Offset(outPx + outNx * sparkExtrude, outPy + outNy * sparkExtrude))
+                                if (i != 0 && i != numBars - 1) {
+                                    computePointAndNormal(dLeft)
+                                    drawCircle(color = colorVibrantLayer, radius = size, center = androidx.compose.ui.geometry.Offset(outPx + outNx * extrude, outPy + outNy * extrude))
+                                    if (boostedAmplitude > 0.1f) {
+                                        val sparkOffset = ((timeMs + i * 40 + 400) % 800) / 800f
+                                        val sparkExtrude = extrude - (sparkOffset * 50f)
+                                        val sparkSize = size * 0.5f
+                                        drawCircle(color = colorVibrantLayer.copy(alpha = opacity * (1f - sparkOffset)), radius = sparkSize, center = androidx.compose.ui.geometry.Offset(outPx + outNx * sparkExtrude, outPy + outNy * sparkExtrude))
+                                    }
                                 }
                             }
                         }
@@ -1231,11 +1303,29 @@ fun PlayerScreen(
                                 }
                             },
                             onDoubleTap = { offset ->
+                                if (showSeek10sTutorial) {
+                                    showSeek10sTutorial = false
+                                    prefs.hasUsedSeek10sGesture = true
+                                }
                                 exoPlayer?.let { player ->
                                     if (offset.x < size.width / 2) {
                                         player.seekTo((player.currentPosition - 10000).coerceAtLeast(0))
+                                        if (prefs.showGestureConfirmations) {
+                                            coroutineScope.launch {
+                                                feedbackSeekLeft = true
+                                                delay(400)
+                                                feedbackSeekLeft = false
+                                            }
+                                        }
                                     } else {
                                         player.seekTo((player.currentPosition + 10000).coerceAtMost(player.duration))
+                                        if (prefs.showGestureConfirmations) {
+                                            coroutineScope.launch {
+                                                feedbackSeekRight = true
+                                                delay(400)
+                                                feedbackSeekRight = false
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1259,6 +1349,23 @@ fun PlayerScreen(
                             contentDescription = "Album Art",
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
+                        )
+                    }
+                }
+                
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isBuffering,
+                    enter = androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.fadeOut(),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            color = paletteColors.vibrant,
+                            modifier = Modifier.size(64.dp)
                         )
                     }
                 }
@@ -1528,7 +1635,8 @@ fun PlayerScreen(
             title = { Text(stringResource(R.string.equalizer), color = colorVibrant, fontWeight = FontWeight.Bold) },
             text = {
                 Column(modifier = Modifier
-            .fillMaxSize()
+            .fillMaxWidth()
+            .wrapContentHeight()
             .windowInsetsPadding(WindowInsets.navigationBars)
         ) {
             // Header
@@ -1596,13 +1704,21 @@ fun PlayerScreen(
                             Spacer(modifier = Modifier.height(24.dp))
                             
                             val range = (maxLevel - minLevel).coerceAtLeast(1)
-                            Row(modifier = Modifier.fillMaxWidth().height(150.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                                 bands.forEach { band ->
                                     val level = bandLevels[band] ?: 0.toShort()
                                     val freqHz = equalizerManager.getCenterFreq(band) / 1000
                                     val freqStr = if (freqHz >= 1000) "${freqHz / 1000}k" else "$freqHz"
                                     
-                                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                        Text(
+                                            text = freqStr, 
+                                            color = Color.Gray, 
+                                            style = MaterialTheme.typography.labelMedium,
+                                            modifier = Modifier.width(48.dp),
+                                            textAlign = androidx.compose.ui.text.style.TextAlign.End
+                                        )
+                                        Spacer(modifier = Modifier.width(16.dp))
                                         androidx.compose.material3.Slider(
                                             value = level.toFloat(),
                                             onValueChange = { equalizerManager.setBandLevel(band, it.toInt().toShort()) },
@@ -1610,7 +1726,6 @@ fun PlayerScreen(
                                             colors = androidx.compose.material3.SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant),
                                             modifier = Modifier.weight(1f)
                                         )
-                                        Text(freqStr, color = Color.Gray, style = MaterialTheme.typography.labelSmall)
                                     }
                                 }
                             }
@@ -1721,14 +1836,13 @@ fun PlayerScreen(
             onDismissRequest = { showSettingsMenu = false },
             containerColor = colorDominant.copy(alpha = 0.95f)
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.9f)
-                    .padding(horizontal = 24.dp)
-                    .animateContentSize()
-                    .verticalScroll(rememberScrollState())
-            ) {
+            androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxHeight(0.9f)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
                 Text(stringResource(R.string.playback_settings), color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
                 
@@ -1960,6 +2074,21 @@ fun PlayerScreen(
             }
         }
     }
+    }
+    
+    // Render Gestures Feedbacks
+    GestureFeedbackOverlay(show = feedbackPrevTrack, text = "⏮", alignLeft = true)
+    GestureFeedbackOverlay(show = feedbackNextTrack, text = "⏭", alignLeft = false)
+    GestureFeedbackOverlay(show = feedbackSeekLeft, text = "-10s", alignLeft = true)
+    GestureFeedbackOverlay(show = feedbackSeekRight, text = "+10s", alignLeft = false)
+    
+    // Render Gesture Tutorials
+    GestureTutorialOverlay(
+        showNextPrev = showNextPrevTutorial,
+        showSeek10s = showSeek10sTutorial,
+        showVinylSeek = showVinylSeekTutorial,
+        showPlaylistSwipe = showPlaylistSwipeTutorial
+    )
 
     if (showQueue) {
         androidx.compose.material3.ModalBottomSheet(
@@ -2069,5 +2198,101 @@ fun PlayerScreen(
             containerColor = colorDominant
         )
     }
+}
+}
+
+@androidx.compose.runtime.Composable
+private fun GestureFeedbackOverlay(show: Boolean, text: String, alignLeft: Boolean) {
+    if (!show) return
+    val alphaAnim = androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (show) 1f else 0f,
+        animationSpec = androidx.compose.animation.core.tween(durationMillis = 300)
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp),
+        contentAlignment = if (alignLeft) Alignment.CenterStart else Alignment.CenterEnd
+    ) {
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .graphicsLayer(alpha = alphaAnim.value)
+                .background(Color.White.copy(alpha = 0.2f), shape = androidx.compose.foundation.shape.CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text, color = Color.White, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 24.sp)
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+private fun GestureTutorialOverlay(
+    showNextPrev: Boolean,
+    showSeek10s: Boolean,
+    showVinylSeek: Boolean,
+    showPlaylistSwipe: Boolean
+) {
+    if (!showNextPrev && !showSeek10s && !showVinylSeek && !showPlaylistSwipe) return
+    
+    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
+    val dotOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(1500, easing = androidx.compose.animation.core.LinearEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+        )
+    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // Next/Prev tutorial (Edges)
+        if (showNextPrev) {
+            // Pulsing effect (two quick flashes)
+            val pulse = if (dotOffset % 0.5f < 0.25f) 1f else 0f
+            
+            // Left edge
+            Box(modifier = Modifier.align(Alignment.CenterStart).offset(x = 16.dp).graphicsLayer { alpha = pulse }) {
+                Box(modifier = Modifier.size(24.dp).background(Color.White.copy(alpha=0.6f), androidx.compose.foundation.shape.CircleShape))
+            }
+            // Right edge
+            Box(modifier = Modifier.align(Alignment.CenterEnd).offset(x = (-16).dp).graphicsLayer { alpha = pulse }) {
+                Box(modifier = Modifier.size(24.dp).background(Color.White.copy(alpha=0.6f), androidx.compose.foundation.shape.CircleShape))
+            }
+            Text(stringResource(id = R.string.gesture_next_prev), color = Color.White, modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp).background(Color.Black.copy(alpha=0.5f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(8.dp))
+        }
+        
+        // Seek 10s tutorial (Center-ish left/right)
+        if (showSeek10s && !showNextPrev) { // Only show if nextprev is done to avoid clutter
+            Box(modifier = Modifier.align(Alignment.Center).offset(x = -50.dp).graphicsLayer { alpha = 1f - dotOffset }) {
+                Box(modifier = Modifier.size(20.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape))
+            }
+            Box(modifier = Modifier.align(Alignment.Center).offset(x = 50.dp).graphicsLayer { alpha = 1f - dotOffset }) {
+                Box(modifier = Modifier.size(20.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape))
+            }
+            Text(stringResource(id = R.string.gesture_seek_10s), color = Color.White, modifier = Modifier.align(Alignment.Center).offset(y = (-100).dp).background(Color.Black.copy(alpha=0.5f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(8.dp))
+        }
+
+        // Vinyl seek tutorial
+        if (showVinylSeek && !showSeek10s) {
+            Icon(
+                imageVector = Icons.Default.Sync,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.8f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(80.dp)
+                    .graphicsLayer { rotationZ = dotOffset * 360f }
+            )
+            Text(stringResource(id = R.string.gesture_vinyl_seek), color = Color.White, modifier = Modifier.align(Alignment.Center).offset(y = 120.dp).background(Color.Black.copy(alpha=0.5f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(8.dp))
+        }
+        
+        // Playlist swipe tutorial
+        if (showPlaylistSwipe) {
+            Box(modifier = Modifier.align(Alignment.Center).offset(y = 80.dp + (-dotOffset * 60).dp).graphicsLayer { alpha = 1f - dotOffset }) {
+                Box(modifier = Modifier.size(24.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape))
+            }
+            Text(stringResource(id = R.string.gesture_playlist_swipe), color = Color.White, modifier = Modifier.align(Alignment.Center).offset(y = 160.dp).background(Color.Black.copy(alpha=0.5f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp)).padding(8.dp))
+        }
     }
 }

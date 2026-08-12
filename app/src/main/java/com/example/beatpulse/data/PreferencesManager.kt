@@ -13,6 +13,22 @@ class PreferencesManager private constructor(context: Context) {
     private val prefs: SharedPreferences = appContext.getSharedPreferences("beatpulse_prefs", Context.MODE_PRIVATE)
 
     companion object {
+        private const val KEY_SHUFFLE_MODE = "shuffle_mode"
+        private const val KEY_REPEAT_MODE = "repeat_mode"
+        private const val KEY_ALBUM_ART_CENTER_Y = "album_art_center_y"
+        private const val KEY_THEME = "app_theme"
+        private const val KEY_EQ_BAND_PREFIX = "eq_band_"
+        private const val KEY_BASS_BOOST = "bass_boost"
+        private const val KEY_VIRTUALIZER = "virtualizer"
+        private const val KEY_PRESET = "eq_preset"
+        private const val KEY_AUTO_ANALYZE_LYRICS = "auto_analyze_lyrics"
+        private const val KEY_USED_NEXT_PREV = "used_next_prev"
+        private const val KEY_USED_SEEK_10S = "used_seek_10s"
+        private const val KEY_USED_VINYL_SEEK = "used_vinyl_seek"
+        private const val KEY_USED_PLAYLIST_SWIPE = "used_playlist_swipe"
+        private const val KEY_SHOW_GESTURE_CONFIRM = "show_gesture_confirm"
+        private const val KEY_LANGUAGE = "appLanguage"
+
         @Volatile
         private var INSTANCE: PreferencesManager? = null
 
@@ -24,8 +40,8 @@ class PreferencesManager private constructor(context: Context) {
     }
 
     var appLanguage: String
-        get() = prefs.getString("appLanguage", "es") ?: "es"
-        set(value) = prefs.edit().putString("appLanguage", value).apply()
+        get() = prefs.getString(KEY_LANGUAGE, "es") ?: "es"
+        set(value) = prefs.edit().putString(KEY_LANGUAGE, value).apply()
 
     var visualizerStyle: String
         get() = prefs.getString("visualizerStyle", "BARS") ?: "BARS"
@@ -96,20 +112,20 @@ class PreferencesManager private constructor(context: Context) {
         set(value) = prefs.edit().putInt("lastLibraryGeneralTab", value).apply()
 
     var shuffleModeEnabled: Boolean
-        get() = prefs.getBoolean("shuffleModeEnabled", false)
-        set(value) = prefs.edit().putBoolean("shuffleModeEnabled", value).apply()
+        get() = prefs.getBoolean(KEY_SHUFFLE_MODE, false)
+        set(value) = prefs.edit().putBoolean(KEY_SHUFFLE_MODE, value).apply()
 
     var repeatMode: Int
-        get() = prefs.getInt("repeatMode", androidx.media3.common.Player.REPEAT_MODE_OFF)
-        set(value) = prefs.edit().putInt("repeatMode", value).apply()
+        get() = prefs.getInt(KEY_REPEAT_MODE, androidx.media3.common.Player.REPEAT_MODE_OFF)
+        set(value) = prefs.edit().putInt(KEY_REPEAT_MODE, value).apply()
 
     var eqEnabled: Boolean
         get() = prefs.getBoolean("eqEnabled", false)
         set(value) = prefs.edit().putBoolean("eqEnabled", value).apply()
 
     var eqPreset: Short
-        get() = prefs.getInt("eqPreset", -1).toShort()
-        set(value) = prefs.edit().putInt("eqPreset", value.toInt()).apply()
+        get() = prefs.getInt(KEY_PRESET, -1).toShort()
+        set(value) = prefs.edit().putInt(KEY_PRESET, value.toInt()).apply()
 
     var eqCustomBands: String
         get() = prefs.getString("eqCustomBands", "") ?: ""
@@ -148,8 +164,8 @@ class PreferencesManager private constructor(context: Context) {
         set(value) = prefs.edit().putBoolean("hasUsedPlaylistGesture", value).apply()
 
     var albumArtCenterY: Float
-        get() = prefs.getFloat("albumArtCenterY", -1f)
-        set(value) = prefs.edit().putFloat("albumArtCenterY", value).apply()
+        get() = prefs.getFloat(KEY_ALBUM_ART_CENTER_Y, -1f)
+        set(value) = prefs.edit().putFloat(KEY_ALBUM_ART_CENTER_Y, value).apply()
 
     var showGestureFeedback: Boolean
         get() = prefs.getBoolean("showGestureFeedback", true)
@@ -224,6 +240,26 @@ class PreferencesManager private constructor(context: Context) {
     }
 
     var autoAnalyzeLyrics: Boolean
-        get() = prefs.getBoolean("autoAnalyzeLyrics", true)
-        set(value) = prefs.edit().putBoolean("autoAnalyzeLyrics", value).apply()
+        get() = prefs.getBoolean(KEY_AUTO_ANALYZE_LYRICS, false)
+        set(value) = prefs.edit().putBoolean(KEY_AUTO_ANALYZE_LYRICS, value).apply()
+        
+    var hasUsedNextPrevGesture: Boolean
+        get() = prefs.getBoolean(KEY_USED_NEXT_PREV, false)
+        set(value) = prefs.edit().putBoolean(KEY_USED_NEXT_PREV, value).apply()
+
+    var hasUsedSeek10sGesture: Boolean
+        get() = prefs.getBoolean(KEY_USED_SEEK_10S, false)
+        set(value) = prefs.edit().putBoolean(KEY_USED_SEEK_10S, value).apply()
+
+    var hasUsedVinylSeekGesture: Boolean
+        get() = prefs.getBoolean(KEY_USED_VINYL_SEEK, false)
+        set(value) = prefs.edit().putBoolean(KEY_USED_VINYL_SEEK, value).apply()
+
+    var hasUsedPlaylistSwipeGesture: Boolean
+        get() = prefs.getBoolean(KEY_USED_PLAYLIST_SWIPE, false)
+        set(value) = prefs.edit().putBoolean(KEY_USED_PLAYLIST_SWIPE, value).apply()
+
+    var showGestureConfirmations: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_GESTURE_CONFIRM, true)
+        set(value) = prefs.edit().putBoolean(KEY_SHOW_GESTURE_CONFIRM, value).apply()
 }

@@ -197,4 +197,16 @@
     <string name="reload_covers">Recargar Portadas</string>
     <string name="reloading_covers_progress">Recargando %1$d de %2$d...</string>
     <string name="covers_reloaded">Portadas recargadas</string>
+    
+    <string name="support_dialog_title">Apoyar y Sugerencias</string>
+    <string name="support_ideas_title">¿Quieres aportar ideas?</string>
+    <string name="support_ideas_desc">Escríbelo en las issues de GitHub para mejorar la aplicación.</string>
+    <string name="support_patreon_title">Apoya el proyecto</string>
+    <string name="support_patreon_desc">Para que siga creciendo con más estilos, más tipos de onda y beneficios personales.</string>
+    
+    <string name="gesture_next_prev">Toca dos veces los bordes para cambiar de canción</string>
+    <string name="gesture_seek_10s">Toca dos veces aquí para adelantar o retrasar 10s</string>
+    <string name="gesture_vinyl_seek">Gira la portada para adelantar o retrasar</string>
+    <string name="gesture_playlist_swipe">Desliza hacia arriba para abrir la lista</string>
+    <string name="gesture_confirmations_toggle">Confirmaciones visuales de gestos</string>
 </resources>

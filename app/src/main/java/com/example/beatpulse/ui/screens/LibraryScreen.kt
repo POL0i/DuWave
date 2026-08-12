@@ -123,28 +123,7 @@ fun LibraryScreen(
         }
     }
 
-    LaunchedEffect(onlineSearchQuery, isSearchingOnline) {
-        if (isSearchingOnline && onlineSearchQuery.isNotBlank()) {
-            viewModel.isOnlineSearchLoading.value = true
-            try {
-                kotlinx.coroutines.delay(500)
-                viewModel.onlineSearchResults.value = viewModel.searchOnlineMusic(onlineSearchQuery)
-            } catch (e: Exception) {
-                if (e !is kotlinx.coroutines.CancellationException) {
-                    viewModel.onlineSearchResults.value = emptyList()
-                } else {
-                    throw e
-                }
-            } finally {
-                viewModel.isOnlineSearchLoading.value = false
-            }
-        } else if (isSearchingOnline) {
-            viewModel.onlineSearchResults.value = emptyList()
-            viewModel.isOnlineSearchLoading.value = false
-        } else {
-            viewModel.isOnlineSearchLoading.value = false
-        }
-    }
+    // Remove automatic LaunchedEffect search for online to prevent unnecessary API calls
 
     val bgStyle by prefs.backgroundStyleFlow.collectAsState()
     val isDarkTheme = isSystemInDarkTheme()
@@ -429,12 +408,31 @@ fun LibraryScreen(
              }
              AnimatedVisibility(visible = isSearchExpanded) {
                  Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
+                     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
                      OutlinedTextField(
                          value = if (isSearchingOnline) onlineSearchQuery else localSearchQuery,
                          onValueChange = { if (isSearchingOnline) viewModel.searchQuery.value = it else localSearchQuery = it },
                          placeholder = { Text(if (isSearchingOnline) "Buscar online..." else "Buscar...", color = Color.LightGray) },
                          singleLine = true,
                          modifier = Modifier.width(200.dp),
+                         keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                         keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                             onSearch = {
+                                 keyboardController?.hide()
+                                 if (isSearchingOnline && onlineSearchQuery.isNotBlank()) {
+                                     scope.launch {
+                                         viewModel.isOnlineSearchLoading.value = true
+                                         try {
+                                             viewModel.onlineSearchResults.value = viewModel.searchOnlineMusic(onlineSearchQuery)
+                                         } catch (e: Exception) {
+                                             viewModel.onlineSearchResults.value = emptyList()
+                                         } finally {
+                                             viewModel.isOnlineSearchLoading.value = false
+                                         }
+                                     }
+                                 }
+                             }
+                         ),
                          colors = OutlinedTextFieldDefaults.colors(
                              focusedTextColor = Color.White,
                              unfocusedTextColor = Color.White,
