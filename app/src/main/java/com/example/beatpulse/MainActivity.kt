@@ -606,6 +606,7 @@ fun MainScreen(
                     androidx.compose.material3.Button(
                         onClick = {
                             prefs.appLanguage = "es"
+                            (context as? android.app.Activity)?.recreate()
                         },
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = if (prefs.appLanguage == "es") paletteColors.vibrant else Color.DarkGray
@@ -614,6 +615,7 @@ fun MainScreen(
                     androidx.compose.material3.Button(
                         onClick = {
                             prefs.appLanguage = "en"
+                            (context as? android.app.Activity)?.recreate()
                         },
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = if (prefs.appLanguage == "en") paletteColors.vibrant else Color.DarkGray
@@ -622,6 +624,7 @@ fun MainScreen(
                     androidx.compose.material3.Button(
                         onClick = {
                             prefs.appLanguage = "pt"
+                            (context as? android.app.Activity)?.recreate()
                         },
                         colors = androidx.compose.material3.ButtonDefaults.buttonColors(
                             containerColor = if (prefs.appLanguage == "pt") paletteColors.vibrant else Color.DarkGray

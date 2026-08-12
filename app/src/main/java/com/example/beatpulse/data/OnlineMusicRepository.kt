@@ -21,42 +21,38 @@ class OnlineMusicRepository @Inject constructor(
     private var playerClient = JSONObject()
 
     init {
-        try {
-            val configStr = context.assets.open("youtube_config.json").bufferedReader().use { it.readText() }
-            val configJson = JSONObject(configStr)
-            apiKey = configJson.optString("api_key", "")
-            searchClient = configJson.optJSONObject("search_client") ?: JSONObject()
-            playerClient = configJson.optJSONObject("player_client") ?: JSONObject()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        // Initialization no longer requires youtube_config.json
     }
 
     suspend fun searchOnlineMusic(query: String): List<TrackEntity> {
         return withContext(Dispatchers.IO) {
+            val results = mutableListOf<TrackEntity>()
             try {
-                val url = URL("https://music.youtube.com/youtubei/v1/search?key=$apiKey")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.setRequestProperty("Content-Type", "application/json")
-                conn.doOutput = true
-
-                val payload = JSONObject().apply {
-                    put("context", JSONObject().put("client", searchClient))
-                    put("query", query)
-                }
-
-                conn.outputStream.write(payload.toString().toByteArray())
-
-                if (conn.responseCode == 200) {
-                    val responseStr = InputStreamReader(conn.inputStream).readText()
-                    val responseJson = JSONObject(responseStr)
-                    return@withContext extractSearchResults(responseJson)
+                val searchExtractor = org.schabi.newpipe.extractor.ServiceList.YouTube.getSearchExtractor(query, emptyList(), null)
+                searchExtractor.fetchPage()
+                for (item in searchExtractor.initialPage.items) {
+                    if (item is org.schabi.newpipe.extractor.stream.StreamInfoItem) {
+                        val videoId = item.url.substringAfter("v=").substringBefore("&")
+                        val thumbUrl = (item.thumbnails?.firstOrNull()?.url ?: "").replace(Regex("=w\\d+-h\\d+[^&]*"), "=w600-h600-l90-rj")
+                        
+                        results.add(
+                            TrackEntity(
+                                id = videoId.hashCode().toLong(),
+                                title = item.name,
+                                artist = item.uploaderName,
+                                album = "YouTube",
+                                duration = item.duration * 1000L,
+                                dataPath = "youtube://${videoId}|${item.name.replace("|", "")}|${item.uploaderName.replace("|", "")}",
+                                folderPath = "Online",
+                                customCoverPath = thumbUrl
+                            )
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
-            emptyList()
+            results.distinctBy { it.id }
         }
     }
 

@@ -230,7 +230,7 @@ fun LibraryScreen(
                 }
             } else if (isSearchingOnline && onlineSearchResults.isEmpty() && onlineSearchQuery.isNotBlank()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("No se encontraron resultados online.", color = dynamicTextColor)
+                    Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.no_results_online), color = dynamicTextColor)
                 }
             } else {
                 val shapeIdx by prefs.thumbnailShapeFlow.collectAsState(initial = 0)
@@ -412,7 +412,7 @@ fun LibraryScreen(
                      OutlinedTextField(
                          value = if (isSearchingOnline) onlineSearchQuery else localSearchQuery,
                          onValueChange = { if (isSearchingOnline) viewModel.searchQuery.value = it else localSearchQuery = it },
-                         placeholder = { Text(if (isSearchingOnline) "Buscar online..." else "Buscar...", color = Color.LightGray) },
+                         placeholder = { Text(if (isSearchingOnline) androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.search_online_dots) else androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.search_dots), color = Color.LightGray) },
                          singleLine = true,
                          modifier = Modifier.width(200.dp),
                          keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search),

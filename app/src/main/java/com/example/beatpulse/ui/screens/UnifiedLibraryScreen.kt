@@ -233,6 +233,9 @@ fun UnifiedLibraryScreen(
                                                     .clickable {
                                                         prefs.appLanguage = code
                                                         showLanguageDialog = false
+                                                        if (context is android.app.Activity) {
+                                                            context.recreate()
+                                                        }
                                                     }
                                                     .padding(16.dp),
                                                 fontSize = 18.sp,

@@ -177,7 +177,8 @@
     <string name="stats_plays_short">%1$s rep.</string>
     <string name="based_on">Baseado em: %1$s</string>
     <string name="for_you">Para você</string>
-    <string name="search_dots">Buscar...</string>
+    <string name="search_dots">Pesquisar...</string>
+    <string name="search_online_dots">Pesquisar online...</string>
     <string name="shape_squircle">Forma: Squircle</string>
     <string name="change_cover_title">Alterar Capa</string>
     <string name="style_classic">Estilo: Clássico</string>

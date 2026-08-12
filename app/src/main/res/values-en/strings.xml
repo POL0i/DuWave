@@ -178,6 +178,7 @@
     <string name="based_on">Based on: %1$s</string>
     <string name="for_you">For you</string>
     <string name="search_dots">Search...</string>
+    <string name="search_online_dots">Search online...</string>
     <string name="shape_squircle">Shape: Squircle</string>
     <string name="change_cover_title">Change Cover</string>
     <string name="style_classic">Style: Classic</string>
