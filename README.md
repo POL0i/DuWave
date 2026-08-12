@@ -51,17 +51,17 @@ Alternatively, download the latest **Release APK** from the GitHub Releases page
         <br/><b>Local Library</b>
       </td>
       <td align="center">
-        <img src="https://via.placeholder.com/250x550.png?text=Online+Search" width="250" alt="Online Search"/>
+        <i>[ Sube tu captura de "Online Search" aquí ]</i>
         <br/><b>Online Search</b>
       </td>
     </tr>
     <tr>
       <td align="center" colspan="1">
-        <img src="https://via.placeholder.com/250x550.png?text=Equalizer" width="250" alt="Equalizer"/>
+        <i>[ Sube tu captura de "Equalizer" aquí ]</i>
         <br/><b>Equalizer</b>
       </td>
       <td align="center" colspan="2">
-        <img src="https://via.placeholder.com/250x550.png?text=Audio+Trim" width="250" alt="Trim Audio"/>
+        <i>[ Sube tu captura de "Trim Audio" aquí ]</i>
         <br/><b>Trim Audio</b>
       </td>
     </tr>
@@ -69,7 +69,8 @@ Alternatively, download the latest **Release APK** from the GitHub Releases page
 
   <h3>🛡️ Security & Reliability</h3>
   <p>100% Clean! Verified by 67 security vendors on VirusTotal.</p>
-  <img src="https://via.placeholder.com/800x400.png?text=VirusTotal+Scan+Result+(Horizontal)" width="800" alt="VirusTotal Scan Result"/>
+  <br/>
+  <i>[ Sube tu captura horizontal de "VirusTotal" aquí ]</i>
 </div>
 
 ## 📄 License
