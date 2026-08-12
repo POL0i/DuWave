@@ -51,20 +51,17 @@ Alternatively, download the latest **Release APK** from the GitHub Releases page
         <br/><b>Local Library</b>
       </td>
       <td align="center">
-        <i><img width="714" height="1599" alt="onlinesearch" src="https://github.com/user-attachments/assets/b4dc0021-2c06-4f7f-925b-55eec9515f31" />
-</i>
+        <img width="250" alt="onlinesearch" src="https://github.com/user-attachments/assets/b4dc0021-2c06-4f7f-925b-55eec9515f31" />
         <br/><b>Online Search</b>
       </td>
     </tr>
     <tr>
       <td align="center" colspan="1">
-        <i><img width="714" height="1599" alt="eq" src="https://github.com/user-attachments/assets/d1fc1265-dbf6-4b53-95bf-fc53594e8926" />
-</i>
+        <img width="250" alt="eq" src="https://github.com/user-attachments/assets/d1fc1265-dbf6-4b53-95bf-fc53594e8926" />
         <br/><b>Equalizer</b>
       </td>
       <td align="center" colspan="2">
-        <i><img width="714" height="1599" alt="trim" src="https://github.com/user-attachments/assets/0ca63eac-46ba-46a6-87d9-19251c8b4ead" />
-</i>
+        <img width="250" alt="trim" src="https://github.com/user-attachments/assets/0ca63eac-46ba-46a6-87d9-19251c8b4ead" />
         <br/><b>Trim Audio</b>
       </td>
     </tr>
@@ -73,8 +70,7 @@ Alternatively, download the latest **Release APK** from the GitHub Releases page
   <h3>🛡️ Security & Reliability</h3>
   <p>100% Clean! Verified by 67 security vendors on VirusTotal.</p>
   <br/>
-  <i><img width="1904" height="1022" alt="viad" src="https://github.com/user-attachments/assets/52486b6e-9778-428b-8b61-c5cd34323932" />
-</i>
+  <img width="800" alt="viad" src="https://github.com/user-attachments/assets/52486b6e-9778-428b-8b61-c5cd34323932" />
 </div>
 
 ## 📄 License
