@@ -204,4 +204,19 @@
     <string name="gesture_vinyl_seek">Gire a capa para avançar ou voltar</string>
     <string name="gesture_playlist_swipe">Deslize para cima para abrir a lista</string>
     <string name="gesture_confirmations_toggle">Confirmações visuais de gestos</string>
+
+    <string name="download_completed">Download concluído</string>
+    <string name="download_completed_desc">Download concluído: %1$s</string>
+
+    <string name="search_in_category">Pesquisar em %1$s...</string>
+    <string name="folders_category">Pastas</string>
+    <string name="no_playlists_created">Você não tem playlists. Crie uma na guia Álbuns.</string>
+    <string name="delete_track_title">Excluir música</string>
+    <string name="delete_track_desc">Tem certeza de que deseja excluir permanentemente \'%1$s\' do dispositivo?</string>
+    <string name="delete_button_red">Excluir</string>
+    <string name="play_trimmed">Ouvir Corte</string>
+    <string name="pause_trimmed">Pausar</string>
+    <string name="stats_time_format">%1$d horas %2$d minutos</string>
+
+
 </resources>

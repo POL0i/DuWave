@@ -221,7 +221,7 @@ fun LibraryScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = paletteColors.vibrant)
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text(if (isOnlineSearchLoading) androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.searching_online) else "Buscando música...", color = dynamicTextColor)
+                        Text(if (isOnlineSearchLoading) androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.searching_online) else androidx.compose.ui.res.stringResource(id = com.example.beatpulse.R.string.searching_music), color = dynamicTextColor)
                     }
                 }
             } else if (!isSearchingOnline && selectedTabIndex != 2 && currentList.isEmpty()) {
@@ -394,10 +394,10 @@ fun LibraryScreen(
                          expanded = isSortMenuExpanded,
                          onDismissRequest = { isSortMenuExpanded = false }
                      ) {
-                         DropdownMenuItem(text = { Text("Directorio (Por defecto)") }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
-                         DropdownMenuItem(text = { Text("Título (A-Z)") }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
-                         DropdownMenuItem(text = { Text("Artista (A-Z)") }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
-                         DropdownMenuItem(text = { Text("Álbum (A-Z)") }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
+                         DropdownMenuItem(text = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.sort_directory)) }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
+                         DropdownMenuItem(text = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.sort_title)) }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
+                         DropdownMenuItem(text = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.sort_artist)) }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
+                         DropdownMenuItem(text = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.sort_album)) }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
                      }
                  }
              }
@@ -454,7 +454,7 @@ fun LibraryScreen(
                 title = { Text(context.getString(R.string.add_to_playlist)) },
                 text = {
                     if (playlists.isEmpty()) {
-                        Text("No tienes playlists creadas. Crea una desde la pestaña de Álbumes.")
+                        Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.no_playlists_created))
                     } else {
                         LazyColumn {
                             items(playlists) { pl ->
@@ -486,8 +486,8 @@ fun LibraryScreen(
         trackPendingConfirmation?.let { track ->
             AlertDialog(
                 onDismissRequest = { trackPendingConfirmation = null },
-                title = { Text("Eliminar canción", color = dynamicTextColor) },
-                text = { Text("¿Estás seguro de que quieres eliminar permanentemente '${track.title}' del dispositivo?", color = dynamicTextColor) },
+                title = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.delete_track_title), color = dynamicTextColor) },
+                text = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.delete_track_desc, track.title), color = dynamicTextColor) },
                 confirmButton = {
                     TextButton(onClick = {
                         val t = track
@@ -503,7 +503,7 @@ fun LibraryScreen(
                             }
                         }
                     }) {
-                        Text("Eliminar", color = Color.Red)
+                        Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.delete_button_red), color = Color.Red)
                     }
                 },
                 dismissButton = {

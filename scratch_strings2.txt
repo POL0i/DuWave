@@ -1,0 +1,96 @@
+app/src/main/java/com/example/beatpulse/ui/components/player/SleepTimerDialog.kt:        title = { Text("Temporizador Exacto", color = colorVibrant) },
+app/src/main/java/com/example/beatpulse/ui/components/player/SleepTimerDialog.kt:                        Text("Apagar", color = colorVibrant)
+app/src/main/java/com/example/beatpulse/ui/components/player/SleepTimerDialog.kt:                        Text("+5m", color = colorVibrant)
+app/src/main/java/com/example/beatpulse/ui/components/player/SleepTimerDialog.kt:            TextButton(onClick = onDismiss) { Text("Cerrar", color = colorVibrant) }
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:            title = { Text("Sugerir mejoras", color = colorVibrant) },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:            text = { Text("¿Deseas abrir el navegador para sugerir mejoras o reportar problemas en GitHub?", color = dynamicTextColor) },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                    Text("Abrir", color = colorVibrant)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                    Text("Cancelar", color = dynamicTextColor.copy(alpha=0.7f))
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:            title = { Text("Temporizador", color = colorVibrant) },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("${sleepTimerSeconds / 60}m", color = Color.White, style = MaterialTheme.typography.titleLarge)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                TextButton(onClick = { showTimerDialog = false }) { Text("Aceptar", color = colorVibrant) }
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:            title = { Text("Ecualizador", color = colorVibrant, fontWeight = FontWeight.Bold) },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Activar Ecualizador", color = Color.White)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                            Text("Modo Auto (Loudness)", color = Color.White)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                            Text("Preset:", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                                        text = { Text("Personalizado", color = Color.White) },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:            confirmButton = { TextButton(onClick = { showEqDialog = false }) { Text("Cerrar", color = colorVibrant) } },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:            title = { Text("Editar Etiqueta", color = colorVibrant) },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        label = { Text("Título", color = Color.Gray) },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        label = { Text("Artista", color = Color.Gray) },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        label = { Text("Álbum", color = Color.Gray) },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Elegir Portada")
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Portada personalizada seleccionada", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                }) { Text("Guardar", color = colorVibrant) }
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                TextButton(onClick = { showEditorDialog = false }) { Text("Cancelar", color = Color.Gray) }
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                Text("Ajustes de Reproducción", color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Reproducción Aleatoria", color = Color.White)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                Text("Estilo Visual", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                Text("Modo de Repetición", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Desactivado", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_OFF) colorVibrant else Color.Gray)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Lista", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_ALL) colorVibrant else Color.Gray)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Una", color = if (!abRepeatModeEnabled && currentMode == androidx.media3.common.Player.REPEAT_MODE_ONE) colorVibrant else Color.Gray)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("A y B", color = if (abRepeatModeEnabled) colorVibrant else Color.Gray)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                Text("Arquetipo de Ondas", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                            Text("3 Ondas Superpuestas", color = if (visualizerArchetype == 0) colorVibrant else Color.Gray, fontSize = 12.sp)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                            Text("1 Onda Combinada", color = if (visualizerArchetype == 1) colorVibrant else Color.Gray, fontSize = 12.sp)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                Text("Modo de Cálculo (FFT)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                            Text("Promedio (Estable)", color = if (fftMode == "AVERAGE") colorVibrant else Color.Gray, fontSize = 12.sp)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                            Text("Máximo (Dinámico)", color = if (fftMode == "MAX") colorVibrant else Color.Gray, fontSize = 12.sp)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                Text("Reactividad de Caos: ${String.format("%.2f", reactivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Sensibilidad de Graves (Bajos): ${String.format("%.1f", bassMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Sensibilidad de Medios: ${String.format("%.1f", midMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Sensibilidad de Altos (Agudos): ${String.format("%.1f", trebleMult)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                    Text("Sensibilidad General: ${String.format("%.1f", sensitivity)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                Text("Cola de Reproducción", color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:            title = { Text("Efectos de Audio", color = colorVibrant) },
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Slow Reverb", color = Color.White)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Velocidad: ${String.format("%.2f", playbackSpeed)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Tono: ${String.format("%.2f", playbackPitch)}x", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                        Text("Preajuste (Efectos)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+app/src/main/java/com/example/beatpulse/ui/components/player/PlayerScreen.kt:                    Text("Cerrar", color = colorVibrant)
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                    Text("No hay canciones aquí.", color = dynamicTextColor)
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                    Text("No se encontraron resultados online.", color = dynamicTextColor)
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                         DropdownMenuItem(text = { Text("Directorio (Por defecto)") }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                         DropdownMenuItem(text = { Text("Título (A-Z)") }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                         DropdownMenuItem(text = { Text("Artista (A-Z)") }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                         DropdownMenuItem(text = { Text("Álbum (A-Z)") }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                title = { Text("Añadir a Playlist") },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                        Text("No tienes playlists creadas. Crea una desde la pestaña de Álbumes.")
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                        Text("Cerrar", color = colorVibrant)
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                title = { Text("Eliminar canción", color = dynamicTextColor) },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                text = { Text("¿Estás seguro de que quieres eliminar permanentemente '${track.title}' del dispositivo?", color = dynamicTextColor) },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                        Text("Eliminar", color = Color.Red)
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                        Text("Cancelar", color = colorVibrant)
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                title = { Text("Confirmar descarga", color = dynamicTextColor) },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                text = { Text("¿Deseas descargar '${track.title}' a tu dispositivo para escucharla sin conexión?", color = dynamicTextColor) },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                        Text("Descargar", color = colorVibrant)
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                        Text("Cancelar", color = dynamicTextColor)
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                                text = { Text("Añadir a Playlist") },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                                text = { Text("Eliminar del dispositivo") },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                                text = { Text("Quitar de la Playlist") },
+app/src/main/java/com/example/beatpulse/ui/screens/LibraryScreen.kt:                                text = { Text("Descargar música") },
+app/src/main/java/com/example/beatpulse/ui/screens/AlbumsScreen.kt:                    Text("Buscando música...", color = dynamicTextColor)
+app/src/main/java/com/example/beatpulse/ui/screens/AlbumsScreen.kt:                            Text("Crear Playlist")
+app/src/main/java/com/example/beatpulse/ui/screens/AlbumsScreen.kt:            Text("Nueva Playlist", style = MaterialTheme.typography.titleLarge, color = dynamicTextColor, modifier = Modifier.weight(1f))
+app/src/main/java/com/example/beatpulse/ui/screens/AlbumsScreen.kt:                Text("Guardar")
+app/src/main/java/com/example/beatpulse/ui/screens/AlbumsScreen.kt:            label = { Text("Nombre de la playlist", color = dynamicTextColor.copy(alpha=0.7f)) },
+app/src/main/java/com/example/beatpulse/ui/screens/AlbumsScreen.kt:            placeholder = { Text("Buscar canciones...", color = dynamicTextColor.copy(alpha=0.5f)) },
+app/src/main/java/com/example/beatpulse/ui/screens/AlbumsScreen.kt:            Text("Añadir Canciones", style = MaterialTheme.typography.titleLarge, color = dynamicTextColor, modifier = Modifier.weight(1f))
+app/src/main/java/com/example/beatpulse/ui/screens/AlbumsScreen.kt:            placeholder = { Text("Buscar canciones...", color = dynamicTextColor.copy(alpha=0.5f)) },
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                     DropdownMenuItem(text = { Text("Directorio (Por defecto)") }, onClick = { sortOrder = "DIRECTORY"; prefs.librarySortOrder = "DIRECTORY"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                     DropdownMenuItem(text = { Text("Título (A-Z)") }, onClick = { sortOrder = "TITLE"; prefs.librarySortOrder = "TITLE"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                     DropdownMenuItem(text = { Text("Artista (A-Z)") }, onClick = { sortOrder = "ARTIST"; prefs.librarySortOrder = "ARTIST"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                     DropdownMenuItem(text = { Text("Álbum (A-Z)") }, onClick = { sortOrder = "ALBUM"; prefs.librarySortOrder = "ALBUM"; isSortMenuExpanded = false })
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                    placeholder = { Text("Buscar en ${currentViewData.title}...", color = dynamicTextColor.copy(alpha=0.5f)) },
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                        title = { Text("Añadir a Playlist") },
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                Text("No tienes playlists creadas.")
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                Text("Cerrar", color = paletteColors.vibrant)
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                        title = { Text("Eliminar canción", color = dynamicTextColor) },
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                        text = { Text("¿Estás seguro de que quieres eliminar permanentemente '${track.title}' del dispositivo?", color = dynamicTextColor) },
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                Text("Eliminar", color = Color.Red)
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                                Text("Cancelar", color = paletteColors.vibrant)
+app/src/main/java/com/example/beatpulse/ui/screens/UnifiedLibraryScreen.kt:                Text("Crear Playlist")
+app/src/main/java/com/example/beatpulse/MainActivity.kt:            title = { androidx.compose.material3.Text("Añadir a Playlist", color = paletteColors.vibrant) },
+app/src/main/java/com/example/beatpulse/MainActivity.kt:                    androidx.compose.material3.Text("No tienes playlists creadas. Crea una desde la pestaña de Álbumes.", color = androidx.compose.ui.graphics.Color.White)
+app/src/main/java/com/example/beatpulse/MainActivity.kt:                    androidx.compose.material3.Text("Cerrar", color = paletteColors.vibrant)

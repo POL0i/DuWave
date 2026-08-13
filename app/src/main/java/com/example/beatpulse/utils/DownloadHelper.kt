@@ -100,7 +100,7 @@ object DownloadHelper {
                     }
                 }
 
-                builder.setContentTitle("Descarga completada")
+                builder.setContentTitle(context.getString(com.example.beatpulse.R.string.download_completed))
                     .setContentText(title)
                     .setSmallIcon(android.R.drawable.stat_sys_download_done)
                     .setProgress(0, 0, false)
@@ -109,7 +109,7 @@ object DownloadHelper {
                 notificationManager.notify(notificationId, builder.build())
                 
                 withContext(Dispatchers.Main) {
-                    prefs.showToast("✅ Descarga completada: $title")
+                    prefs.showToast(context.getString(com.example.beatpulse.R.string.download_completed_desc, title))
                 }
                 
                 // Forzar escaneo para que se agregue inmediatamente a la librería con las etiquetas correctas

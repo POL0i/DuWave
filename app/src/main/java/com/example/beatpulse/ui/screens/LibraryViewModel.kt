@@ -367,13 +367,21 @@ class LibraryViewModel @Inject constructor(
 
             if (tracksWithoutCover.isEmpty()) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    prefs.showToast(context.getString(com.example.beatpulse.R.string.covers_reloaded))
+                    val locale = java.util.Locale(prefs.appLanguage)
+                    val config = android.content.res.Configuration(context.resources.configuration)
+                    config.setLocale(locale)
+                    val localizedContext = context.createConfigurationContext(config)
+                    prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.covers_reloaded))
                 }
                 return@launch
             }
 
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                prefs.showToast(context.getString(com.example.beatpulse.R.string.reloading_covers_progress, 0, tracksWithoutCover.size))
+                val locale = java.util.Locale(prefs.appLanguage)
+                val config = android.content.res.Configuration(context.resources.configuration)
+                config.setLocale(locale)
+                val localizedContext = context.createConfigurationContext(config)
+                prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.reloading_covers_progress, 0, tracksWithoutCover.size))
             }
 
             for (track in tracksWithoutCover) {
@@ -417,7 +425,11 @@ class LibraryViewModel @Inject constructor(
                 processed++
                 if (processed % 5 == 0 || processed == tracksWithoutCover.size) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        prefs.showToast(context.getString(com.example.beatpulse.R.string.reloading_covers_progress, processed, tracksWithoutCover.size))
+                        val locale = java.util.Locale(prefs.appLanguage)
+                        val config = android.content.res.Configuration(context.resources.configuration)
+                        config.setLocale(locale)
+                        val localizedContext = context.createConfigurationContext(config)
+                        prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.reloading_covers_progress, processed, tracksWithoutCover.size))
                     }
                 }
             }

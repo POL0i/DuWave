@@ -204,4 +204,19 @@
     <string name="gesture_vinyl_seek">Rotate the cover to seek</string>
     <string name="gesture_playlist_swipe">Swipe up to open playlist</string>
     <string name="gesture_confirmations_toggle">Visual gesture confirmations</string>
+
+    <string name="download_completed">Download completed</string>
+    <string name="download_completed_desc">Download completed: %1$s</string>
+
+    <string name="search_in_category">Search in %1$s...</string>
+    <string name="folders_category">Folders</string>
+    <string name="no_playlists_created">You have no playlists. Create one from the Albums tab.</string>
+    <string name="delete_track_title">Delete track</string>
+    <string name="delete_track_desc">Are you sure you want to permanently delete \'%1$s\' from your device?</string>
+    <string name="delete_button_red">Delete</string>
+    <string name="play_trimmed">Play Trim</string>
+    <string name="pause_trimmed">Pause</string>
+    <string name="stats_time_format">%1$d hours %2$d minutes</string>
+
+
 </resources>

@@ -177,7 +177,7 @@ fun AudioTrimmerDialog(
                     modifier = Modifier.align(Alignment.CenterHorizontally),
                     colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
                 ) {
-                    Text(if (isPlaying) "Pausar" else "Reproducir Recorte", color = if (isDark) Color.Black else Color.White)
+                    Text(if (isPlaying) androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.pause_trimmed) else androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.play_trimmed), color = if (isDark) Color.Black else Color.White)
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))

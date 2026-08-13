@@ -549,7 +549,7 @@ fun UnifiedLibraryScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text("Buscar en ${currentViewData.title}...", color = dynamicTextColor.copy(alpha=0.5f)) },
+                    placeholder = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.search_in_category, currentViewData.title), color = dynamicTextColor.copy(alpha=0.5f)) },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = dynamicTextColor.copy(alpha=0.5f)) },
@@ -671,7 +671,7 @@ fun UnifiedLibraryScreen(
                         title = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.add_to_playlist)) },
                         text = {
                             if (playlists.isEmpty()) {
-                                Text("No tienes playlists creadas.")
+                                Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.no_playlists_created))
                             } else {
                                 LazyColumn {
                                     items(playlists) { pl ->
@@ -703,8 +703,8 @@ fun UnifiedLibraryScreen(
                 trackPendingConfirmation?.let { track ->
                     AlertDialog(
                         onDismissRequest = { trackPendingConfirmation = null },
-                        title = { Text("Eliminar canción", color = dynamicTextColor) },
-                        text = { Text("¿Estás seguro de que quieres eliminar permanentemente '${track.title}' del dispositivo?", color = dynamicTextColor) },
+                        title = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.delete_track_title), color = dynamicTextColor) },
+                        text = { Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.delete_track_desc, track.title), color = dynamicTextColor) },
                         confirmButton = {
                             TextButton(onClick = {
                                 val t = track
@@ -720,7 +720,7 @@ fun UnifiedLibraryScreen(
                                     }
                                 }
                             }) {
-                                Text("Eliminar", color = Color.Red)
+                                Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.delete_button_red), color = Color.Red)
                             }
                         },
                         dismissButton = {

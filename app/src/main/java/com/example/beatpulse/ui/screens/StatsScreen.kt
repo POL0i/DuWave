@@ -294,7 +294,8 @@ private fun HeroListeningCard(
     totalPlayCount: Int,
     paletteColors: PaletteColors
 ) {
-    val timeText = formatDuration(totalMs)
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val timeText = formatDuration(totalMs, context)
     val formatter = NumberFormat.getNumberInstance(Locale("es", "ES"))
 
     Card(
@@ -958,14 +959,18 @@ private fun FavoritesCard(
     }
 }
 
-private fun formatDuration(ms: Long): String {
+private fun formatDuration(ms: Long, context: android.content.Context): String {
     val totalMinutes = ms / 60_000
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60
 
     return if (hours > 0) {
-        "$hours horas $minutes minutos"
+        context.getString(com.example.beatpulse.R.string.stats_time_format, hours, minutes)
     } else {
-        "$minutes minutos"
+        context.getString(com.example.beatpulse.R.string.stats_time_format, 0, minutes).let {
+            if (it.contains("0 horas ")) it.replace("0 horas ", "")
+            else if (it.contains("0 hours ")) it.replace("0 hours ", "")
+            else it
+        }
     }
 }

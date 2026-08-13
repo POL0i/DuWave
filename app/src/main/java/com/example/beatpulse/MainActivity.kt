@@ -105,7 +105,7 @@ class MainActivity : ComponentActivity() {
                             val title = cursor.getString(titleIndex)
                             val status = cursor.getInt(statusIndex)
                             if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
-                                prefs.showToast("✅ Descarga completada: $title")
+                                prefs.showToast(getString(R.string.download_completed_desc, title))
                                 kotlinx.coroutines.GlobalScope.launch {
                                     musicRepository.scanMediaStore()
                                 }
