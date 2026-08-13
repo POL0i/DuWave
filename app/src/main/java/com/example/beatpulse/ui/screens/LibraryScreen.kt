@@ -528,20 +528,20 @@ fun LibraryScreen(
         trackPendingDownload?.let { track ->
             AlertDialog(
                 onDismissRequest = { trackPendingDownload = null },
-                title = { Text("Confirmar descarga", color = dynamicTextColor) },
-                text = { Text("¿Deseas descargar '${track.title}' a tu dispositivo para escucharla sin conexión?", color = dynamicTextColor) },
+                title = { Text(stringResource(R.string.confirm_download), color = dynamicTextColor) },
+                text = { Text(stringResource(R.string.confirm_download_desc, track.title), color = dynamicTextColor) },
                 confirmButton = {
                     TextButton(onClick = {
                         trackPendingDownload = null
                         viewModel.downloadOnlineTrack(context, track)
                         prefs.showToast("Descargando ${track.title}...")
                     }) {
-                        Text("Descargar", color = colorVibrant)
+                        Text(stringResource(R.string.download), color = colorVibrant)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { trackPendingDownload = null }) {
-                        Text("Cancelar", color = dynamicTextColor)
+                        Text(stringResource(R.string.cancel), color = dynamicTextColor)
                     }
                 },
                 containerColor = paletteColors.dominant
