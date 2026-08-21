@@ -750,6 +750,7 @@ fun ListsSubPage(
     onCreatePlaylist: () -> Unit,
     viewModel: LibraryViewModel
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 120.dp, top = 8.dp)
