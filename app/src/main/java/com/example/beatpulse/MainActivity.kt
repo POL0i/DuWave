@@ -130,9 +130,6 @@ class MainActivity : ComponentActivity() {
 
         if (storageGranted) {
             setupApp()
-            if (!recordAudioGranted) {
-                Toast.makeText(this, "Las animaciones rítmicas están desactivadas porque no hay permiso de micrófono.", Toast.LENGTH_LONG).show()
-            }
         } else {
             Toast.makeText(this, "Se requiere permiso de almacenamiento para buscar tu música.", Toast.LENGTH_LONG).show()
         }
@@ -248,9 +245,7 @@ class MainActivity : ComponentActivity() {
         }
 
         val missingPermissions = mutableListOf<String>()
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            missingPermissions.add(Manifest.permission.RECORD_AUDIO)
-        }
+        // RECORD_AUDIO is no longer requested at startup. It will be requested on-demand in Mic Mode.
         if (ContextCompat.checkSelfPermission(this, storagePermission) != PackageManager.PERMISSION_GRANTED) {
             missingPermissions.add(storagePermission)
         }
@@ -324,6 +319,9 @@ fun MainScreen(
     val playbackPitch by playerViewModel.playbackPitch.collectAsState()
     val reverbEnabled by playerViewModel.reverbEnabled.collectAsState()
     val effectsPreset by playerViewModel.effectsPreset.collectAsState()
+    
+    val isMicModeActive by playerViewModel.isMicModeActive.collectAsState()
+    val streamConfigEffectsVisible by playerViewModel.streamConfigEffectsVisible.collectAsState()
     val bgStyle by prefs.backgroundStyleFlow.collectAsState()
     val scope = rememberCoroutineScope()
 
@@ -480,9 +478,11 @@ fun MainScreen(
         }
     }
 
+    val effectiveBgStyle = if (isMicModeActive && !streamConfigEffectsVisible) 0 else bgStyle
+
     // Wrap content with appropriate background, with AnimatedContent for smooth style transitions!
     AnimatedContent(
-        targetState = bgStyle,
+        targetState = effectiveBgStyle,
         transitionSpec = { fadeIn(tween(1000)) togetherWith fadeOut(tween(1000)) },
         label = "bg_transition"
     ) { style ->

@@ -1,7 +1,12 @@
-DuWave is an open-source local music player.
+DuWave is a dynamic local and open-source music player, designed to offer the best experience both offline and online.
 
 Main features:
+* Online search and streaming: Find and listen to music directly from the internet.
+* Music downloading: Save your favorite songs for offline listening.
 * Smooth playback and optimized support via ExoPlayer.
-* Dynamic interface with Palette API.
+* Dynamic interface with Palette API that changes and adapts to the album covers of your songs.
 * Real-time audio visualizer.
-* Comprehensive music library management.
+* Comprehensive local music library and playlist management.
+* Built-in audio trimmer.
+* Advanced equalizer with multiple profiles and unique visual styles (including Pixel Art style).
+* Advanced customization options for changing album covers based on titles.

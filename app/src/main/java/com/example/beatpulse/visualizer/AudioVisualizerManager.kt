@@ -14,7 +14,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.abs
 import kotlin.math.hypot
 import com.example.beatpulse.data.PreferencesManager
-
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
+import androidx.core.content.ContextCompat
+import java.nio.ByteBuffer
 enum class FilterMode {
     ALL, BASS, MIDS, TREBLE
 }
@@ -86,6 +93,10 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
     private val managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val dataMutex = Mutex()
 
+    private var audioRecord: AudioRecord? = null
+    private var isRecording = false
+    private var recordJob: kotlinx.coroutines.Job? = null
+
     var isAdvancedMode = MutableStateFlow(prefs.isAdvancedMode)
     var visualizerArchetype = MutableStateFlow(prefs.visualizerArchetype)
     var filterMode = MutableStateFlow(runCatching { FilterMode.valueOf(prefs.filterMode) }.getOrDefault(FilterMode.ALL))
@@ -107,6 +118,68 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
         // FFT is now passive via ExoPlayer's TeeAudioProcessor.
         // We just stop any decay jobs.
         decayJob?.cancel()
+    }
+
+    fun startMicMode(context: Context) {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Log.e("AudioVisualizerManager", "No RECORD_AUDIO permission")
+            return
+        }
+        
+        stopMicMode()
+        isRecording = true
+        isEnabled = true
+
+        val sampleRate = 44100
+        val channelConfig = AudioFormat.CHANNEL_IN_MONO
+        val audioFormat = AudioFormat.ENCODING_PCM_16BIT
+        val minBufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+        
+        // Ensure buffer is large enough for FFT_SIZE (1024 floats = 2048 bytes)
+        val bufferSize = maxOf(minBufferSize, 2048)
+
+        try {
+            audioRecord = AudioRecord(
+                MediaRecorder.AudioSource.MIC,
+                sampleRate,
+                channelConfig,
+                audioFormat,
+                bufferSize
+            )
+
+            audioRecord?.startRecording()
+
+            recordJob = managerScope.launch(Dispatchers.IO) {
+                val byteBuffer = ByteBuffer.allocateDirect(bufferSize)
+                val bufferBytes = ByteArray(bufferSize)
+                
+                while (isRecording && audioRecord?.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                    val read = audioRecord?.read(bufferBytes, 0, bufferSize) ?: 0
+                    if (read > 0) {
+                        byteBuffer.clear()
+                        byteBuffer.put(bufferBytes, 0, read)
+                        byteBuffer.flip()
+                        // FftAudioSink can process ByteBuffer
+                        fftSink.handleBuffer(byteBuffer)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("AudioVisualizerManager", "Failed to start AudioRecord", e)
+        }
+    }
+
+    fun stopMicMode() {
+        isRecording = false
+        recordJob?.cancel()
+        recordJob = null
+        try {
+            audioRecord?.stop()
+            audioRecord?.release()
+        } catch (e: Exception) {
+            Log.e("AudioVisualizerManager", "Failed to release AudioRecord", e)
+        }
+        audioRecord = null
     }
 
     var isEnabled = true

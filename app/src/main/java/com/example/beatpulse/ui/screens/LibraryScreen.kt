@@ -103,7 +103,7 @@ fun LibraryScreen(
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             trackToDelete?.let { track ->
                 viewModel.completeDeletion(track.id)
-                prefs.showToast("Canción eliminada")
+                prefs.showToast(context.getString(com.example.beatpulse.R.string.track_deleted))
                 viewModel.scanMediaStore()
             }
         }
@@ -464,7 +464,7 @@ fun LibraryScreen(
                                         .fillMaxWidth()
                                         .clickable {
                                             viewModel.addTrackToPlaylist(pl.playlistId, trackToAdd)
-                                            prefs.showToast("Añadido a ${pl.name}")
+                                            prefs.showToast(context.getString(com.example.beatpulse.R.string.added_to_playlist, pl.name))
                                             trackToAddToPlaylist = null
                                         }
                                         .padding(16.dp),
@@ -498,7 +498,7 @@ fun LibraryScreen(
                                 trackToDelete = t
                                 deleteLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
                             } else {
-                                prefs.showToast("Canción eliminada")
+                                prefs.showToast(context.getString(com.example.beatpulse.R.string.track_deleted))
                                 viewModel.scanMediaStore()
                             }
                         }
@@ -534,7 +534,7 @@ fun LibraryScreen(
                     TextButton(onClick = {
                         trackPendingDownload = null
                         viewModel.downloadOnlineTrack(context, track)
-                        prefs.showToast("Descargando ${track.title}...")
+                        prefs.showToast(context.getString(com.example.beatpulse.R.string.toast_downloading, track.title))
                     }) {
                         Text(stringResource(R.string.download), color = colorVibrant)
                     }

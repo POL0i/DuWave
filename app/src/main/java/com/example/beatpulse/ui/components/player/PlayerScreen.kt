@@ -9,6 +9,8 @@ import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.CastConnected
 import androidx.compose.material.icons.filled.Feedback
 import androidx.compose.ui.graphics.asAndroidPath
 import android.content.Intent
@@ -248,7 +250,22 @@ fun PlayerScreen(
     val filterMode by visualizerManager.filterMode.collectAsState()
     val sensitivity by visualizerManager.sensitivity.collectAsState()
     val reactivity by visualizerManager.reactivity.collectAsState()
-    val bassMult by visualizerManager.bassMultiplier.collectAsState()
+
+    // Streamer Mode State
+    val isMicModeActive by playerViewModel.isMicModeActive.collectAsState()
+    val streamConfigUiVisible by playerViewModel.streamConfigUiVisible.collectAsState()
+    val streamConfigEffectsVisible by playerViewModel.streamConfigEffectsVisible.collectAsState()
+    val streamConfigAspectRatio by playerViewModel.streamConfigAspectRatio.collectAsState()
+    var showStreamConfigDialog by remember { mutableStateOf(false) }
+
+    // State for rotating button
+    var showMicButton by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(3000)
+            showMicButton = !showMicButton
+        }
+    }    val bassMult by visualizerManager.bassMultiplier.collectAsState()
     val midMult by visualizerManager.midMultiplier.collectAsState()
     val trebleMult by visualizerManager.trebleMultiplier.collectAsState()
     val visualizerArchetype by visualizerManager.visualizerArchetype.collectAsState()
@@ -440,8 +457,18 @@ fun PlayerScreen(
         )
     }
 
+    val activeAspectRatio = if (isMicModeActive) {
+        when (streamConfigAspectRatio) {
+            "16:9" -> 16f / 9f
+            "4:3" -> 4f / 3f
+            "1:1" -> 1f
+            else -> 0f
+        }
+    } else 0f
+
     Box(modifier = modifier
         .fillMaxSize()
+        .then(if (activeAspectRatio > 0f) Modifier.aspectRatio(activeAspectRatio) else Modifier)
         .drawBehind {
             if (currentStyle == VisualizerStyle.BANDS) {
                 val w = size.width
@@ -565,35 +592,189 @@ fun PlayerScreen(
                         }
                     }
                     Row(modifier = Modifier.align(Alignment.CenterEnd)) {
-                        IconButton(
-                            onClick = { onAddToPlaylist?.invoke(track) },
-                            modifier = Modifier
-                                .padding(end = 8.dp)
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(paletteColors.dominant.copy(alpha = 0.5f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.PlaylistAdd,
-                                contentDescription = "Añadir a Playlist",
-                                tint = colorVibrant,
-                                modifier = Modifier.size(20.dp)
+                        AnimatedContent(
+                            targetState = if (isMicModeActive) 2 else if (showMicButton) 1 else 0,
+                            transitionSpec = {
+                                fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
+                            }
+                        ) { state ->
+                            when (state) {
+                                0 -> { // Playlist Add
+                                    IconButton(
+                                        onClick = { onAddToPlaylist?.invoke(track) },
+                                        modifier = Modifier
+                                            .padding(end = 8.dp)
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(paletteColors.dominant.copy(alpha = 0.5f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.PlaylistAdd,
+                                            contentDescription = "Añadir a Playlist",
+                                            tint = colorVibrant,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
+                                1 -> { // Mic Mode Trigger
+                                    IconButton(
+                                        onClick = { 
+                                            // Activar Mic Mode (Request permission first in a real scenario, but for now toggle)
+                                            val context = view.context
+                                            if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                                playerViewModel.toggleMicMode()
+                                                if (!isMicModeActive) { // If it was false, it means it's turning true
+                                                    visualizerManager.startMicMode(context)
+                                                } else {
+                                                    visualizerManager.stopMicMode()
+                                modifier = Modifier.basicMarquee()
                             )
+                            var showRemainingTime by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                            androidx.compose.foundation.layout.Row(
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                                modifier = androidx.compose.ui.Modifier.clickable(
+                                    interactionSource = androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                    indication = null
+                                ) { showRemainingTime = !showRemainingTime }
+                            ) {
+                                Text(
+                                    text = track.artist,
+                                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                                    color = colorVibrant,
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false)
+                                )
+                                androidx.compose.foundation.layout.Spacer(modifier = androidx.compose.ui.Modifier.width(8.dp))
+                                val dur = duration
+                                val pos = currentPosition
+                                val formatTime = { ms: Long -> 
+                                    val totalSeconds = ms / 1000
+                                    val m = totalSeconds / 60
+                                    val s = totalSeconds % 60
+                                    String.format("%02d:%02d", m, s)
+                                }
+                                val timeText = if (abRepeatModeEnabled) {
+                                    val aTime = (abPointA * dur).toLong()
+                                    val bTime = (abPointB * dur).toLong()
+                                    val posStr = if (showRemainingTime) "-${formatTime(dur - pos)}" else formatTime(pos)
+                                    "$posStr / A:${formatTime(aTime)} - B:${formatTime(bTime)}"
+                                } else {
+                                    if (showRemainingTime) "-${formatTime(dur - pos)} / ${formatTime(dur)}" else "${formatTime(pos)} / ${formatTime(dur)}"
+                                }
+                                Text(
+                                    text = timeText,
+                                    style = androidx.compose.material3.MaterialTheme.typography.bodyMedium,
+                                    color = colorVibrant
+                                )
+                            }
                         }
-                        if (lyrics.isNotEmpty()) {
+                        Row(modifier = Modifier.align(Alignment.CenterStart)) {
                             IconButton(
-                                onClick = { showLyrics = !showLyrics },
+                                onClick = { showSupportDialog = true },
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
                                     .background(paletteColors.dominant.copy(alpha = 0.5f))
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Info,
-                                    contentDescription = "Letras",
-                                    tint = if (showLyrics) colorVibrant else colorVibrant.copy(alpha=0.4f),
+                                    imageVector = Icons.Default.Favorite,
+                                    contentDescription = "Apoyo y Sugerencias",
+                                    tint = colorVibrant,
                                     modifier = Modifier.size(20.dp)
                                 )
+                            }
+                        }
+                        Row(modifier = Modifier.align(Alignment.CenterEnd)) {
+                            AnimatedContent(
+                                targetState = if (isMicModeActive) 2 else if (showMicButton) 1 else 0,
+                                transitionSpec = {
+                                    fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500))
+                                }
+                            ) { state ->
+                                when (state) {
+                                    0 -> { // Playlist Add
+                                        IconButton(
+                                            onClick = { onAddToPlaylist?.invoke(track) },
+                                            modifier = Modifier
+                                                .padding(end = 8.dp)
+                                                .size(36.dp)
+                                                .clip(CircleShape)
+                                                .background(paletteColors.dominant.copy(alpha = 0.5f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlaylistAdd,
+                                                contentDescription = "Añadir a Playlist",
+                                                tint = colorVibrant,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                    1 -> { // Mic Mode Trigger
+                                        IconButton(
+                                            onClick = { 
+                                                // Activar Mic Mode (Request permission first in a real scenario, but for now toggle)
+                                                val context = view.context
+                                                if (androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.RECORD_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                                    playerViewModel.toggleMicMode()
+                                                    if (!isMicModeActive) { // If it was false, it means it's turning true
+                                                        visualizerManager.startMicMode(context)
+                                                    } else {
+                                                        visualizerManager.stopMicMode()
+                                                    }
+                                                } else {
+                                                    Toast.makeText(context, "Requiere permiso de micrófono (Modo Streamer)", Toast.LENGTH_SHORT).show()
+                                                    // Ideally launch permission request here, but for now we just toast
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .padding(end = 8.dp)
+                                                .size(36.dp)
+                                                .clip(CircleShape)
+                                                .background(paletteColors.dominant.copy(alpha = 0.5f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Mic,
+                                                contentDescription = "Modo Streamer",
+                                                tint = colorVibrant,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                    2 -> { // Stream Config Menu Button (When Mic Mode is Active)
+                                        IconButton(
+                                            onClick = { showStreamConfigDialog = true },
+                                            modifier = Modifier
+                                                .padding(end = 8.dp)
+                                                .size(36.dp)
+                                                .clip(CircleShape)
+                                                .background(paletteColors.dominant.copy(alpha = 0.5f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.CastConnected,
+                                                contentDescription = "Configuración de Stream",
+                                                tint = colorVibrant,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            if (lyrics.isNotEmpty()) {
+                                IconButton(
+                                    onClick = { showLyrics = !showLyrics },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(paletteColors.dominant.copy(alpha = 0.5f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = "Letras",
+                                        tint = if (showLyrics) colorVibrant else colorVibrant.copy(alpha=0.4f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -1529,41 +1710,43 @@ fun PlayerScreen(
         
         // Control Row
 
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Expandable Timer
+        AnimatedVisibility(visible = !isMicModeActive || streamConfigUiVisible) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { showTimerDialog = true }) {
-                    Icon(
-                        androidx.compose.material.icons.Icons.Default.Timer, 
-                        contentDescription = "Timer", 
-                        tint = if (sleepTimerSeconds > 0) colorVibrant else Color.Gray,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-                IconButton(onClick = { showEqDialog = true }) {
-                    Icon(
-                        androidx.compose.material.icons.Icons.Default.GraphicEq, 
-                        contentDescription = "Equalizer", 
-                        tint = if (equalizerManager.isEnabled.collectAsState().value) colorVibrant else Color.Gray,
-                        modifier = Modifier.size(28.dp)
-                    )
-                }
-                IconButton(onClick = { showEffectsDialog = true }) {
-                    Icon(Icons.Default.Star, contentDescription = "Audio Effects", tint = Color.Gray, modifier = Modifier.size(28.dp))
-                }
-                IconButton(onClick = { showEditorDialog = true }) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit Track", tint = Color.Gray, modifier = Modifier.size(28.dp))
-                }
-                IconButton(onClick = { showSettingsMenu = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "More Options", tint = Color.Gray, modifier = Modifier.size(28.dp))
+                // Expandable Timer
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { showTimerDialog = true }) {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Default.Timer, 
+                            contentDescription = "Timer", 
+                            tint = if (sleepTimerSeconds > 0) colorVibrant else Color.Gray,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    IconButton(onClick = { showEqDialog = true }) {
+                        Icon(
+                            androidx.compose.material.icons.Icons.Default.GraphicEq, 
+                            contentDescription = "Equalizer", 
+                            tint = if (equalizerManager.isEnabled.collectAsState().value) colorVibrant else Color.Gray,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+                    IconButton(onClick = { showEffectsDialog = true }) {
+                        Icon(Icons.Default.Star, contentDescription = "Audio Effects", tint = Color.Gray, modifier = Modifier.size(28.dp))
+                    }
+                    IconButton(onClick = { showEditorDialog = true }) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit Track", tint = Color.Gray, modifier = Modifier.size(28.dp))
+                    }
+                    IconButton(onClick = { showSettingsMenu = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "More Options", tint = Color.Gray, modifier = Modifier.size(28.dp))
+                    }
                 }
             }
         }
@@ -1836,7 +2019,8 @@ fun PlayerScreen(
             onDismissRequest = { showSettingsMenu = false },
             containerColor = colorDominant.copy(alpha = 0.95f)
         ) {
-            androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxHeight(0.9f)) {
+            androidx.compose.foundation.layout.Box(modifier =                // Controles inferiores y Top Bar (if any)
+                AnimatedVisibility(visible = !isMicModeActive || streamConfigUiVisible) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2198,7 +2382,56 @@ fun PlayerScreen(
             containerColor = colorDominant
         )
     }
-}
+
+    if (showStreamConfigDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showStreamConfigDialog = false },
+            title = { Text("Configuración de Stream (Modo Mic)", color = colorVibrant) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text("Ocultar controles (interfaz limpia)", color = Color.White)
+                        androidx.compose.material3.Switch(
+                            checked = !streamConfigUiVisible,
+                            onCheckedChange = { playerViewModel.setStreamConfigUiVisible(!it) },
+                            colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorVibrant.copy(alpha=0.5f))
+                        )
+                    }
+
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        Text("Mostrar efectos (Corazones, etc)", color = Color.White)
+                        androidx.compose.material3.Switch(
+                            checked = streamConfigEffectsVisible,
+                            onCheckedChange = { playerViewModel.setStreamConfigEffectsVisible(it) },
+                            colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorVibrant.copy(alpha=0.5f))
+                        )
+                    }
+
+                    Column {
+                        Text("Relación de Aspecto del Lienzo", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val aspectRatios = listOf("Libre", "16:9", "4:3", "1:1")
+                            items(aspectRatios.size) { i ->
+                                val ratio = aspectRatios[i]
+                                androidx.compose.material3.FilterChip(
+                                    selected = streamConfigAspectRatio == ratio,
+                                    onClick = { playerViewModel.setStreamConfigAspectRatio(ratio) },
+                                    label = { Text(ratio) },
+                                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(selectedContainerColor = colorVibrant, selectedLabelColor = Color.White)
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showStreamConfigDialog = false }) {
+                    Text(stringResource(R.string.close), color = colorVibrant)
+                }
+            },
+            containerColor = colorDominant
+        )
+    }
 }
 
 @androidx.compose.runtime.Composable

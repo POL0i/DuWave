@@ -99,7 +99,7 @@ fun UnifiedLibraryScreen(
         if (result.resultCode == android.app.Activity.RESULT_OK) {
             trackToDelete?.let { track ->
                 viewModel.completeDeletion(track.id)
-                prefs.showToast("Canción eliminada")
+                prefs.showToast(context.getString(com.example.beatpulse.R.string.track_deleted))
                 viewModel.scanMediaStore()
             }
         }
@@ -681,7 +681,7 @@ fun UnifiedLibraryScreen(
                                                 .fillMaxWidth()
                                                 .clickable {
                                                     viewModel.addTrackToPlaylist(pl.playlistId, trackToAdd)
-                                                    prefs.showToast("Añadido a ${pl.name}")
+                                                    prefs.showToast(context.getString(com.example.beatpulse.R.string.added_to_playlist, pl.name))
                                                     trackToAddToPlaylist = null
                                                 }
                                                 .padding(16.dp),
@@ -715,7 +715,7 @@ fun UnifiedLibraryScreen(
                                         trackToDelete = t
                                         deleteLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
                                     } else {
-                                        prefs.showToast("Canción eliminada")
+                                        prefs.showToast(context.getString(com.example.beatpulse.R.string.track_deleted))
                                         viewModel.scanMediaStore()
                                     }
                                 }
@@ -765,24 +765,24 @@ fun ListsSubPage(
         
         item {
             PlaylistFolderItem(
-                title = "Todas las canciones",
+                title = androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.all_songs_title),
                 count = allTracks.size,
                 icon = Icons.Default.MusicNote,
                 tint = paletteColors.vibrant,
                 textColor = dynamicTextColor,
-                onClick = { onPlaylistSelected(PlaylistViewData("Todas las canciones", allTracks)) }
+                onClick = { onPlaylistSelected(PlaylistViewData(context.getString(com.example.beatpulse.R.string.all_songs_title), allTracks)) }
             )
         }
         
         if (recentTracks.isNotEmpty()) {
             item {
                 PlaylistFolderItem(
-                    title = "Reproducciones Recientes",
+                    title = androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.recent_plays_title),
                     count = recentTracks.size,
                     icon = Icons.Default.History,
                     tint = paletteColors.vibrant,
                     textColor = dynamicTextColor,
-                    onClick = { onPlaylistSelected(PlaylistViewData("Reproducciones Recientes", recentTracks)) }
+                    onClick = { onPlaylistSelected(PlaylistViewData(context.getString(com.example.beatpulse.R.string.recent_plays_title), recentTracks)) }
                 )
             }
         }
@@ -790,12 +790,12 @@ fun ListsSubPage(
         if (favoriteTracks.isNotEmpty()) {
             item {
                 PlaylistFolderItem(
-                    title = "Favoritos",
+                    title = androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.favorites_title),
                     count = favoriteTracks.size,
                     icon = Icons.Default.Favorite,
                     tint = paletteColors.vibrant,
                     textColor = dynamicTextColor,
-                    onClick = { onPlaylistSelected(PlaylistViewData("Favoritos", favoriteTracks)) }
+                    onClick = { onPlaylistSelected(PlaylistViewData(context.getString(com.example.beatpulse.R.string.favorites_title), favoriteTracks)) }
                 )
             }
         }
@@ -803,12 +803,12 @@ fun ListsSubPage(
         if (topTracks.isNotEmpty()) {
             item {
                 PlaylistFolderItem(
-                    title = "Mejores Reproducciones",
+                    title = androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.top_plays_title),
                     count = topTracks.size,
                     icon = Icons.Default.Star,
                     tint = paletteColors.vibrant,
                     textColor = dynamicTextColor,
-                    onClick = { onPlaylistSelected(PlaylistViewData("Mejores Reproducciones", topTracks)) }
+                    onClick = { onPlaylistSelected(PlaylistViewData(context.getString(com.example.beatpulse.R.string.top_plays_title), topTracks)) }
                 )
             }
         }
@@ -816,12 +816,12 @@ fun ListsSubPage(
         if (recentlyAdded.isNotEmpty()) {
             item {
                 PlaylistFolderItem(
-                    title = "Últimos Agregados",
+                    title = androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.recently_added_title),
                     count = recentlyAdded.size,
                     icon = Icons.Default.NewReleases,
                     tint = paletteColors.vibrant,
                     textColor = dynamicTextColor,
-                    onClick = { onPlaylistSelected(PlaylistViewData("Últimos Agregados", recentlyAdded)) }
+                    onClick = { onPlaylistSelected(PlaylistViewData(context.getString(com.example.beatpulse.R.string.recently_added_title), recentlyAdded)) }
                 )
             }
         }
@@ -857,7 +857,7 @@ fun ListsSubPage(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Crear Playlist")
+                Text(androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.create_playlist))
             }
         }
     }

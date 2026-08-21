@@ -1,7 +1,12 @@
-DuWave es un reproductor de música local de código abierto.
+DuWave es un reproductor de música local dinámico y de código abierto, diseñado para ofrecerte la mejor experiencia tanto offline como online.
 
 Características principales:
+* Búsqueda y reproducción online: Encuentra y escucha música directamente desde internet.
+* Descarga de música: Guarda tus canciones favoritas para escucharlas sin conexión.
 * Reproducción fluida y soporte optimizado mediante ExoPlayer.
-* Interfaz dinámica con Palette API.
+* Interfaz dinámica con Palette API que cambia y se adapta a la portada del título de tus canciones.
 * Visualizador de audio en tiempo real.
-* Gestión completa de biblioteca musical.
+* Gestión completa de tu biblioteca musical y listas de reproducción.
+* Recortador de audios integrado.
+* Ecualizador avanzado con múltiples perfiles y estilos visuales únicos (incluyendo estilo Pixel Art).
+* Opciones de personalización avanzadas para el cambio de portadas.

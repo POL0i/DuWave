@@ -88,6 +88,22 @@ class PlayerViewModel @Inject constructor(
     val isFetchingLyrics = MutableStateFlow(false)
     val searchFailed = MutableStateFlow(false)
     
+    // --- Mic/Streamer Mode State ---
+    val isMicModeActive = MutableStateFlow(false)
+    val streamConfigUiVisible = MutableStateFlow(false) // Hide UI by default in Mic Mode
+    val streamConfigEffectsVisible = MutableStateFlow(true) // Keep effects by default
+    val streamConfigAspectRatio = MutableStateFlow("default") // "default" or "16:9"
+
+    fun toggleMicMode() {
+        val newState = !isMicModeActive.value
+        isMicModeActive.value = newState
+        if (newState) {
+            // Pause playback when entering Mic Mode
+            _playerState.value?.pause()
+        }
+    }
+    // -------------------------------
+    
     val autoAnalyzeLyrics = MutableStateFlow(true)
     val availableLyricsResults = MutableStateFlow<List<LrcSearchResult>>(emptyList())
     
@@ -221,6 +237,22 @@ class PlayerViewModel @Inject constructor(
         PlaybackService.playbackPitchFlow.value = prefs.playbackPitch
         PlaybackService.reverbEnabledFlow.value = prefs.reverbEnabled
         setupPlayer()
+
+        // Keep currentTrack synchronized with DB changes (e.g. when cover is updated from Library)
+        viewModelScope.launch {
+            repository.allTracksFlow.collect { allTracks ->
+                val current = _currentTrack.value
+                if (current != null) {
+                    val updated = allTracks.find { it.id == current.id }
+                    if (updated != null && updated != current) {
+                        _currentTrack.value = updated
+                        if (updated.customCoverPath != current.customCoverPath) {
+                            extractColors(updated)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private fun setupPlayer() {

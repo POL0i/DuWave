@@ -302,7 +302,8 @@ class LibraryViewModel @Inject constructor(
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 resolvingTracks.value += track.id
-                prefs.showToast("Obteniendo enlace de ${track.title}...")
+                val localizedContext = context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply { setLocale(java.util.Locale(prefs.appLanguage)) })
+                prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.toast_fetching_link, track.title))
                 // El dataPath viene como youtube://videoId|...
                 val videoId = track.dataPath.removePrefix("youtube://").substringBefore("|")
                 val url = onlineRepository.getStreamUrl(videoId)
@@ -341,14 +342,17 @@ class LibraryViewModel @Inject constructor(
                             title = track.customTitle ?: track.title,
                             artist = track.customArtist ?: track.artist
                         )
-                        prefs.showToast("Descarga iniciada: ${track.title}")
+                        val localizedContext = context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply { setLocale(java.util.Locale(prefs.appLanguage)) })
+                        prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.toast_download_started, track.title))
                     }
                 } else {
-                    prefs.showToast("No se pudo obtener el enlace de ${track.title}")
+                    val localizedContext = context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply { setLocale(java.util.Locale(prefs.appLanguage)) })
+                    prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.toast_download_failed_link, track.title))
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                prefs.showToast("Error al procesar descarga de ${track.title}")
+                val localizedContext = context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply { setLocale(java.util.Locale(prefs.appLanguage)) })
+                prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.toast_download_error, track.title))
             } finally {
                 resolvingTracks.value -= track.id
             }

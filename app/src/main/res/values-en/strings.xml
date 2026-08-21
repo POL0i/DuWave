@@ -218,5 +218,16 @@
     <string name="pause_trimmed">Pause</string>
     <string name="stats_time_format">%1$d hours %2$d minutes</string>
 
+    <string name="toast_fetching_link">Fetching link for %1$s...</string>
+    <string name="toast_download_started">Download started: %1$s</string>
+    <string name="toast_download_failed_link">Could not get link for %1$s</string>
+    <string name="toast_download_error">Error processing download for %1$s</string>
+    <string name="toast_downloading">Downloading %1$s...</string>
+
+    <string name="all_songs_title">All Songs</string>
+    <string name="recent_plays_title">Recently Played</string>
+    <string name="favorites_title">Favorites</string>
+    <string name="top_plays_title">Top Played</string>
+    <string name="recently_added_title">Recently Added</string>
 
 </resources>
