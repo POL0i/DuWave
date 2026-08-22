@@ -378,18 +378,28 @@ fun MainScreen(
         Scaffold(
             containerColor = Color.Transparent,
                         bottomBar = {
-                com.example.beatpulse.ui.components.BottomNavigationBar(
-                    currentPage = currentPage,
-                    onPageChange = { currentPage = it },
-                    currentTrack = currentTrack,
-                    isPlaying = isPlaying,
-                    accentColor = accentColor,
-                    paletteColors = paletteColors,
-                    bgStyle = bgStyle,
-                    prefs = prefs,
-                    exoPlayer = exoPlayer,
-                    onPlayPauseClick = { if (exoPlayer?.isPlaying == true) exoPlayer?.pause() else exoPlayer?.play() }
-                )
+                val streamConfigUiVisible by playerViewModel.streamConfigUiVisible.collectAsState()
+                val isMicModeActive by playerViewModel.isMicModeActive.collectAsState()
+                val hideBottomBar = currentPage == 2 && isMicModeActive && !streamConfigUiVisible
+
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !hideBottomBar,
+                    enter = androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.fadeOut()
+                ) {
+                    com.example.beatpulse.ui.components.BottomNavigationBar(
+                        currentPage = currentPage,
+                        onPageChange = { currentPage = it },
+                        currentTrack = currentTrack,
+                        isPlaying = isPlaying,
+                        accentColor = accentColor,
+                        paletteColors = paletteColors,
+                        bgStyle = bgStyle,
+                        prefs = prefs,
+                        exoPlayer = exoPlayer,
+                        onPlayPauseClick = { if (exoPlayer?.isPlaying == true) exoPlayer?.pause() else exoPlayer?.play() }
+                    )
+                }
             }
         ) { innerPadding ->
             AnimatedContent(
@@ -443,35 +453,40 @@ fun MainScreen(
                     }
                     2 -> Box(modifier = Modifier.fillMaxSize()) {
                         PlayerScreen(
-                        bottomPadding = innerPadding.calculateBottomPadding(),
-                        playerViewModel = playerViewModel,
-                        visualizerManager = visualizerManager,
-                        equalizerManager = equalizerManager,
-                        exoPlayer = exoPlayer,
-                        currentTrack = currentTrack,
-                        currentQueue = currentQueue,
-                        onPlayTrack = { track, queue -> playerViewModel.playTrack(track, queue) },
-                        paletteColors = paletteColors,
-                        prefs = prefs,
-                        repeatModeState = repeatModeState,
-                        shuffleModeState = shuffleModeState,
-                        sleepTimerSeconds = sleepTimerSeconds,
-                        onSetSleepTimer = { sleepTimerSeconds = it },
-                        onUpdateTrackMetadata = { id, title, artist, album, coverPath ->
-                            playerViewModel.updateTrackMetadata(id, title, artist, album, coverPath)
-                        },
-                        onAddToPlaylist = { track ->
-                            trackToAddToPlaylist = track
-                        },
-                        playbackSpeed = playbackSpeed,
-                        playbackPitch = playbackPitch,
-                        reverbEnabled = reverbEnabled,
-                        effectsPreset = effectsPreset,
-                        onSetSpeed = { playerViewModel.setSpeed(it) },
-                        onSetPitch = { playerViewModel.setPitch(it) },
-                        onSetReverb = { playerViewModel.setReverb(it) },
-                        onApplyPreset = { playerViewModel.applyPreset(it) }
-                    )
+                            modifier = Modifier,
+                            playerViewModel = playerViewModel,
+                            visualizerManager = visualizerManager,
+                            equalizerManager = equalizerManager,
+                            state = com.example.beatpulse.ui.components.player.PlayerScreenState(
+                                exoPlayer = exoPlayer,
+                                currentTrack = currentTrack,
+                                currentQueue = currentQueue,
+                                paletteColors = paletteColors,
+                                bottomPadding = innerPadding.calculateBottomPadding(),
+                                prefs = prefs,
+                                repeatModeState = repeatModeState,
+                                shuffleModeState = shuffleModeState,
+                                playbackSpeed = playbackSpeed,
+                                playbackPitch = playbackPitch,
+                                reverbEnabled = reverbEnabled,
+                                effectsPreset = effectsPreset,
+                                sleepTimerSeconds = sleepTimerSeconds
+                            ),
+                            callbacks = com.example.beatpulse.ui.components.player.PlayerScreenCallbacks(
+                                onPlayTrack = { track, queue ->
+                                    playerViewModel.playTrack(track, queue)
+                                },
+                                onSetSpeed = { speed -> playerViewModel.setSpeed(speed) },
+                                onSetPitch = { pitch -> playerViewModel.setPitch(pitch) },
+                                onSetReverb = { enabled -> playerViewModel.setReverb(enabled) },
+                                onApplyPreset = { preset -> playerViewModel.applyPreset(preset) },
+                                onSetSleepTimer = { seconds -> sleepTimerSeconds = seconds },
+                                onUpdateTrackMetadata = { id, title, artist, album, coverPath ->
+                                    playerViewModel.updateTrackMetadata(id, title, artist, album, coverPath)
+                                },
+                                onAddToPlaylist = { track -> trackToAddToPlaylist = track }
+                            )
+                        )
                     }
                 }
             }

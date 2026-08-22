@@ -92,7 +92,25 @@ class PlayerViewModel @Inject constructor(
     val isMicModeActive = MutableStateFlow(false)
     val streamConfigUiVisible = MutableStateFlow(false) // Hide UI by default in Mic Mode
     val streamConfigEffectsVisible = MutableStateFlow(true) // Keep effects by default
+    val streamConfigMiniPlayerVisible = MutableStateFlow(false) // Hide mini player by default
     val streamConfigAspectRatio = MutableStateFlow("default") // "default" or "16:9"
+    val streamAvatarUri = MutableStateFlow<String?>(PreferencesManager.getInstance(context).streamAvatarUri)
+    
+    val isWifiStreamActive = MutableStateFlow(false)
+    val wifiStreamFps = MutableStateFlow(60)
+    val wifiStreamQuality = MutableStateFlow(100)
+    val wifiStreamCustomWidth = MutableStateFlow(1920)
+    val wifiStreamCustomHeight = MutableStateFlow(1080)
+
+    fun updateStreamAvatar(uri: String?) {
+        PreferencesManager.getInstance(context).streamAvatarUri = uri
+        streamAvatarUri.value = uri
+        if (isMicModeActive.value && uri != null) {
+            viewModelScope.launch { extractColorsFromUri(uri) }
+        } else if (isMicModeActive.value) {
+            _currentTrack.value?.let { viewModelScope.launch { extractColors(it) } }
+        }
+    }
 
     fun toggleMicMode() {
         val newState = !isMicModeActive.value
@@ -100,6 +118,9 @@ class PlayerViewModel @Inject constructor(
         if (newState) {
             // Pause playback when entering Mic Mode
             _playerState.value?.pause()
+            streamAvatarUri.value?.let { uri -> viewModelScope.launch { extractColorsFromUri(uri) } }
+        } else {
+            _currentTrack.value?.let { track -> viewModelScope.launch { extractColors(track) } }
         }
     }
     // -------------------------------
@@ -504,6 +525,32 @@ class PlayerViewModel @Inject constructor(
             } catch (e: Exception) {
                 _paletteColors.value = PaletteColors()
             }
+        }
+    }
+    
+    private suspend fun extractColorsFromUri(uriString: String) {
+        withContext(Dispatchers.IO) {
+            try {
+                var bitmap: android.graphics.Bitmap? = null
+                val uri = android.net.Uri.parse(uriString)
+                val inputStream = context.contentResolver.openInputStream(uri)
+                bitmap = BitmapFactory.decodeStream(inputStream)
+                inputStream?.close()
+
+                if (bitmap != null) {
+                    val palette = Palette.from(bitmap).generate()
+                    val dominantRaw = palette.getDominantColor(android.graphics.Color.DKGRAY)
+                    val colors = PaletteColors(
+                        dominant = Color(dominantRaw),
+                        vibrant = Color(palette.getVibrantColor(dominantRaw)),
+                        muted = Color(palette.getMutedColor(dominantRaw)),
+                        darkVibrant = Color(palette.getDarkVibrantColor(dominantRaw)),
+                        lightVibrant = Color(palette.getLightVibrantColor(dominantRaw)),
+                        darkMuted = Color(palette.getDarkMutedColor(dominantRaw))
+                    )
+                    _paletteColors.value = colors
+                }
+            } catch (e: Exception) {}
         }
     }
 

@@ -54,6 +54,8 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+
     buildFeatures {
       compose = true
       aidl = false
@@ -123,6 +125,12 @@ dependencies {
   // Icons Extended
   implementation("androidx.compose.material:material-icons-extended:1.6.0")
 
+  // RTSP Streaming via Hardware (MediaProjection)
+  implementation("com.github.pedroSG94.RootEncoder:library:2.7.2")
+  implementation("com.github.pedroSG94:RTSP-Server:1.4.1") {
+      exclude(group = "com.github.pedroSG94.RootEncoder")
+  }
+
   // Room
   implementation("androidx.room:room-runtime:2.7.0-alpha13")
   implementation("androidx.room:room-ktx:2.7.0-alpha13")
@@ -145,4 +153,5 @@ dependencies {
 
   // NewPipeExtractor for native YouTube streaming
   implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.4")
+
 }

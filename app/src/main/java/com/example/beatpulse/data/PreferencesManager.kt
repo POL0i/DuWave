@@ -262,4 +262,8 @@ class PreferencesManager private constructor(context: Context) {
     var showGestureConfirmations: Boolean
         get() = prefs.getBoolean(KEY_SHOW_GESTURE_CONFIRM, true)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_GESTURE_CONFIRM, value).apply()
+
+    var streamAvatarUri: String?
+        get() = prefs.getString("streamAvatarUri", null)
+        set(value) = prefs.edit().putString("streamAvatarUri", value).apply()
 }

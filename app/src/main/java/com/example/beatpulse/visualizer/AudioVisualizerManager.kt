@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -110,6 +111,9 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
     var midMultiplier = MutableStateFlow(prefs.midMultiplier)
     var trebleMultiplier = MutableStateFlow(prefs.trebleMultiplier)
     
+    val isSilent = MutableStateFlow(true)
+    private var lastAudioTime = System.currentTimeMillis()
+    
     val fftSink = FftAudioSink { magnitudes ->
         processFftMagnitudes(magnitudes)
     }
@@ -118,6 +122,7 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
         // FFT is now passive via ExoPlayer's TeeAudioProcessor.
         // We just stop any decay jobs.
         decayJob?.cancel()
+        startSilenceDetector()
     }
 
     fun startMicMode(context: Context) {
@@ -129,6 +134,8 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
         stopMicMode()
         isRecording = true
         isEnabled = true
+        fftSink.isMicModeActive = true
+        startSilenceDetector()
 
         val sampleRate = 44100
         val channelConfig = AudioFormat.CHANNEL_IN_MONO
@@ -160,7 +167,7 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
                         byteBuffer.put(bufferBytes, 0, read)
                         byteBuffer.flip()
                         // FftAudioSink can process ByteBuffer
-                        fftSink.handleBuffer(byteBuffer)
+                        fftSink.handleMicBuffer(byteBuffer)
                     }
                 }
             }
@@ -171,6 +178,7 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
 
     fun stopMicMode() {
         isRecording = false
+        fftSink.isMicModeActive = false
         recordJob?.cancel()
         recordJob = null
         try {
@@ -180,6 +188,17 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
             Log.e("AudioVisualizerManager", "Failed to release AudioRecord", e)
         }
         audioRecord = null
+    }
+
+    private var silenceJob: kotlinx.coroutines.Job? = null
+    private fun startSilenceDetector() {
+        if (silenceJob?.isActive == true) return
+        silenceJob = managerScope.launch {
+            while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                isSilent.value = (System.currentTimeMillis() - lastAudioTime) > 3000L
+                kotlinx.coroutines.delay(500L)
+            }
+        }
     }
 
     var isEnabled = true
@@ -313,6 +332,11 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
             _midAmplitudes.value = smoothMidOut.copyOf()
             _highAmplitudes.value = smoothHighOut.copyOf()
             _combinedAmplitudes.value = smoothCombinedOut.copyOf()
+            
+            val maxAmp = smoothCombinedOut.maxOrNull() ?: 0f
+            if (maxAmp > 0.05f) {
+                lastAudioTime = System.currentTimeMillis()
+            }
             
             _bassGhosts.value = bassGhosts.copyOf()
             _midGhosts.value = midGhosts.copyOf()

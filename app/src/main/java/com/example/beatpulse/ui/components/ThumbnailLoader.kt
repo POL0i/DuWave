@@ -413,3 +413,39 @@ fun Color.toArgb(): Int {
         (blue * 255).toInt()
     )
 }
+
+@Composable
+fun rememberStreamAvatar(uri: String?): ImageBitmap? {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var bitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
+    
+    LaunchedEffect(uri) {
+        withContext(Dispatchers.IO) {
+            try {
+                if (!uri.isNullOrEmpty()) {
+                    val parsedUri = android.net.Uri.parse(uri)
+                    context.contentResolver.openInputStream(parsedUri)?.use { stream ->
+                        val decoded = BitmapFactory.decodeStream(stream)
+                        if (decoded != null) {
+                            bitmap = decoded.asImageBitmap()
+                        }
+                    }
+                }
+                
+                if (bitmap == null) {
+                    val defaultLogo = BitmapFactory.decodeResource(context.resources, com.example.beatpulse.R.mipmap.ic_launcher)
+                    if (defaultLogo != null) {
+                        bitmap = defaultLogo.asImageBitmap()
+                    }
+                }
+            } catch (e: Exception) {
+                val defaultLogo = BitmapFactory.decodeResource(context.resources, com.example.beatpulse.R.mipmap.ic_launcher)
+                if (defaultLogo != null) {
+                    bitmap = defaultLogo.asImageBitmap()
+                }
+            }
+        }
+    }
+    
+    return bitmap
+}
