@@ -25,7 +25,8 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import android.graphics.BitmapFactory
 import android.media.MediaMetadataRetriever
-import androidx.palette.graphics.Palette
+import com.kmpalette.palette.graphics.Palette
+import androidx.compose.ui.graphics.asImageBitmap
 import com.example.beatpulse.theme.PaletteColors
 import androidx.compose.ui.graphics.Color
 import kotlinx.coroutines.Dispatchers
@@ -503,15 +504,15 @@ class PlayerViewModel(
                 }
 
                 if (bitmap != null) {
-                    val palette = Palette.from(bitmap!!).generate()
-                    val dominantRaw = palette.getDominantColor(android.graphics.Color.DKGRAY)
+                    val palette = Palette.from(bitmap!!.asImageBitmap()).generate()
+                    val dominantRaw = (palette.dominantSwatch?.rgb ?: android.graphics.Color.DKGRAY)
                     val colors = PaletteColors(
                         dominant = Color(dominantRaw),
-                        vibrant = Color(palette.getVibrantColor(dominantRaw)),
-                        muted = Color(palette.getMutedColor(dominantRaw)),
-                        darkVibrant = Color(palette.getDarkVibrantColor(dominantRaw)),
-                        lightVibrant = Color(palette.getLightVibrantColor(dominantRaw)),
-                        darkMuted = Color(palette.getDarkMutedColor(dominantRaw))
+                        vibrant = Color((palette.vibrantSwatch?.rgb ?: dominantRaw)),
+                        muted = Color((palette.mutedSwatch?.rgb ?: dominantRaw)),
+                        darkVibrant = Color((palette.darkVibrantSwatch?.rgb ?: dominantRaw)),
+                        lightVibrant = Color((palette.lightVibrantSwatch?.rgb ?: dominantRaw)),
+                        darkMuted = Color((palette.darkMutedSwatch?.rgb ?: dominantRaw))
                     )
                     PaletteCache.put(context, track.id, colors)
                     _paletteColors.value = colors
@@ -534,15 +535,15 @@ class PlayerViewModel(
                 inputStream?.close()
 
                 if (bitmap != null) {
-                    val palette = Palette.from(bitmap).generate()
-                    val dominantRaw = palette.getDominantColor(android.graphics.Color.DKGRAY)
+                    val palette = Palette.from(bitmap.asImageBitmap()).generate()
+                    val dominantRaw = (palette.dominantSwatch?.rgb ?: android.graphics.Color.DKGRAY)
                     val colors = PaletteColors(
                         dominant = Color(dominantRaw),
-                        vibrant = Color(palette.getVibrantColor(dominantRaw)),
-                        muted = Color(palette.getMutedColor(dominantRaw)),
-                        darkVibrant = Color(palette.getDarkVibrantColor(dominantRaw)),
-                        lightVibrant = Color(palette.getLightVibrantColor(dominantRaw)),
-                        darkMuted = Color(palette.getDarkMutedColor(dominantRaw))
+                        vibrant = Color((palette.vibrantSwatch?.rgb ?: dominantRaw)),
+                        muted = Color((palette.mutedSwatch?.rgb ?: dominantRaw)),
+                        darkVibrant = Color((palette.darkVibrantSwatch?.rgb ?: dominantRaw)),
+                        lightVibrant = Color((palette.lightVibrantSwatch?.rgb ?: dominantRaw)),
+                        darkMuted = Color((palette.darkMutedSwatch?.rgb ?: dominantRaw))
                     )
                     _paletteColors.value = colors
                 }

@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
-import androidx.palette.graphics.Palette
+import com.kmpalette.palette.graphics.Palette
 import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.theme.PaletteColors
 import kotlinx.coroutines.Dispatchers
@@ -381,14 +381,14 @@ fun rememberTrackPalette(track: TrackEntity): PaletteColors {
                             val bitmap = imageBitmap.asAndroidBitmap()
                             // Usamos un bitmap pequeñito (64x64) para que Palette.generate sea instantáneo < 1ms
                             val smallBitmap = Bitmap.createScaledBitmap(bitmap, 64, 64, false)
-                            val palette = Palette.from(smallBitmap).generate()
+                            val palette = Palette.from(smallBitmap.asImageBitmap()).generate()
                             val extracted = PaletteColors(
-                                dominant = Color(palette.getDominantColor(android.graphics.Color.DKGRAY)),
-                                vibrant = Color(palette.getVibrantColor(android.graphics.Color.DKGRAY)),
-                                muted = Color(palette.getMutedColor(android.graphics.Color.DKGRAY)),
-                                darkVibrant = Color(palette.getDarkVibrantColor(android.graphics.Color.DKGRAY)),
-                                lightVibrant = Color(palette.getLightVibrantColor(android.graphics.Color.DKGRAY)),
-                                darkMuted = Color(palette.getDarkMutedColor(android.graphics.Color.DKGRAY))
+                                dominant = Color((palette.dominantSwatch?.rgb ?: android.graphics.Color.DKGRAY)),
+                                vibrant = Color((palette.vibrantSwatch?.rgb ?: android.graphics.Color.DKGRAY)),
+                                muted = Color((palette.mutedSwatch?.rgb ?: android.graphics.Color.DKGRAY)),
+                                darkVibrant = Color((palette.darkVibrantSwatch?.rgb ?: android.graphics.Color.DKGRAY)),
+                                lightVibrant = Color((palette.lightVibrantSwatch?.rgb ?: android.graphics.Color.DKGRAY)),
+                                darkMuted = Color((palette.darkMutedSwatch?.rgb ?: android.graphics.Color.DKGRAY))
                             )
                             PaletteCache.put(context, track.id, extracted)
                             colors = extracted

@@ -40,8 +40,7 @@ kotlin {
                 exclude(group = "com.github.pedroSG94.RootEncoder")
             }
             
-            // Palette API
-            implementation("androidx.palette:palette-ktx:1.0.0")
+            // Palette API (Removed, using KMPalette in commonMain)
             
             // DI
             implementation(libs.koin.android)
@@ -70,6 +69,7 @@ kotlin {
             implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.4")
             
             implementation(libs.koin.core)
+            implementation(libs.kmpalette.core)
         }
         
         desktopMain.dependencies {

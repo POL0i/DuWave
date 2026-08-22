@@ -10,7 +10,8 @@ import android.graphics.BitmapFactory
 import android.os.SystemClock
 import android.view.View
 import android.widget.RemoteViews
-import androidx.palette.graphics.Palette
+import com.kmpalette.palette.graphics.Palette
+import androidx.compose.ui.graphics.asImageBitmap
 import com.example.beatpulse.MainActivity
 import com.example.beatpulse.R
 import com.example.beatpulse.service.PlaybackService
@@ -156,8 +157,8 @@ class MediaWidgetProvider4x1 : AppWidgetProvider() {
                         views.setImageViewBitmap(R.id.widget_cover, styledBitmap)
                         
                         // Extract Palette color for dynamic background
-                        val palette = Palette.from(bitmap).generate()
-                        val dominantColor = palette.getDominantColor(0xFF222222.toInt())
+                        val palette = Palette.from(bitmap.asImageBitmap()).generate()
+                        val dominantColor = (palette.dominantSwatch?.rgb ?: 0xFF222222.toInt())
                         val bgTint = getStyleColor(bgStyle, dominantColor)
                         val bgBitmap = getWidgetBackgroundBitmap(bgStyle, bgTint)
                         views.setImageViewBitmap(R.id.widget_dynamic_bg, bgBitmap)
@@ -212,8 +213,8 @@ class MediaWidgetProvider4x1 : AppWidgetProvider() {
                         val styledBitmap = getStyledBitmap(bitmap, bgStyle)
                         views.setImageViewBitmap(R.id.widget_cover, styledBitmap)
                         
-                        val palette = Palette.from(bitmap).generate()
-                        val dominantColor = palette.getDominantColor(0xFF222222.toInt())
+                        val palette = Palette.from(bitmap.asImageBitmap()).generate()
+                        val dominantColor = (palette.dominantSwatch?.rgb ?: 0xFF222222.toInt())
                         val bgTint = getStyleColor(bgStyle, dominantColor)
                         views.setImageViewBitmap(R.id.widget_dynamic_bg, getWidgetBackgroundBitmap(bgStyle, bgTint))
                         applyTextColors(views, bgStyle)

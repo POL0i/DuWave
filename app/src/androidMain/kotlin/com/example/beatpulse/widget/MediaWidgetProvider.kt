@@ -10,7 +10,8 @@ import android.graphics.BitmapFactory
 import android.os.SystemClock
 import android.view.View
 import android.widget.RemoteViews
-import androidx.palette.graphics.Palette
+import com.kmpalette.palette.graphics.Palette
+import androidx.compose.ui.graphics.asImageBitmap
 import com.example.beatpulse.MainActivity
 import com.example.beatpulse.R
 import com.example.beatpulse.service.PlaybackService
@@ -146,8 +147,8 @@ class MediaWidgetProvider : AppWidgetProvider() {
                         views.setImageViewBitmap(R.id.widget_cover, styledBitmap)
                         
                         // Extract Palette color for dynamic background
-                        val palette = Palette.from(bitmap).generate()
-                        val dominantColor = palette.getDominantColor(0xFF222222.toInt())
+                        val palette = Palette.from(bitmap.asImageBitmap()).generate()
+                        val dominantColor = (palette.dominantSwatch?.rgb ?: 0xFF222222.toInt())
                         // Make the background color semi-transparent and dark
                         val darkenedColor = android.graphics.Color.argb(
                             200, // Alpha
