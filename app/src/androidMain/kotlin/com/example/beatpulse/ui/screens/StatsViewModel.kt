@@ -6,14 +6,11 @@ import com.example.beatpulse.data.AlbumStats
 import com.example.beatpulse.data.ArtistStats
 import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.data.TrackEntity
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 
-@HiltViewModel
-class StatsViewModel @Inject constructor(
+class StatsViewModel(
     private val repository: MusicRepository
 ) : ViewModel() {
 

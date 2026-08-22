@@ -6,13 +6,11 @@ import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.data.PreferencesManager
 import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.data.PlaylistEntity
-import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import javax.inject.Inject
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
 import android.content.IntentSender
@@ -21,9 +19,8 @@ import com.example.beatpulse.utils.DownloadHelper
 
 import com.example.beatpulse.data.OnlineMusicRepository
 
-@HiltViewModel
-class LibraryViewModel @Inject constructor(
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: android.content.Context,
+class LibraryViewModel(
+    private val context: android.content.Context,
     private val repository: MusicRepository,
     private val onlineRepository: OnlineMusicRepository,
     val prefs: PreferencesManager

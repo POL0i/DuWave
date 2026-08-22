@@ -13,25 +13,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.beatpulse.data.OnlineMusicRepository
+import org.koin.android.ext.android.inject
 import com.example.beatpulse.utils.DownloadHelper
-import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.schabi.newpipe.extractor.stream.StreamInfo
-import javax.inject.Inject
 import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.data.TrackEntity
 
-@AndroidEntryPoint
 class ShareActivity : ComponentActivity() {
 
-    @Inject
-    lateinit var onlineMusicRepository: OnlineMusicRepository
+    private val onlineMusicRepository: OnlineMusicRepository by inject()
     
-    @Inject
-    lateinit var musicRepository: MusicRepository
+    private val musicRepository: MusicRepository by inject()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

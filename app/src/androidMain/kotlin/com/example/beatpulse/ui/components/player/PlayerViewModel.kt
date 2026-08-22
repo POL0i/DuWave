@@ -34,14 +34,10 @@ import android.content.Context
 import android.content.Intent
 
 import android.annotation.SuppressLint
-import dagger.hilt.android.lifecycle.HiltViewModel
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
 
-@HiltViewModel
 @SuppressLint("StaticFieldLeak")
-class PlayerViewModel @Inject constructor(
-    @ApplicationContext private val context: Context,
+class PlayerViewModel(
+    private val context: Context,
     private val repository: MusicRepository,
     val visualizerManager: AudioVisualizerManager
 ) : ViewModel() {

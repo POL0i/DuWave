@@ -18,17 +18,14 @@ import android.os.Bundle
 import com.example.beatpulse.R
 import com.example.beatpulse.visualizer.AudioVisualizerManager
 import com.example.beatpulse.data.OnlineMusicRepository
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
-import kotlinx.coroutines.flow.StateFlow
+import org.koin.android.ext.android.inject
 import kotlinx.coroutines.runBlocking
 
-@AndroidEntryPoint
 class PlaybackService : MediaSessionService() {
 
-    @Inject lateinit var equalizerManager: EqualizerManager
-    @Inject lateinit var visualizerManager: AudioVisualizerManager
-    @Inject lateinit var onlineRepository: OnlineMusicRepository
+    private val equalizerManager: EqualizerManager by inject()
+    private val visualizerManager: AudioVisualizerManager by inject()
+    private val onlineRepository: OnlineMusicRepository by inject()
 
     private var mediaSession: MediaSession? = null
     private var exoPlayer: ExoPlayer? = null

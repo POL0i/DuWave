@@ -38,7 +38,7 @@ fun AudioTrimmerDialog(
     onDismiss: () -> Unit,
     onTrimSuccess: (String) -> Unit = {},
     playerViewModel: com.example.beatpulse.ui.components.player.PlayerViewModel = 
-        androidx.hilt.navigation.compose.hiltViewModel()
+        org.koin.androidx.compose.koinViewModel()
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()

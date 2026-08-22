@@ -68,26 +68,27 @@ import com.example.beatpulse.ui.components.player.PlayerViewModel
 import com.example.beatpulse.ui.components.player.PlayerViewModelFactory
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
-import androidx.hilt.navigation.compose.hiltViewModel
+
+
+import org.koin.android.ext.android.inject
+import org.koin.androidx.viewmodel.ext.android.viewModel
 import java.util.concurrent.atomic.AtomicBoolean
+
 object NavigationKeys {
     const val LIBRARY = "library"
     const val FOLDERS = "folders"
     const val PLAYER = "player"
 }
 
-@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    @Inject lateinit var visualizerManager: AudioVisualizerManager
-    @Inject lateinit var prefs: PreferencesManager
-    @Inject lateinit var musicRepository: MusicRepository
-    @Inject lateinit var equalizerManager: com.example.beatpulse.service.EqualizerManager
+    private val visualizerManager: AudioVisualizerManager by inject()
+    private val prefs: PreferencesManager by inject()
+    private val musicRepository: MusicRepository by inject()
+    private val equalizerManager: com.example.beatpulse.service.EqualizerManager by inject()
 
-    private val playerViewModel: com.example.beatpulse.ui.components.player.PlayerViewModel by viewModels()
-    private val libraryViewModel: com.example.beatpulse.ui.screens.LibraryViewModel by viewModels()
+    private val playerViewModel: com.example.beatpulse.ui.components.player.PlayerViewModel by viewModel()
+    private val libraryViewModel: com.example.beatpulse.ui.screens.LibraryViewModel by viewModel()
     private val isSetupDone = AtomicBoolean(false)
     
     private val downloadReceiver = object : android.content.BroadcastReceiver() {
@@ -217,19 +218,15 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         playerViewModel.isUiVisible = true
-        if (::visualizerManager.isInitialized) {
-            visualizerManager.isEnabled = true
-            visualizerManager.start(0)
-        }
+        visualizerManager.isEnabled = true
+        visualizerManager.start(0)
     }
 
     override fun onPause() {
         super.onPause()
         playerViewModel.isUiVisible = false
-        if (::visualizerManager.isInitialized) {
-            visualizerManager.isEnabled = false
-            visualizerManager.stop(decay = false)
-        }
+        visualizerManager.isEnabled = false
+        visualizerManager.stop(decay = false)
     }
 
     override fun onDestroy() {
@@ -293,10 +290,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (::visualizerManager.isInitialized) {
-            // Only stop with decay; the visualizer will be restarted in onStart()
-            visualizerManager.stop()
-        }
+        // Only stop with decay; the visualizer will be restarted in onStart()
+        visualizerManager.stop()
     }
 }
 

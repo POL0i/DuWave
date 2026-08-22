@@ -1,7 +1,7 @@
 package com.example.beatpulse.data
 
 import android.content.Context
-import dagger.hilt.android.qualifiers.ApplicationContext
+
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -9,12 +9,8 @@ import org.json.JSONObject
 import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
-import javax.inject.Inject
-import javax.inject.Singleton
-
-@Singleton
-class OnlineMusicRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+class OnlineMusicRepository(
+    private val context: Context
 ) {
     private var apiKey = ""
     private var searchClient = JSONObject()

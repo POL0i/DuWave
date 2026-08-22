@@ -37,7 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
+
 import com.example.beatpulse.data.PreferencesManager
 import com.example.beatpulse.theme.PaletteColors
 import com.example.beatpulse.ui.components.rememberAlbumArt
@@ -50,7 +50,7 @@ fun StatsScreen(
     paletteColors: PaletteColors,
     prefs: PreferencesManager
 ) {
-    val viewModel: StatsViewModel = hiltViewModel()
+    val viewModel: StatsViewModel = org.koin.androidx.compose.koinViewModel()
     val state by viewModel.state.collectAsState()
 
     var visible by remember { mutableStateOf(false) }
