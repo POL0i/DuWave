@@ -23,6 +23,9 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateColor
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.animation.core.*
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.Paint
@@ -894,6 +897,25 @@ private fun ColumnScope.PlayerVisualizerArea(
         modifier = Modifier
             .then(areaModifier)
             .fillMaxWidth()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                            event.changes.forEach { it.consume() }
+                            val touchY = event.changes.first().position.y
+                            if (touchY > size.height * 0.7f) {
+                                // Bottom section: Open Playlist
+                                onShowQueue()
+                            } else {
+                                // Upper section: Next track
+                                exoPlayer?.seekToNext()
+                                if (prefs.showGestureConfirmations) coroutineScope.launch { onFeedbackNextTrack(true); delay(400); onFeedbackNextTrack(false) }
+                            }
+                        }
+                    }
+                }
+            }
             .pointerInput(abRepeatModeEnabled) {
                 detectDragGestures(
                     onDragStart = { currentDragAction = DragAction.NONE; lastAngle = null; accumulatedAngle = 0f; dragSeekTimeMs = exoPlayer?.currentPosition },

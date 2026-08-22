@@ -36,6 +36,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.activity.compose.BackHandler
 import kotlinx.coroutines.launch
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
 import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.data.PreferencesManager
 import com.example.beatpulse.data.TrackEntity
@@ -399,7 +402,19 @@ fun UnifiedLibraryScreen(
 
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while(true) {
+                                val event = awaitPointerEvent()
+                                if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                                    event.changes.forEach { it.consume() }
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                                    }
+                                }
+                            }
+                        }
+                    }
                 ) { page ->
                     when (page % 4) {
                         0 -> ListsSubPage(
