@@ -2,7 +2,7 @@ package com.example.beatpulse.utils
 
 import java.io.File
 
-data class LyricLine(val timeMs: Long, val text: String)
+
 
 object LrcParser {
     fun parseLrcFile(lrcFile: File): List<LyricLine> {

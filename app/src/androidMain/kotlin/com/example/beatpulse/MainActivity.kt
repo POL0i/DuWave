@@ -66,6 +66,7 @@ import com.example.beatpulse.visualizer.AudioVisualizerManager
 import com.example.beatpulse.data.PreferencesManager
 import com.example.beatpulse.ui.components.player.PlayerViewModel
 import com.example.beatpulse.ui.components.player.PlayerViewModelFactory
+import com.example.beatpulse.player.ExoPlayerAdapter
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 
@@ -83,7 +84,7 @@ object NavigationKeys {
 class MainActivity : ComponentActivity() {
 
     private val visualizerManager: AudioVisualizerManager by inject()
-    private val prefs: PreferencesManager by inject()
+    private val prefs: com.example.beatpulse.data.AppPreferences by inject()
     private val musicRepository: MusicRepository by inject()
     private val equalizerManager: com.example.beatpulse.service.EqualizerManager by inject()
 
@@ -299,7 +300,7 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     visualizerManager: AudioVisualizerManager,
     equalizerManager: com.example.beatpulse.service.EqualizerManager,
-    prefs: PreferencesManager,
+    prefs: com.example.beatpulse.data.AppPreferences,
     libraryViewModel: com.example.beatpulse.ui.screens.LibraryViewModel,
     playerViewModel: PlayerViewModel
 ) {
@@ -368,6 +369,7 @@ fun MainScreen(
         }
     }
 
+    val appPlayer = remember(exoPlayer) { exoPlayer?.let { com.example.beatpulse.player.ExoPlayerAdapter(it) } }
     val content: @Composable () -> Unit = {
         var accumulatedDrag by remember { mutableFloatStateOf(0f) }
         Scaffold(
@@ -390,8 +392,12 @@ fun MainScreen(
                         accentColor = accentColor,
                         paletteColors = paletteColors,
                         bgStyle = bgStyle,
-                        prefs = prefs,
-                        exoPlayer = exoPlayer,
+                        hasUsedMiniplayerGesture = prefs.hasUsedMiniplayerGesture,
+                        onMiniplayerGestureUsed = { prefs.hasUsedMiniplayerGesture = true },
+                        hasSeenTutorial = prefs.hasSeenTutorial,
+                        currentPos = exoPlayer?.currentPosition ?: 0L,
+                        duration = exoPlayer?.duration ?: 1L,
+                        albumArtBitmap = currentTrack?.let { com.example.beatpulse.ui.components.rememberAlbumArt(it) },
                         onPlayPauseClick = { if (exoPlayer?.isPlaying == true) exoPlayer?.pause() else exoPlayer?.play() }
                     )
                 }
@@ -453,7 +459,7 @@ fun MainScreen(
                             visualizerManager = visualizerManager,
                             equalizerManager = equalizerManager,
                             state = com.example.beatpulse.ui.components.player.PlayerScreenState(
-                                exoPlayer = exoPlayer,
+                                appPlayer = appPlayer,
                                 currentTrack = currentTrack,
                                 currentQueue = currentQueue,
                                 paletteColors = paletteColors,

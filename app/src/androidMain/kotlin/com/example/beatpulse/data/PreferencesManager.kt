@@ -8,7 +8,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.channels.BufferOverflow
 
-class PreferencesManager private constructor(context: Context) {
+class PreferencesManager private constructor(context: Context) : AppPreferences {
     private val appContext = context.applicationContext
     private val prefs: SharedPreferences = appContext.getSharedPreferences("beatpulse_prefs", Context.MODE_PRIVATE)
 
@@ -39,178 +39,178 @@ class PreferencesManager private constructor(context: Context) {
         }
     }
 
-    var appLanguage: String
+    override var appLanguage: String
         get() = prefs.getString(KEY_LANGUAGE, "es") ?: "es"
         set(value) = prefs.edit().putString(KEY_LANGUAGE, value).apply()
 
-    var visualizerStyle: String
+    override var visualizerStyle: String
         get() = prefs.getString("visualizerStyle", "BARS") ?: "BARS"
         set(value) = prefs.edit().putString("visualizerStyle", value).apply()
 
-    var visualizerArchetype: Int
+    override var visualizerArchetype: Int
         get() = prefs.getInt("visualizerArchetype", 0) // 0 = Overlapped, 1 = Segmented
         set(value) = prefs.edit().putInt("visualizerArchetype", value).apply()
 
-    var visualizerFftMode: String
+    override var visualizerFftMode: String
         get() = prefs.getString("visualizerFftMode", "MAX") ?: "MAX"
         set(value) = prefs.edit().putString("visualizerFftMode", value).apply()
 
-    var isAdvancedMode: Boolean
+    override var isAdvancedMode: Boolean
         get() = prefs.getBoolean("isAdvancedMode", true)
         set(value) = prefs.edit().putBoolean("isAdvancedMode", value).apply()
 
-    var visualizerBandsMode: Int
+    override var visualizerBandsMode: Int
         get() = prefs.getInt("visualizerBandsMode", 3) // 3 bands by default
         set(value) = prefs.edit().putInt("visualizerBandsMode", value).apply()
 
-    var filterMode: String
+    override var filterMode: String
         get() = prefs.getString("filterMode", "ALL") ?: "ALL"
         set(value) = prefs.edit().putString("filterMode", value).apply()
 
-    var physicsMode: String
+    override var physicsMode: String
         get() = prefs.getString("physicsMode", "EQUILIBRADO") ?: "EQUILIBRADO"
         set(value) = prefs.edit().putString("physicsMode", value).apply()
 
-    var filterWhatsAppShorts: Boolean
+    override var filterWhatsAppShorts: Boolean
         get() = prefs.getBoolean("filterWhatsAppShorts", true)
         set(value) = prefs.edit().putBoolean("filterWhatsAppShorts", value).apply()
 
-    var sensitivity: Float
+    override var sensitivity: Float
         get() = prefs.getFloat("sensitivity", 0.8f)
         set(value) = prefs.edit().putFloat("sensitivity", value).apply()
 
-    var reactivity: Float
+    override var reactivity: Float
         get() = prefs.getFloat("reactivity", 0.8f)
         set(value) = prefs.edit().putFloat("reactivity", value).apply()
 
-    var bassMultiplier: Float
+    override var bassMultiplier: Float
         get() = prefs.getFloat("bassMultiplier", 2.2f)
         set(value) = prefs.edit().putFloat("bassMultiplier", value).apply()
 
-    var midMultiplier: Float
+    override var midMultiplier: Float
         get() = prefs.getFloat("midMultiplier", 1.2f)
         set(value) = prefs.edit().putFloat("midMultiplier", value).apply()
 
-    var trebleMultiplier: Float
+    override var trebleMultiplier: Float
         get() = prefs.getFloat("trebleMultiplier", 0.8f)
         set(value) = prefs.edit().putFloat("trebleMultiplier", value).apply()
 
-    var usePerBandMultiplier: Boolean
+    override var usePerBandMultiplier: Boolean
         get() = prefs.getBoolean("usePerBandMultiplier", false)
         set(value) = prefs.edit().putBoolean("usePerBandMultiplier", value).apply()
 
-    var lastMainScreenPage: Int
+    override var lastMainScreenPage: Int
         get() = prefs.getInt("lastMainScreenPage", 0)
         set(value) = prefs.edit().putInt("lastMainScreenPage", value).apply()
 
-    var lastLibraryTab: Int
+    override var lastLibraryTab: Int
         get() = prefs.getInt("lastLibraryTab", 0)
         set(value) = prefs.edit().putInt("lastLibraryTab", value).apply()
 
-    var lastLibraryGeneralTab: Int
+    override var lastLibraryGeneralTab: Int
         get() = prefs.getInt("lastLibraryGeneralTab", 0)
         set(value) = prefs.edit().putInt("lastLibraryGeneralTab", value).apply()
 
-    var shuffleModeEnabled: Boolean
+    override var shuffleModeEnabled: Boolean
         get() = prefs.getBoolean(KEY_SHUFFLE_MODE, false)
         set(value) = prefs.edit().putBoolean(KEY_SHUFFLE_MODE, value).apply()
 
-    var repeatMode: Int
+    override var repeatMode: Int
         get() = prefs.getInt(KEY_REPEAT_MODE, androidx.media3.common.Player.REPEAT_MODE_OFF)
         set(value) = prefs.edit().putInt(KEY_REPEAT_MODE, value).apply()
 
-    var eqEnabled: Boolean
+    override var eqEnabled: Boolean
         get() = prefs.getBoolean("eqEnabled", false)
         set(value) = prefs.edit().putBoolean("eqEnabled", value).apply()
 
-    var eqPreset: Short
+    override var eqPreset: Short
         get() = prefs.getInt(KEY_PRESET, -1).toShort()
         set(value) = prefs.edit().putInt(KEY_PRESET, value.toInt()).apply()
 
-    var eqCustomBands: String
+    override var eqCustomBands: String
         get() = prefs.getString("eqCustomBands", "") ?: ""
         set(value) = prefs.edit().putString("eqCustomBands", value).apply()
 
-    var eqAutoMode: Boolean
+    override var eqAutoMode: Boolean
         get() = prefs.getBoolean("eqAutoMode", false)
         set(value) = prefs.edit().putBoolean("eqAutoMode", value).apply()
 
-    var lastPlayedTrackPath: String?
+    override var lastPlayedTrackPath: String?
         get() = prefs.getString("lastPlayedTrackPath", null)
         set(value) = prefs.edit().putString("lastPlayedTrackPath", value).apply()
 
-    var hasSeenTutorial: Boolean
+    override var hasSeenTutorial: Boolean
         get() = prefs.getBoolean("hasSeenTutorial", false)
         set(value) = prefs.edit().putBoolean("hasSeenTutorial", value).apply()
 
-    var hasSeenBottomBarHint: Boolean
+    override var hasSeenBottomBarHint: Boolean
         get() = prefs.getBoolean("hasSeenBottomBarHint", false)
         set(value) = prefs.edit().putBoolean("hasSeenBottomBarHint", value).apply()
 
-    var hasSeenPlayerHints: Boolean
+    override var hasSeenPlayerHints: Boolean
         get() = prefs.getBoolean("hasSeenPlayerHints", false)
         set(value) = prefs.edit().putBoolean("hasSeenPlayerHints", value).apply()
 
-    var hasUsedMiniplayerGesture: Boolean
+    override var hasUsedMiniplayerGesture: Boolean
         get() = prefs.getBoolean("hasUsedMiniplayerGesture", false)
         set(value) = prefs.edit().putBoolean("hasUsedMiniplayerGesture", value).apply()
 
-    var hasUsedCoverGesture: Boolean
+    override var hasUsedCoverGesture: Boolean
         get() = prefs.getBoolean("hasUsedCoverGesture", false)
         set(value) = prefs.edit().putBoolean("hasUsedCoverGesture", value).apply()
 
-    var hasUsedPlaylistGesture: Boolean
+    override var hasUsedPlaylistGesture: Boolean
         get() = prefs.getBoolean("hasUsedPlaylistGesture", false)
         set(value) = prefs.edit().putBoolean("hasUsedPlaylistGesture", value).apply()
 
-    var albumArtCenterY: Float
+    override var albumArtCenterY: Float
         get() = prefs.getFloat(KEY_ALBUM_ART_CENTER_Y, -1f)
         set(value) = prefs.edit().putFloat(KEY_ALBUM_ART_CENTER_Y, value).apply()
 
-    var showGestureFeedback: Boolean
+    override var showGestureFeedback: Boolean
         get() = prefs.getBoolean("showGestureFeedback", true)
         set(value) = prefs.edit().putBoolean("showGestureFeedback", value).apply()
 
-    var librarySortOrder: String
+    override var librarySortOrder: String
         get() = prefs.getString("librarySortOrder", "DIRECTORY") ?: "DIRECTORY"
         set(value) = prefs.edit().putString("librarySortOrder", value).apply()
 
-    var libraryScrollIndex: Int
+    override var libraryScrollIndex: Int
         get() = prefs.getInt("libraryScrollIndex", 0)
         set(value) = prefs.edit().putInt("libraryScrollIndex", value).apply()
 
-    var libraryScrollOffset: Int
+    override var libraryScrollOffset: Int
         get() = prefs.getInt("libraryScrollOffset", 0)
         set(value) = prefs.edit().putInt("libraryScrollOffset", value).apply()
 
-    var playbackSpeed: Float
+    override var playbackSpeed: Float
         get() = prefs.getFloat("playbackSpeed", 1.0f)
         set(value) = prefs.edit().putFloat("playbackSpeed", value).apply()
 
-    var playbackPitch: Float
+    override var playbackPitch: Float
         get() = prefs.getFloat("playbackPitch", 1.0f)
         set(value) = prefs.edit().putFloat("playbackPitch", value).apply()
 
-    var reverbEnabled: Boolean
+    override var reverbEnabled: Boolean
         get() = prefs.getBoolean("reverbEnabled", false)
         set(value) = prefs.edit().putBoolean("reverbEnabled", value).apply()
 
-    var effectsPreset: String
+    override var effectsPreset: String
         get() = prefs.getString("effectsPreset", "NORMAL") ?: "NORMAL"
         set(value) = prefs.edit().putString("effectsPreset", value).apply()
 
-    var lastRecommendationsTimestamp: Long
+    override var lastRecommendationsTimestamp: Long
         get() = prefs.getLong("lastRecommendationsTimestamp", 0L)
         set(value) = prefs.edit().putLong("lastRecommendationsTimestamp", value).apply()
 
-    var cachedRecommendationsJson: String
+    override var cachedRecommendationsJson: String
         get() = prefs.getString("cachedRecommendationsJson", "") ?: ""
         set(value) = prefs.edit().putString("cachedRecommendationsJson", value).apply()
 
     private val _backgroundStyleFlow = MutableStateFlow(prefs.getInt("backgroundStyle", 0))
-    val backgroundStyleFlow: StateFlow<Int> = _backgroundStyleFlow
+    override val backgroundStyleFlow: StateFlow<Int> = _backgroundStyleFlow
 
-    var backgroundStyle: Int
+    override var backgroundStyle: Int
         get() = prefs.getInt("backgroundStyle", 0)
         set(value) {
             prefs.edit().putInt("backgroundStyle", value).apply()
@@ -224,46 +224,46 @@ class PreferencesManager private constructor(context: Context) {
         }
 
     private val _thumbnailShapeFlow = MutableStateFlow(prefs.getInt("thumbnailShape", 0))
-    val thumbnailShapeFlow: StateFlow<Int> = _thumbnailShapeFlow
+    override val thumbnailShapeFlow: StateFlow<Int> = _thumbnailShapeFlow
 
-    var thumbnailShape: Int
+    override var thumbnailShape: Int
         get() = prefs.getInt("thumbnailShape", 0)
         set(value) {
             prefs.edit().putInt("thumbnailShape", value).apply()
             _thumbnailShapeFlow.value = value
         }
     private val _toastFlow = MutableSharedFlow<String>(extraBufferCapacity = 5, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    val toastFlow: SharedFlow<String> = _toastFlow
+    override val toastFlow: SharedFlow<String> = _toastFlow
 
-    fun showToast(message: String) {
+    override fun showToast(message: String) {
         _toastFlow.tryEmit(message)
     }
 
-    var autoAnalyzeLyrics: Boolean
+    override var autoAnalyzeLyrics: Boolean
         get() = prefs.getBoolean(KEY_AUTO_ANALYZE_LYRICS, false)
         set(value) = prefs.edit().putBoolean(KEY_AUTO_ANALYZE_LYRICS, value).apply()
         
-    var hasUsedNextPrevGesture: Boolean
+    override var hasUsedNextPrevGesture: Boolean
         get() = prefs.getBoolean(KEY_USED_NEXT_PREV, false)
         set(value) = prefs.edit().putBoolean(KEY_USED_NEXT_PREV, value).apply()
 
-    var hasUsedSeek10sGesture: Boolean
+    override var hasUsedSeek10sGesture: Boolean
         get() = prefs.getBoolean(KEY_USED_SEEK_10S, false)
         set(value) = prefs.edit().putBoolean(KEY_USED_SEEK_10S, value).apply()
 
-    var hasUsedVinylSeekGesture: Boolean
+    override var hasUsedVinylSeekGesture: Boolean
         get() = prefs.getBoolean(KEY_USED_VINYL_SEEK, false)
         set(value) = prefs.edit().putBoolean(KEY_USED_VINYL_SEEK, value).apply()
 
-    var hasUsedPlaylistSwipeGesture: Boolean
+    override var hasUsedPlaylistSwipeGesture: Boolean
         get() = prefs.getBoolean(KEY_USED_PLAYLIST_SWIPE, false)
         set(value) = prefs.edit().putBoolean(KEY_USED_PLAYLIST_SWIPE, value).apply()
 
-    var showGestureConfirmations: Boolean
+    override var showGestureConfirmations: Boolean
         get() = prefs.getBoolean(KEY_SHOW_GESTURE_CONFIRM, true)
         set(value) = prefs.edit().putBoolean(KEY_SHOW_GESTURE_CONFIRM, value).apply()
 
-    var streamAvatarUri: String?
+    override var streamAvatarUri: String?
         get() = prefs.getString("streamAvatarUri", null)
         set(value) = prefs.edit().putString("streamAvatarUri", value).apply()
 }

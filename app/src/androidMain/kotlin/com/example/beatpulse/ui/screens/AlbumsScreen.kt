@@ -32,7 +32,7 @@ import com.example.beatpulse.ui.components.PixelIcons
 
 @Composable
 fun AlbumsScreen(
-    viewModel: LibraryViewModel,
+    viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
     paletteColors: PaletteColors,
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
 ) {
@@ -457,7 +457,7 @@ fun PlaylistFolderItem(
 
 @Composable
 fun CreatePlaylistScreen(
-    viewModel: LibraryViewModel,
+    viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
     allTracks: List<TrackEntity>,
     dynamicTextColor: androidx.compose.ui.graphics.Color,
     paletteColors: PaletteColors,
@@ -564,7 +564,7 @@ fun CreatePlaylistScreen(
 
 @Composable
 fun AddTracksScreen(
-    viewModel: LibraryViewModel,
+    viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
     playlistId: Long,
     allTracks: List<TrackEntity>,
     dynamicTextColor: androidx.compose.ui.graphics.Color,

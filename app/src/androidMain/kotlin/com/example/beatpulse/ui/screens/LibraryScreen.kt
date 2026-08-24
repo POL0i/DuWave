@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.data.TrackEntity
+import com.example.beatpulse.ui.viewmodels.PlaylistViewData
 import com.example.beatpulse.ui.screens.LibraryViewModel
 import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.animateColorAsState
@@ -63,7 +64,7 @@ import androidx.compose.animation.core.RepeatMode
 
 @Composable
 fun LibraryScreen(
-    viewModel: LibraryViewModel,
+    viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
     paletteColors: com.example.beatpulse.theme.PaletteColors,
     currentPlayingTrack: TrackEntity?,
     isPlaying: Boolean,
@@ -97,18 +98,14 @@ fun LibraryScreen(
     var trackToDelete by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingTrim by remember { mutableStateOf<TrackEntity?>(null) }
 
-    val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            trackToDelete?.let { track ->
-                viewModel.completeDeletion(track.id)
-                prefs.showToast(context.getString(com.example.beatpulse.R.string.track_deleted))
-                viewModel.scanMediaStore()
-            }
+    val deleteLauncher = com.example.beatpulse.ui.utils.rememberTrackDeleteHandler(onDeleted = {
+        trackToDelete?.let { track ->
+            viewModel.completeDeletion(track.id)
+            prefs.showToast(context.getString(com.example.beatpulse.R.string.track_deleted))
+            viewModel.scanMediaStore()
         }
         trackToDelete = null
-    }
+    })
 
     val isSearchingOnline = selectedTabIndex == 1
     val onlineSearchResults by viewModel.onlineSearchResults.collectAsState()
@@ -496,7 +493,7 @@ fun LibraryScreen(
                             val sender = viewModel.deleteTrack(t.id)
                             if (sender != null) {
                                 trackToDelete = t
-                                deleteLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
+                                deleteLauncher(t.id, sender)
                             } else {
                                 prefs.showToast(context.getString(com.example.beatpulse.R.string.track_deleted))
                                 viewModel.scanMediaStore()
@@ -533,7 +530,7 @@ fun LibraryScreen(
                 confirmButton = {
                     TextButton(onClick = {
                         trackPendingDownload = null
-                        viewModel.downloadOnlineTrack(context, track)
+                        viewModel.downloadOnlineTrack(track)
                         prefs.showToast(context.getString(com.example.beatpulse.R.string.toast_downloading, track.title))
                     }) {
                         Text(stringResource(R.string.download), color = colorVibrant)
@@ -751,7 +748,7 @@ fun TrackItem(
 @Composable
 fun ChangeCoverDialog(
     track: TrackEntity,
-    viewModel: LibraryViewModel,
+    viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
     paletteColors: com.example.beatpulse.theme.PaletteColors,
     onDismiss: () -> Unit,
     onCoverSelected: (String) -> Unit

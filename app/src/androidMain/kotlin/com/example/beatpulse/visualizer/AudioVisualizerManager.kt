@@ -15,6 +15,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlin.math.abs
 import kotlin.math.hypot
 import com.example.beatpulse.data.PreferencesManager
+import com.example.beatpulse.data.AppPreferences
+import com.example.beatpulse.visualizer.AppVisualizerManager
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -23,17 +25,9 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import androidx.core.content.ContextCompat
 import java.nio.ByteBuffer
-enum class FilterMode {
-    ALL, BASS, MIDS, TREBLE
-}
 
-enum class PhysicsMode {
-    SUAVE,       // Smooth gliding — very low reactivity, slow ghost decay
-    EQUILIBRADO, // Balanced — medium reactivity, moderate ghost decay
-    VIOLENTO     // Aggressive — high reactivity, fast ghost decay
-}
 
-class AudioVisualizerManager(private val prefs: PreferencesManager) {
+class AudioVisualizerManager(private val prefs: AppPreferences) : AppVisualizerManager {
 
     private val BARS_COUNT = 180
     private val BASS_COUNT = BARS_COUNT / 3
@@ -41,13 +35,13 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
     private val HIGH_COUNT = BARS_COUNT - (BASS_COUNT + MID_COUNT)
 
     private val _bassAmplitudes = MutableStateFlow<FloatArray>(FloatArray(0))
-    val bassAmplitudes: StateFlow<FloatArray> = _bassAmplitudes.asStateFlow()
+    override val bassAmplitudes: StateFlow<FloatArray> = _bassAmplitudes.asStateFlow()
 
     private val _midAmplitudes = MutableStateFlow<FloatArray>(FloatArray(0))
-    val midAmplitudes: StateFlow<FloatArray> = _midAmplitudes.asStateFlow()
+    override val midAmplitudes: StateFlow<FloatArray> = _midAmplitudes.asStateFlow()
 
     private val _highAmplitudes = MutableStateFlow<FloatArray>(FloatArray(0))
-    val highAmplitudes: StateFlow<FloatArray> = _highAmplitudes.asStateFlow()
+    override val highAmplitudes: StateFlow<FloatArray> = _highAmplitudes.asStateFlow()
 
     val amplitudes: StateFlow<FloatArray> = _bassAmplitudes.asStateFlow()
 
@@ -64,7 +58,7 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
     private val smoothCombinedOut = FloatArray(BARS_COUNT)
     private val combinedGhosts = FloatArray(BARS_COUNT)
     private val _combinedAmplitudes = MutableStateFlow(FloatArray(0))
-    val combinedAmplitudes: StateFlow<FloatArray> = _combinedAmplitudes.asStateFlow()
+    override val combinedAmplitudes: StateFlow<FloatArray> = _combinedAmplitudes.asStateFlow()
     private val _combinedGhosts = MutableStateFlow(FloatArray(0))
     val combinedGhostsState: StateFlow<FloatArray> = _combinedGhosts.asStateFlow()
     
@@ -98,18 +92,18 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
     private var isRecording = false
     private var recordJob: kotlinx.coroutines.Job? = null
 
-    var isAdvancedMode = MutableStateFlow(prefs.isAdvancedMode)
-    var visualizerArchetype = MutableStateFlow(prefs.visualizerArchetype)
-    var filterMode = MutableStateFlow(runCatching { FilterMode.valueOf(prefs.filterMode) }.getOrDefault(FilterMode.ALL))
+    override var isAdvancedMode = MutableStateFlow(prefs.isAdvancedMode)
+    override var visualizerArchetype = MutableStateFlow(prefs.visualizerArchetype)
+    override var filterMode = MutableStateFlow(runCatching { FilterMode.valueOf(prefs.filterMode) }.getOrDefault(FilterMode.ALL))
     var physicsMode = MutableStateFlow(runCatching { PhysicsMode.valueOf(prefs.physicsMode) }.getOrDefault(PhysicsMode.EQUILIBRADO))
-    var sensitivity = MutableStateFlow(prefs.sensitivity)
-    var reactivity = MutableStateFlow(prefs.reactivity)
+    override var sensitivity = MutableStateFlow(prefs.sensitivity)
+    override var reactivity = MutableStateFlow(prefs.reactivity)
 
-    var fftMode = MutableStateFlow(prefs.visualizerFftMode)
+    override var fftMode = MutableStateFlow(prefs.visualizerFftMode)
 
-    var bassMultiplier = MutableStateFlow(prefs.bassMultiplier)
-    var midMultiplier = MutableStateFlow(prefs.midMultiplier)
-    var trebleMultiplier = MutableStateFlow(prefs.trebleMultiplier)
+    override var bassMultiplier = MutableStateFlow(prefs.bassMultiplier)
+    override var midMultiplier = MutableStateFlow(prefs.midMultiplier)
+    override var trebleMultiplier = MutableStateFlow(prefs.trebleMultiplier)
     
     val isSilent = MutableStateFlow(true)
     private var lastAudioTime = System.currentTimeMillis()
@@ -118,15 +112,16 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
         processFftMagnitudes(magnitudes)
     }
 
-    fun start(audioSessionId: Int) {
+    override fun start(audioSessionId: Int) {
         // FFT is now passive via ExoPlayer's TeeAudioProcessor.
         // We just stop any decay jobs.
         decayJob?.cancel()
         startSilenceDetector()
     }
 
-    fun startMicMode(context: Context) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+    override fun startMicMode(context: Any) {
+        val androidContext = context as Context
+        if (ContextCompat.checkSelfPermission(androidContext, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             Log.e("AudioVisualizerManager", "No RECORD_AUDIO permission")
             return
         }
@@ -176,7 +171,7 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
         }
     }
 
-    fun stopMicMode() {
+    override fun stopMicMode() {
         isRecording = false
         fftSink.isMicModeActive = false
         recordJob?.cancel()
@@ -201,7 +196,7 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
         }
     }
 
-    var isEnabled = true
+    override var isEnabled = true
 
     private fun rebuildLookupTables(numMagnitudes: Int) {
         if (numMagnitudes == cachedMagnitudeSize) return
@@ -365,6 +360,7 @@ class AudioVisualizerManager(private val prefs: PreferencesManager) {
         }
     }
 
+    override fun stop() { stop(true) }
     fun stop(decay: Boolean = true) {
         try {
             decayJob?.cancel()

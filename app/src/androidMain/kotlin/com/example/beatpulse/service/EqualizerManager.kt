@@ -4,19 +4,20 @@ import android.media.audiofx.Equalizer
 import com.example.beatpulse.data.PreferencesManager
 import kotlinx.coroutines.flow.MutableStateFlow
 
-class EqualizerManager(private val prefs: PreferencesManager) {
+class EqualizerManager(private val prefs: com.example.beatpulse.data.AppPreferences) : com.example.beatpulse.player.AppEqualizerManager {
 
     private var equalizer: Equalizer? = null
     private val lock = Any()
-    val isEnabled = MutableStateFlow(prefs.eqEnabled)
-    val currentPreset = MutableStateFlow(prefs.eqPreset)
-    val isAutoMode = MutableStateFlow(prefs.eqAutoMode)
+    override val numBands: Int get() = bands.value.size
+    override val isEnabled = MutableStateFlow(prefs.eqEnabled)
+    override val currentPreset = MutableStateFlow(prefs.eqPreset)
+    override val isAutoMode = MutableStateFlow(prefs.eqAutoMode)
     
-    val bands = MutableStateFlow<List<Short>>(emptyList())
-    val bandLevels = MutableStateFlow<Map<Short, Short>>(emptyMap())
-    val presets = MutableStateFlow<List<Pair<Short, String>>>(emptyList())
-    val minLevel = MutableStateFlow<Short>(0)
-    val maxLevel = MutableStateFlow<Short>(0)
+    override val bands = MutableStateFlow<List<Short>>(emptyList())
+    override val bandLevels = MutableStateFlow<Map<Short, Short>>(emptyMap())
+    override val presets = MutableStateFlow<List<Pair<Short, String>>>(emptyList())
+    override val minLevel = MutableStateFlow<Short>(0)
+    override val maxLevel = MutableStateFlow<Short>(0)
 
     fun initialize(audioSessionId: Int) {
         if (audioSessionId == 0 || audioSessionId == -1) return
@@ -73,7 +74,7 @@ class EqualizerManager(private val prefs: PreferencesManager) {
         updateBandLevels()
     }
 
-    fun setEnabled(enabled: Boolean) {
+    override fun setEnabled(enabled: Boolean) {
         isEnabled.value = enabled
         prefs.eqEnabled = enabled
         synchronized(lock) {
@@ -81,7 +82,7 @@ class EqualizerManager(private val prefs: PreferencesManager) {
         }
     }
 
-    fun setPreset(preset: Short) {
+    override fun setPreset(preset: Short) {
         isAutoMode.value = false
         prefs.eqAutoMode = false
         currentPreset.value = preset
@@ -94,7 +95,7 @@ class EqualizerManager(private val prefs: PreferencesManager) {
         }
     }
 
-    fun setBandLevel(band: Short, level: Short) {
+    override fun setBandLevel(band: Short, level: Short) {
         isAutoMode.value = false
         prefs.eqAutoMode = false
         synchronized(lock) {
@@ -106,7 +107,7 @@ class EqualizerManager(private val prefs: PreferencesManager) {
         }
     }
 
-    fun setAutoMode(enabled: Boolean) {
+    override fun setAutoMode(enabled: Boolean) {
         isAutoMode.value = enabled
         prefs.eqAutoMode = enabled
         if (enabled) {
@@ -164,7 +165,7 @@ class EqualizerManager(private val prefs: PreferencesManager) {
         prefs.eqCustomBands = bandsStr
     }
     
-    fun getCenterFreq(band: Short): Int {
+    override fun getCenterFreq(band: Short): Int {
         synchronized(lock) {
             return equalizer?.getCenterFreq(band) ?: 0
         }

@@ -42,16 +42,16 @@ import androidx.compose.ui.input.pointer.isSecondaryPressed
 import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.data.PreferencesManager
 import com.example.beatpulse.data.TrackEntity
+import com.example.beatpulse.ui.viewmodels.PlaylistViewData
 import com.example.beatpulse.theme.PaletteColors
 import com.example.beatpulse.ui.components.PixelIcons
 import com.example.beatpulse.ui.screens.LibraryViewModel
 
-data class PlaylistViewData(val title: String, val tracks: List<TrackEntity>, val playlistId: Long? = null, val filterType: Int? = null, val filterValue: String? = null)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun UnifiedLibraryScreen(
-    viewModel: LibraryViewModel,
+    viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
     paletteColors: PaletteColors,
     currentPlayingTrack: TrackEntity?,
     isPlaying: Boolean,
@@ -96,18 +96,14 @@ fun UnifiedLibraryScreen(
     var trackPendingTrim by remember { mutableStateOf<TrackEntity?>(null) }
     var showStats by remember { mutableStateOf(false) }
     
-    val deleteLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult()
-    ) { result ->
-        if (result.resultCode == android.app.Activity.RESULT_OK) {
-            trackToDelete?.let { track ->
-                viewModel.completeDeletion(track.id)
-                prefs.showToast(context.getString(com.example.beatpulse.R.string.track_deleted))
-                viewModel.scanMediaStore()
-            }
+    val deleteLauncher = com.example.beatpulse.ui.utils.rememberTrackDeleteHandler(onDeleted = {
+        trackToDelete?.let { track ->
+            viewModel.completeDeletion(track.id)
+            prefs.showToast(context.getString(com.example.beatpulse.R.string.track_deleted))
+            viewModel.scanMediaStore()
         }
         trackToDelete = null
-    }
+    })
 
     // Global Search State
     var globalSearchQuery by remember { mutableStateOf("") }
@@ -728,7 +724,7 @@ fun UnifiedLibraryScreen(
                                     val sender = viewModel.deleteTrack(t.id)
                                     if (sender != null) {
                                         trackToDelete = t
-                                        deleteLauncher.launch(androidx.activity.result.IntentSenderRequest.Builder(sender).build())
+                                        deleteLauncher(t.id, sender)
                                     } else {
                                         prefs.showToast(context.getString(com.example.beatpulse.R.string.track_deleted))
                                         viewModel.scanMediaStore()
@@ -763,7 +759,7 @@ fun ListsSubPage(
     dynamicTextColor: Color,
     onPlaylistSelected: (PlaylistViewData) -> Unit,
     onCreatePlaylist: () -> Unit,
-    viewModel: LibraryViewModel
+    viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     LazyColumn(

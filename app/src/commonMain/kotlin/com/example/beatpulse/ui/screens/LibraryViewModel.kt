@@ -3,7 +3,7 @@ package com.example.beatpulse.ui.screens
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.beatpulse.data.MusicRepository
-import com.example.beatpulse.data.PreferencesManager
+import com.example.beatpulse.data.IOnlineMusicRepository
 import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.data.PlaylistEntity
 import kotlinx.coroutines.flow.Flow
@@ -13,61 +13,62 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
-import android.content.IntentSender
-import android.content.Context
-import com.example.beatpulse.utils.DownloadHelper
 
-import com.example.beatpulse.data.OnlineMusicRepository
+import com.example.beatpulse.ui.viewmodels.ILibraryViewModel
+import com.example.beatpulse.ui.viewmodels.PlaylistViewData
+import com.example.beatpulse.data.ILibraryPlatformHelper
 
 class LibraryViewModel(
-    private val context: android.content.Context,
+    private val platformHelper: ILibraryPlatformHelper,
     private val repository: MusicRepository,
-    private val onlineRepository: OnlineMusicRepository,
-    val prefs: PreferencesManager
-) : ViewModel() {
+    private val onlineRepository: IOnlineMusicRepository,
+    override val prefs: com.example.beatpulse.data.AppPreferences
+) : ViewModel(), ILibraryViewModel {
 
-    val selectedUnifiedCategory = MutableStateFlow(0)
-    val selectedUnifiedGroup = MutableStateFlow<String?>(null)
+    override val selectedUnifiedCategory = MutableStateFlow(0)
+    override val selectedUnifiedGroup = MutableStateFlow<String?>(null)
     
-    val resolvingTracks = MutableStateFlow<Set<Long>>(emptySet())
+    override val resolvingTracks = MutableStateFlow<Set<Long>>(emptySet())
 
-    val allTracks: StateFlow<List<TrackEntity>> = repository.allTracksFlow
+    override val allTracks: StateFlow<List<TrackEntity>> = repository.allTracksFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val recentTracks: StateFlow<List<TrackEntity>> = repository.recentTracksFlow
+    override val recentTracks: StateFlow<List<TrackEntity>> = repository.recentTracksFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val topTracks: StateFlow<List<TrackEntity>> = repository.topPlayedFlow
+    override val topTracks: StateFlow<List<TrackEntity>> = repository.topPlayedFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val recentlyAdded: StateFlow<List<TrackEntity>> = repository.recentlyAddedFlow
+    override val recentlyAdded: StateFlow<List<TrackEntity>> = repository.recentlyAddedFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val favoriteTracks: StateFlow<List<TrackEntity>> = repository.favoritesFlow
+    override val favoriteTracks: StateFlow<List<TrackEntity>> = repository.favoritesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val playlists: StateFlow<List<PlaylistEntity>> = repository.playlistsFlow
+    override val playlists: StateFlow<List<PlaylistEntity>> = repository.playlistsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val isScanning: StateFlow<Boolean> = repository.isScanning
+    override val isScanning: StateFlow<Boolean> = repository.isScanning
 
-    fun scanMediaStore() {
+    override fun scanMediaStore() {
         viewModelScope.launch {
-            repository.scanMediaStore()
+            repository.scanLocalLibrary() // Use the new generic method
         }
     }
 
-    fun copyMetadataForTrimmedTrack(originalTrack: TrackEntity, newFilePath: String) {
+    override fun pickFolderAndScan() {
+        platformHelper.pickFolder { folderPath ->
+            viewModelScope.launch {
+                repository.scanLocalLibrary(folderPath)
+            }
+        }
+    }
+
+    override fun copyMetadataForTrimmedTrack(originalTrack: TrackEntity, newFilePath: String) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            // Escanear el archivo nuevo
-            android.media.MediaScannerConnection.scanFile(
-                context,
-                arrayOf(newFilePath),
-                null // Auto-detect mime type (supports .opus, .m4a, etc)
-            ) { _, _ ->
+            platformHelper.scanFileToSystem(newFilePath) {
                 viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                    // Refrescar DB
-                    repository.scanMediaStore()
+                    repository.scanLocalLibrary()
                     // Buscar la nueva pista y actualizar su metadata
                     var newTrack: TrackEntity? = null
                     // Room's Flow might take a moment to emit the new list, retry up to 3 times
@@ -92,76 +93,74 @@ class LibraryViewModel(
         }
     }
 
-    fun toggleFavorite(track: com.example.beatpulse.data.TrackEntity, isFavorite: Boolean) {
+    override fun toggleFavorite(track: com.example.beatpulse.data.TrackEntity, isFavorite: Boolean) {
         viewModelScope.launch {
             repository.insertOrUpdateTrack(track)
             repository.toggleFavorite(track.id, isFavorite)
         }
     }
 
-    suspend fun deleteTrack(trackId: Long): IntentSender? {
+    override suspend fun deleteTrack(trackId: Long): Any? {
         return repository.deleteTrack(trackId)
     }
 
-    fun completeDeletion(trackId: Long) {
+    override fun completeDeletion(trackId: Long) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             repository.completeDeletion(trackId)
         }
     }
 
-    fun updateTrackCover(track: TrackEntity, newCoverPath: String?) {
+    override fun updateTrackCover(track: TrackEntity, newCoverPath: String?) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             repository.updateTrackMetadata(track.id, track.title, track.artist, track.album, newCoverPath)
-            // Invalidar el caché actual del thumbnail viejo
-            com.example.beatpulse.ui.components.ThumbnailCache.invalidateTrack(context, track)
             // Hacer un rescan para forzar la actualización en la interfaz
             scanMediaStore()
         }
     }
 
-    fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) {
+    override fun removeTrackFromPlaylist(playlistId: Long, trackId: Long) {
         viewModelScope.launch {
             repository.removeTrackFromPlaylist(playlistId, trackId)
         }
     }
 
-    fun addTrackToPlaylist(playlistId: Long, track: com.example.beatpulse.data.TrackEntity) {
+    override fun addTrackToPlaylist(playlistId: Long, track: com.example.beatpulse.data.TrackEntity) {
         viewModelScope.launch {
             repository.insertOrUpdateTrack(track)
             repository.addTrackToPlaylist(playlistId, track.id)
         }
     }
     
-    suspend fun createPlaylist(name: String): Long {
+    override suspend fun createPlaylist(name: String): Long {
         return repository.createPlaylist(name)
     }
 
-    fun getTracksForPlaylist(playlistId: Long): Flow<List<TrackEntity>> {
+    override fun getTracksForPlaylist(playlistId: Long): Flow<List<TrackEntity>> {
         return repository.getTracksForPlaylist(playlistId)
     }
 
-    fun updatePlaylistOrder(playlistId: Long, updates: List<Pair<Long, Int>>) {
+    override fun updatePlaylistOrder(playlistId: Long, updates: List<Pair<Long, Int>>) {
         viewModelScope.launch {
             repository.updatePlaylistOrder(playlistId, updates)
         }
     }
 
-    fun getPlaylistTrackCountFlow(playlistId: Long): Flow<Int> {
+    override fun getPlaylistTrackCountFlow(playlistId: Long): Flow<Int> {
         return repository.getPlaylistTrackCountFlow(playlistId)
     }
 
-    val searchQuery = MutableStateFlow("")
-    val onlineSearchResults = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val isOnlineSearchLoading = MutableStateFlow(false)
+    override val searchQuery = MutableStateFlow("")
+    override val onlineSearchResults = MutableStateFlow<List<TrackEntity>>(emptyList())
+    override val isOnlineSearchLoading = MutableStateFlow(false)
 
-    val recommendations = MutableStateFlow<Map<String, List<TrackEntity>>>(emptyMap())
-    val isRecommendationsLoading = MutableStateFlow(false)
-    val selectedViewData = androidx.compose.runtime.mutableStateOf<PlaylistViewData?>(null)
+    override val recommendations = MutableStateFlow<Map<String, List<TrackEntity>>>(emptyMap())
+    override val isRecommendationsLoading = MutableStateFlow(false)
+    override val selectedViewData = androidx.compose.runtime.mutableStateOf<PlaylistViewData?>(null)
 
-    val changeCoverSearchResults = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val isChangeCoverLoading = MutableStateFlow(false)
+    override val changeCoverSearchResults = MutableStateFlow<List<TrackEntity>>(emptyList())
+    override val isChangeCoverLoading = MutableStateFlow(false)
 
-    fun searchCoversForTrack(track: TrackEntity) {
+    override fun searchCoversForTrack(track: TrackEntity) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             isChangeCoverLoading.value = true
             try {
@@ -175,7 +174,7 @@ class LibraryViewModel(
         }
     }
 
-    fun loadRecommendations(forceUpdate: Boolean = false) {
+    override fun loadRecommendations(forceUpdate: Boolean) {
         if (!forceUpdate && recommendations.value.isNotEmpty()) return
         
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
@@ -187,40 +186,10 @@ class LibraryViewModel(
 
                 val timeSinceLast = now - lastTime
                 
-                if (cachedJson.isNotEmpty() && timeSinceLast < 24 * 60 * 60 * 1000L && !forceUpdate) {
-                    try {
-                        val map = mutableMapOf<String, List<TrackEntity>>()
-                        val jsonObject = org.json.JSONObject(cachedJson)
-                        val keys = jsonObject.keys()
-                        while (keys.hasNext()) {
-                            val key = keys.next()
-                            val array = jsonObject.getJSONArray(key)
-                            val list = mutableListOf<TrackEntity>()
-                            for (i in 0 until array.length()) {
-                                val item = array.getJSONObject(i)
-                                list.add(
-                                    TrackEntity(
-                                        id = item.getLong("id"),
-                                        title = item.getString("title"),
-                                        artist = item.getString("artist"),
-                                        album = item.getString("album"),
-                                        duration = item.getLong("duration"),
-                                        dataPath = item.getString("dataPath"),
-                                        folderPath = item.getString("folderPath"),
-                                        customCoverPath = if (item.has("customCoverPath")) item.getString("customCoverPath") else null,
-                                        dateAdded = item.getLong("dateAdded"),
-                                        isFavorite = item.getBoolean("isFavorite")
-                                    )
-                                )
-                            }
-                            map[key] = list
-                        }
-                        recommendations.value = map
-                        return@launch
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-                }
+                // Caching with JSON is temporarily disabled in KMP until kotlinx.serialization is added
+                // if (cachedJson.isNotEmpty() && timeSinceLast < 24 * 60 * 60 * 1000L && !forceUpdate) {
+                //     ...
+                // }
 
                 val topArtists = repository.getTopArtistsByPlayCount()
                 val topTracks = repository.getTop5Tracks()
@@ -247,38 +216,15 @@ class LibraryViewModel(
                 val trendingResults: List<TrackEntity> = try { filterNew(onlineRepository.searchOnlineMusic(trendingQuery)) } catch (e: Exception) { emptyList() }
                 
                 val newMap: Map<String, List<TrackEntity>> = mapOf(
-                    (if (artistName != null) context.getString(com.example.beatpulse.R.string.because_you_listened, artistName) else context.getString(com.example.beatpulse.R.string.top_artists)) to artistResults,
-                    (if (trackName != null) context.getString(com.example.beatpulse.R.string.based_on, trackName) else context.getString(com.example.beatpulse.R.string.for_you)) to similarResults,
-                    context.getString(com.example.beatpulse.R.string.trending_music) to trendingResults
+                    (if (artistName != null) platformHelper.getLocalizedString("because_you_listened", artistName) else platformHelper.getLocalizedString("top_artists")) to artistResults,
+                    (if (trackName != null) platformHelper.getLocalizedString("based_on", trackName) else platformHelper.getLocalizedString("for_you")) to similarResults,
+                    platformHelper.getLocalizedString("trending_music") to trendingResults
                 )
                 recommendations.value = newMap
 
-                try {
-                    val jsonObject = org.json.JSONObject()
-                    for ((key, list) in newMap) {
-                        val array = org.json.JSONArray()
-                        for (track in list) {
-                            val trackObj = org.json.JSONObject().apply {
-                                put("id", track.id)
-                                put("title", track.title)
-                                put("artist", track.artist)
-                                put("album", track.album)
-                                put("duration", track.duration)
-                                put("dataPath", track.dataPath)
-                                put("folderPath", track.folderPath)
-                                put("customCoverPath", track.customCoverPath ?: "")
-                                put("dateAdded", track.dateAdded)
-                                put("isFavorite", track.isFavorite)
-                            }
-                            array.put(trackObj)
-                        }
-                        jsonObject.put(key, array)
-                    }
-                    prefs.cachedRecommendationsJson = jsonObject.toString()
-                    prefs.lastRecommendationsTimestamp = now
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
+                // try {
+                //     // caching to json
+                // } catch (e: Exception) { ... }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -287,20 +233,19 @@ class LibraryViewModel(
         }
     }
 
-    suspend fun searchOnlineMusic(query: String): List<TrackEntity> {
+    override suspend fun searchOnlineMusic(query: String): List<TrackEntity> {
         return onlineRepository.searchOnlineMusic(query)
     }
 
-    suspend fun resolveStreamUrl(videoId: String): String? {
+    override suspend fun resolveStreamUrl(videoId: String): String? {
         return onlineRepository.getStreamUrl(videoId)
     }
 
-    fun downloadOnlineTrack(context: Context, track: TrackEntity) {
+    override fun downloadOnlineTrack(track: TrackEntity) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 resolvingTracks.value += track.id
-                val localizedContext = context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply { setLocale(java.util.Locale(prefs.appLanguage)) })
-                prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.toast_fetching_link, track.title))
+                prefs.showToast(platformHelper.getLocalizedString("toast_fetching_link", track.title))
                 // El dataPath viene como youtube://videoId|...
                 val videoId = track.dataPath.removePrefix("youtube://").substringBefore("|")
                 val url = onlineRepository.getStreamUrl(videoId)
@@ -311,8 +256,7 @@ class LibraryViewModel(
                     // Descargar la miniatura offline
                     if (coverUrl != null && (coverUrl.startsWith("http://") || coverUrl.startsWith("https://"))) {
                         try {
-                            val coversDir = java.io.File(context.filesDir, "covers")
-                            if (!coversDir.exists()) coversDir.mkdirs()
+                            val coversDir = java.io.File(platformHelper.getCoversDir())
                             val destFile = java.io.File(coversDir, "cover_${System.currentTimeMillis()}.jpg")
                             java.net.URL(coverUrl).openStream().use { input ->
                                 destFile.outputStream().use { output ->
@@ -333,30 +277,26 @@ class LibraryViewModel(
                     repository.insertTrack(trackToSave)
                     
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        DownloadHelper.downloadTrack(
-                            context = context,
+                        platformHelper.downloadTrack(
                             streamUrl = url,
                             title = track.customTitle ?: track.title,
                             artist = track.customArtist ?: track.artist
                         )
-                        val localizedContext = context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply { setLocale(java.util.Locale(prefs.appLanguage)) })
-                        prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.toast_download_started, track.title))
+                        prefs.showToast(platformHelper.getLocalizedString("toast_download_started", track.title))
                     }
                 } else {
-                    val localizedContext = context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply { setLocale(java.util.Locale(prefs.appLanguage)) })
-                    prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.toast_download_failed_link, track.title))
+                    prefs.showToast(platformHelper.getLocalizedString("toast_download_failed_link", track.title))
                 }
             } catch (e: Exception) {
                 e.printStackTrace()
-                val localizedContext = context.createConfigurationContext(android.content.res.Configuration(context.resources.configuration).apply { setLocale(java.util.Locale(prefs.appLanguage)) })
-                prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.toast_download_error, track.title))
+                prefs.showToast(platformHelper.getLocalizedString("toast_download_error", track.title))
             } finally {
                 resolvingTracks.value -= track.id
             }
         }
     }
 
-    fun reloadMissingCoversForList(list: List<TrackEntity>) {
+    override fun reloadMissingCoversForList(list: List<TrackEntity>) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             var processed = 0
             val tracksWithoutCover = list.filter { 
@@ -368,21 +308,13 @@ class LibraryViewModel(
 
             if (tracksWithoutCover.isEmpty()) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    val locale = java.util.Locale(prefs.appLanguage)
-                    val config = android.content.res.Configuration(context.resources.configuration)
-                    config.setLocale(locale)
-                    val localizedContext = context.createConfigurationContext(config)
-                    prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.covers_reloaded))
+                    prefs.showToast(platformHelper.getLocalizedString("covers_reloaded"))
                 }
                 return@launch
             }
 
             kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                val locale = java.util.Locale(prefs.appLanguage)
-                val config = android.content.res.Configuration(context.resources.configuration)
-                config.setLocale(locale)
-                val localizedContext = context.createConfigurationContext(config)
-                prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.reloading_covers_progress, 0, tracksWithoutCover.size))
+                prefs.showToast(platformHelper.getLocalizedString("reloading_covers_progress", 0, tracksWithoutCover.size))
             }
 
             for (track in tracksWithoutCover) {
@@ -398,8 +330,7 @@ class LibraryViewModel(
                         // Descargar portada para guardarla localmente
                         if (coverUrl.startsWith("http://") || coverUrl.startsWith("https://")) {
                             try {
-                                val coversDir = java.io.File(context.filesDir, "covers")
-                                if (!coversDir.exists()) coversDir.mkdirs()
+                                val coversDir = java.io.File(platformHelper.getCoversDir())
                                 val destFile = java.io.File(coversDir, "cover_reloaded_${System.currentTimeMillis()}.jpg")
                                 java.net.URL(coverUrl).openStream().use { input ->
                                     destFile.outputStream().use { output ->
@@ -426,11 +357,7 @@ class LibraryViewModel(
                 processed++
                 if (processed % 5 == 0 || processed == tracksWithoutCover.size) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                        val locale = java.util.Locale(prefs.appLanguage)
-                        val config = android.content.res.Configuration(context.resources.configuration)
-                        config.setLocale(locale)
-                        val localizedContext = context.createConfigurationContext(config)
-                        prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.reloading_covers_progress, processed, tracksWithoutCover.size))
+                        prefs.showToast(platformHelper.getLocalizedString("reloading_covers_progress", processed, tracksWithoutCover.size))
                     }
                 }
             }

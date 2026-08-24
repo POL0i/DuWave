@@ -45,6 +45,7 @@ kotlin {
             // DI
             implementation(libs.koin.android)
             implementation(libs.koin.androidx.compose)
+            implementation("io.coil-kt:coil-compose:2.6.0")
         }
         
         commonMain.dependencies {
@@ -55,12 +56,11 @@ kotlin {
             implementation(compose.components.resources)
             implementation(compose.components.uiToolingPreview)
             
-            implementation(libs.androidx.lifecycle.viewmodel.compose)
-            implementation(libs.androidx.lifecycle.runtime.compose)
+            implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
+            implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
             
-            implementation("androidx.navigation:navigation-compose:2.8.0")
-            implementation("androidx.compose.material:material-icons-extended:1.6.0")
-            implementation("io.coil-kt:coil-compose:2.6.0")
+            implementation("org.jetbrains.androidx.navigation:navigation-compose:2.8.0-alpha10")
+            implementation(compose.materialIconsExtended)
             
             implementation("androidx.room:room-runtime:2.7.0-alpha13")
             
@@ -75,6 +75,21 @@ kotlin {
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.1")
+            implementation("org.xerial:sqlite-jdbc:3.45.1.0")
+            implementation("net.jthink:jaudiotagger:3.0.1")
+            implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
+        }
+    }
+}
+
+compose.desktop {
+    application {
+        mainClass = "MainKt"
+        nativeDistributions {
+            modules("java.sql")
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb)
+            packageName = "DuWave"
+            packageVersion = "2.0.1"
         }
     }
 }

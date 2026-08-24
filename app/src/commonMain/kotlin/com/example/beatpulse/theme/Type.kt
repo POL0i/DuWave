@@ -6,7 +6,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.unit.sp
-import com.example.beatpulse.R
 
 // Set of Material typography styles to start with
 val Typography =
@@ -20,7 +19,7 @@ val Typography =
         letterSpacing = 0.5.sp,
       )
     )
-val VT323 = FontFamily(Font(R.font.vt323))
+val VT323 = FontFamily.Default
 
 val PixelTypography = Typography(
     bodyLarge = TextStyle(

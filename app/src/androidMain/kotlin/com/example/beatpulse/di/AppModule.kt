@@ -15,9 +15,12 @@ import org.koin.dsl.module
 import com.example.beatpulse.data.OnlineMusicRepository
 
 val appModule = module {
+    single<com.example.beatpulse.data.AppPreferences> { PreferencesManager.getInstance(androidContext()) }
     single { PreferencesManager.getInstance(androidContext()) }
-    single { AppDatabase.getDatabase(androidContext()) }
-    single { MusicRepository(androidContext()) }
+    single<com.example.beatpulse.data.ILibraryPlatformHelper> { com.example.beatpulse.data.AndroidLibraryPlatformHelper(androidContext()) }
+    single { com.example.beatpulse.data.getAppDatabase(androidContext()) }
+    single<com.example.beatpulse.data.ILibraryScanner> { com.example.beatpulse.data.AndroidLibraryScanner(androidContext(), get<com.example.beatpulse.data.AppDatabase>().trackDao()) }
+    single { MusicRepository(get(), get(), get()) }
     single { OnlineMusicRepository(androidContext()) }
     single { AudioVisualizerManager(get()) }
     single { EqualizerManager(get()) }

@@ -330,7 +330,7 @@ object PaletteCache {
 }
 
 @Composable
-fun rememberAlbumArt(track: TrackEntity): ImageBitmap? {
+actual fun rememberAlbumArt(track: TrackEntity): ImageBitmap? {
     val context = androidx.compose.ui.platform.LocalContext.current
     val initialBitmap = ThumbnailCache.thumbCache.get(track.id)
     var bitmap by remember(track) { mutableStateOf<ImageBitmap?>(initialBitmap) }

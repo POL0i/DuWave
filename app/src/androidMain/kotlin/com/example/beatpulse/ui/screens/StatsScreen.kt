@@ -48,7 +48,7 @@ import java.util.Locale
 @Composable
 fun StatsScreen(
     paletteColors: PaletteColors,
-    prefs: PreferencesManager
+    prefs: com.example.beatpulse.data.AppPreferences
 ) {
     val viewModel: StatsViewModel = org.koin.androidx.compose.koinViewModel()
     val state by viewModel.state.collectAsState()

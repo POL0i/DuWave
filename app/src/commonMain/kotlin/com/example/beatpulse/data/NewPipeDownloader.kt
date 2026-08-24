@@ -4,7 +4,7 @@ import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
 import org.schabi.newpipe.extractor.downloader.Response
 import okhttp3.OkHttpClient
-import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.RequestBody
 import java.util.concurrent.TimeUnit
 
 class NewPipeDownloader private constructor(builder: OkHttpClient.Builder) : Downloader() {
@@ -34,7 +34,7 @@ class NewPipeDownloader private constructor(builder: OkHttpClient.Builder) : Dow
 
         var requestBody: okhttp3.RequestBody? = null
         if (dataToSend != null) {
-            requestBody = dataToSend.toRequestBody()
+            requestBody = RequestBody.create(null, dataToSend)
         }
 
         val requestBuilder = okhttp3.Request.Builder()
@@ -48,17 +48,20 @@ class NewPipeDownloader private constructor(builder: OkHttpClient.Builder) : Dow
         }
 
         val response = client.newCall(requestBuilder.build()).execute()
-        val body = response.body?.string() ?: ""
+        val body = response.body()?.string() ?: ""
 
         // Map OkHttp Response to NewPipeExtractor Response
         val responseHeaders = mutableMapOf<String, List<String>>()
-        for ((name, value) in response.headers) {
+        val headersObj = response.headers()
+        for (i in 0 until headersObj.size()) {
+            val name = headersObj.name(i)
+            val value = headersObj.value(i)
             val list = responseHeaders.getOrPut(name) { mutableListOf() } as MutableList<String>
             list.add(value)
         }
 
-        val latestUrl = response.request.url.toString()
+        val latestUrl = response.request().url().toString()
 
-        return Response(response.code, response.message, responseHeaders, body, latestUrl)
+        return Response(response.code(), response.message(), responseHeaders, body, latestUrl)
     }
 }
