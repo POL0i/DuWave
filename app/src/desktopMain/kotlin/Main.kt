@@ -2,13 +2,13 @@ package com.example.beatpulse
 
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import com.example.beatpulse.ui.screens.DesktopAppScreen
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.key
-import com.example.beatpulse.di.DummyAppPreferences
-import com.example.beatpulse.di.DummyVisualizerManager
-import com.example.beatpulse.audio.RealDesktopEqualizerManager
+import com.example.beatpulse.DummyAppPreferences
+import com.example.beatpulse.RealDesktopEqualizerManager
+import com.example.beatpulse.DesktopPlayerViewModel
+import com.example.beatpulse.RealDesktopVisualizerManager
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.res.painterResource
@@ -21,8 +21,6 @@ import com.example.beatpulse.ui.screens.LibraryViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import com.example.beatpulse.player.DesktopPlayerAdapter
-import com.example.beatpulse.ui.components.player.DesktopPlayerViewModel
 import com.example.beatpulse.data.OnlineMusicRepository
 import org.schabi.newpipe.extractor.NewPipe
 import com.example.beatpulse.data.NewPipeDownloader
@@ -37,19 +35,13 @@ fun main() = application {
     val libraryScanner = DesktopLibraryScanner(db.trackDao())
     val musicRepository = MusicRepository(db, libraryScanner, prefs)
     val onlineRepository = OnlineMusicRepository()
-    val platformHelper = DesktopLibraryPlatformHelper()
-    val libraryViewModel = LibraryViewModel(platformHelper, musicRepository, onlineRepository, prefs)
+    val platformHelper = com.example.beatpulse.data.DesktopLibraryPlatformHelper()
+    val libraryViewModel = com.example.beatpulse.ui.screens.LibraryViewModel(platformHelper, musicRepository, onlineRepository, prefs)
+    val playerViewModel = DesktopPlayerViewModel()
+    val statsViewModel = com.example.beatpulse.ui.screens.StatsViewModel(musicRepository)
     
-    val appPlayer = DesktopPlayerAdapter()
-    val playerViewModel = DesktopPlayerViewModel(appPlayer, musicRepository, prefs)
-    
-    val visualizerManager = com.example.beatpulse.visualizer.RealDesktopVisualizerManager()
+    val visualizerManager = RealDesktopVisualizerManager()
     val equalizerManager = RealDesktopEqualizerManager()
-
-    appPlayer.equalizerManager = equalizerManager
-    appPlayer.audioDataCallback = { buffer ->
-        visualizerManager.processAudioBytes(buffer)
-    }
 
     val trayState = rememberTrayState()
     Tray(
@@ -62,7 +54,7 @@ fun main() = application {
             )
             Item(
                 "Siguiente",
-                onClick = { playerViewModel.playNext() }
+                onClick = { playerViewModel.seekToNext() }
             )
             Separator()
             Item(
@@ -80,11 +72,11 @@ fun main() = application {
                 if (keyEvent.isAltPressed) {
                     when (keyEvent.key) {
                         androidx.compose.ui.input.key.Key.DirectionRight -> {
-                            playerViewModel.playNext()
+                            playerViewModel.seekToNext()
                             true
                         }
                         androidx.compose.ui.input.key.Key.DirectionLeft -> {
-                            playerViewModel.playPrevious()
+                            playerViewModel.seekToPrevious()
                             true
                         }
                         else -> false
@@ -96,13 +88,15 @@ fun main() = application {
             } else false
         }
     ) {
-        DesktopAppScreen(
+        com.example.beatpulse.theme.BeatPulseTheme { com.example.beatpulse.ui.AppScreen(
             prefs = prefs,
             libraryViewModel = libraryViewModel,
             playerViewModel = playerViewModel,
+            statsViewModel = statsViewModel,
             visualizerManager = visualizerManager,
             equalizerManager = equalizerManager,
-            appPlayer = appPlayer
+            
         )
     }
+}
 }
