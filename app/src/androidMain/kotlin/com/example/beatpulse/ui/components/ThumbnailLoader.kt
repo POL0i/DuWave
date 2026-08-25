@@ -1,4 +1,5 @@
 package com.example.beatpulse.ui.components
+import kotlinx.coroutines.sync.withLock
 
 import android.content.ContentUris
 import android.content.Context
@@ -44,6 +45,8 @@ object ThumbnailCache {
 
     @Volatile
     var isPriorityLoading = false
+
+    private val loadMutexes = java.util.concurrent.ConcurrentHashMap<Long, kotlinx.coroutines.sync.Mutex>()
 
     fun getTrackFingerprint(track: TrackEntity): String {
         return Math.abs((track.title + track.artist + track.album + track.duration + (track.customCoverPath ?: "")).hashCode()).toString()
@@ -109,6 +112,8 @@ object ThumbnailCache {
     }
 
     suspend fun loadThumbnail(context: Context, track: TrackEntity): ImageBitmap? = withContext(Dispatchers.IO) {
+        val mutex = loadMutexes.getOrPut(track.id) { kotlinx.coroutines.sync.Mutex() }
+        mutex.withLock {
         if (noArtSet.contains(track.id)) return@withContext null
         thumbCache.get(track.id)?.let { return@withContext it }
 
@@ -185,6 +190,7 @@ object ThumbnailCache {
             e.printStackTrace()
         }
         null
+        }
     }
 
     private fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
@@ -201,6 +207,8 @@ object ThumbnailCache {
     }
 
     suspend fun loadFullArt(context: Context, track: TrackEntity): ImageBitmap? = withContext(Dispatchers.IO) {
+        val mutex = loadMutexes.getOrPut(track.id) { kotlinx.coroutines.sync.Mutex() }
+        mutex.withLock {
         if (noArtSet.contains(track.id)) return@withContext null
         fullCache.get(track.id)?.let { return@withContext it }
 
@@ -277,6 +285,7 @@ object ThumbnailCache {
             isPriorityLoading = false
         }
         null
+        }
     }
 }
 

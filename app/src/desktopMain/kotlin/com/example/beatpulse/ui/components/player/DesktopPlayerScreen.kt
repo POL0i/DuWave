@@ -96,6 +96,7 @@ import com.example.beatpulse.ui.components.player.VisualizerStyle
 import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.visualizer.AppVisualizerManager
 import com.example.beatpulse.ui.components.PixelIcons
+import com.example.beatpulse.di.PlayerSupportDialog
 import kotlinx.coroutines.delay
 
 class Spark(var x: Float, var y: Float, var vx: Float, var vy: Float, var alpha: Float, val color: Color)
@@ -165,8 +166,8 @@ fun DesktopPlayerScreen(
     visualizerManager: com.example.beatpulse.visualizer.AppVisualizerManager,
     equalizerManager: com.example.beatpulse.player.AppEqualizerManager,
     playerViewModel: com.example.beatpulse.player.IPlayerViewModel,
-    state: PlayerScreenState,
-    callbacks: PlayerScreenCallbacks,
+    state: DesktopPlayerScreenState,
+    callbacks: DesktopPlayerScreenCallbacks,
     modifier: Modifier = Modifier
 ) {
     BoxWithConstraints(modifier = modifier.fillMaxSize()) {
@@ -190,8 +191,8 @@ private fun PlayerScreenContent(
     visualizerManager: AppVisualizerManager,
     equalizerManager: com.example.beatpulse.player.AppEqualizerManager,
     playerViewModel: com.example.beatpulse.player.IPlayerViewModel,
-    state: PlayerScreenState,
-    callbacks: PlayerScreenCallbacks,
+    state: DesktopPlayerScreenState,
+    callbacks: DesktopPlayerScreenCallbacks,
     isLandscape: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -442,15 +443,12 @@ private fun PlayerScreenContent(
                     showLyrics = showLyrics,
                     onToggleLyrics = { showLyrics = !showLyrics },
                     onShowSupport = { showSupportDialog = true },
-                    onAddToPlaylist = { currentTrack?.let { onAddToPlaylist(it) } },
+                    
                     onToggleMicMode = {
-                        if (callbacks.onRequestMicPermission != null) {
-                            callbacks.onRequestMicPermission.invoke()
-                        } else {
-                            playerViewModel.toggleMicMode()
-                        }
+                        playerViewModel.toggleMicMode()
                     },
-                    onShowStreamConfig = { showStreamConfigDialog = true }
+                    onShowStreamConfig = { showStreamConfigDialog = true },
+                    onAddToPlaylist = { currentTrack?.let { onAddToPlaylist(it) } }
                 )
                 
                 // Lyrics Overlay
@@ -497,6 +495,7 @@ private fun PlayerScreenContent(
             Box(modifier = Modifier.weight(0.55f).fillMaxHeight()) {
                 Column(modifier = Modifier.fillMaxSize()) {
                     PlayerVisualizerArea(
+                        playerViewModel = playerViewModel,
                         areaModifier = Modifier.fillMaxSize(),
                         isLandscape = isLandscape,
                         isMicModeActive = isMicModeActive,
@@ -589,20 +588,18 @@ private fun PlayerScreenContent(
                     showLyrics = showLyrics,
                     onToggleLyrics = { showLyrics = !showLyrics },
                     onShowSupport = { showSupportDialog = true },
-                    onAddToPlaylist = { currentTrack?.let { onAddToPlaylist(it) } },
+                    
                     onToggleMicMode = {
-                        if (callbacks.onRequestMicPermission != null) {
-                            callbacks.onRequestMicPermission.invoke()
-                        } else {
-                            playerViewModel.toggleMicMode()
-                        }
+                        playerViewModel.toggleMicMode()
                     },
-                    onShowStreamConfig = { showStreamConfigDialog = true }
+                    onShowStreamConfig = { showStreamConfigDialog = true },
+                    onAddToPlaylist = { currentTrack?.let { onAddToPlaylist(it) } }
                 )
             }
 
             // Visualizer area with gestures
             PlayerVisualizerArea(
+                        playerViewModel = playerViewModel,
                 areaModifier = if (isMicModeCleanUI) Modifier.fillMaxSize() else if (isLandscape) Modifier.height(350.dp) else Modifier.weight(1f),
                 isLandscape = isLandscape,
                 isMicModeActive = isMicModeActive,
@@ -712,75 +709,7 @@ private fun PlayerScreenContent(
     }
 
     // --- DIALOGS (each in its own composable = own register scope) ---
-    PlayerTimerDialog(showTimerDialog = showTimerDialog, onDismissRequest = { showTimerDialog = false }, colorVibrant = colorVibrant, colorDominant = colorDominant, sleepTimerSeconds = sleepTimerSeconds, onSetSleepTimer = onSetSleepTimer)
-    PlayerEqDialog(showEqDialog = showEqDialog, onDismissRequest = { showEqDialog = false }, colorVibrant = colorVibrant, colorDominant = colorDominant, equalizerManager = equalizerManager)
-    PlayerEditorDialog(showEditorDialog = showEditorDialog, onDismissRequest = { showEditorDialog = false }, colorVibrant = colorVibrant, colorDominant = colorDominant, currentTrack = currentTrack, onUpdateTrackMetadata = onUpdateTrackMetadata)
-    PlayerStreamConfigDialog(showStreamConfigDialog = showStreamConfigDialog, onDismissRequest = { showStreamConfigDialog = false }, colorVibrant = colorVibrant, colorDominant = colorDominant, playerViewModel = playerViewModel)
-
-    val styleNames = mapOf(
-        VisualizerStyle.WAVE to "style_waves",
-        VisualizerStyle.SLIME to "style_slime",
-        VisualizerStyle.BARS to "style_bars",
-        VisualizerStyle.DOTS to "style_dots",
-        VisualizerStyle.PARTICLES to "style_particles",
-        VisualizerStyle.RINGS to "style_rings",
-        VisualizerStyle.AURA to "style_aura",
-        VisualizerStyle.BANDS to "style_bands"
-    )
-
-    PlayerSettingsSheet(
-        showSettingsMenu = showSettingsMenu,
-        onDismissRequest = { showSettingsMenu = false },
-        colorDominant = colorDominant, colorVibrant = colorVibrant, colorMuted = colorMuted,
-        playerViewModel = playerViewModel, visualizerManager = visualizerManager,
-        prefs = prefs, currentStyle = currentStyle,
-        onStyleChange = { style, name -> currentStyle = style; currentStyleName = name; prefs.visualizerStyle = style.name },
-        styleNames = styleNames
-    )
-
-    if (showMicPermissionDialog) {
-        AlertDialog(
-            onDismissRequest = { showMicPermissionDialog = false },
-            title = { Text("Modo Grabación", color = colorVibrant) },
-            text = { Text("DuWave requiere permiso para grabar audio y así sincronizar los visualizadores. No guardaremos ningún audio.", color = Color.White) },
-            confirmButton = {
-                TextButton(onClick = {
-                    showMicPermissionDialog = false
-                    callbacks.onRequestMicPermission?.invoke()
-                }) { Text("Confirmar", color = colorVibrant) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMicPermissionDialog = false }) { Text("Cancelar", color = Color.Gray) }
-            },
-            containerColor = colorDominant.copy(alpha = 0.95f)
-        )
-    }
-
-    GestureFeedbackOverlay(show = feedbackPrevTrack, text = "⏮", alignLeft = true)
-    GestureFeedbackOverlay(show = feedbackNextTrack, text = "⏭", alignLeft = false)
-    GestureFeedbackOverlay(show = feedbackSeekLeft, text = "-10s", alignLeft = true)
-    GestureFeedbackOverlay(show = feedbackSeekRight, text = "+10s", alignLeft = false)
-
-    GestureTutorialOverlay(
-        showNextPrev = showNextPrevTutorial,
-        showSeek10s = showSeek10sTutorial,
-        showVinylSeek = showVinylSeekTutorial,
-        showPlaylistSwipe = showPlaylistSwipeTutorial
-    )
-
-    PlayerQueueSheet(
-        showQueue = showQueue, onDismissRequest = { showQueue = false },
-        colorDominant = colorDominant, colorVibrant = colorVibrant,
-        currentQueue = currentQueue, currentTrack = currentTrack, onPlayTrack = onPlayTrack
-    )
-    PlayerEffectsDialog(
-        showEffectsDialog = showEffectsDialog, onDismissRequest = { showEffectsDialog = false },
-        colorVibrant = colorVibrant, colorDominant = colorDominant,
-        reverbEnabled = state.reverbEnabled, onSetReverb = onSetReverb,
-        playbackSpeed = state.playbackSpeed, onSetSpeed = onSetSpeed,
-        playbackPitch = state.playbackPitch, onSetPitch = onSetPitch,
-        effectsPreset = state.effectsPreset, onApplyPreset = onApplyPreset
-    )
+    
     } // End aspect Box
     } // End outer Box
 }
@@ -900,6 +829,7 @@ private fun PlayerTrackInfoHeader(
 /** Central visualizer area with gesture handling, canvas, album art overlay */
 @Composable
 private fun ColumnScope.PlayerVisualizerArea(
+    playerViewModel: com.example.beatpulse.player.IPlayerViewModel,
     areaModifier: Modifier = Modifier,
     isLandscape: Boolean,
     isMicModeActive: Boolean,
@@ -982,7 +912,7 @@ private fun ColumnScope.PlayerVisualizerArea(
                                 onShowQueue()
                             } else {
                                 // Upper section: Next track
-                                appPlayer?.seekToNext()
+                                playerViewModel.playNext()
                                 if (prefs.showGestureConfirmations) coroutineScope.launch { onFeedbackNextTrack(true); delay(400); onFeedbackNextTrack(false) }
                             }
                         }
@@ -1033,8 +963,8 @@ private fun ColumnScope.PlayerVisualizerArea(
                         val vinylRadius = kotlin.math.min(size.width, size.height) / 2.5f
 
                         if (distance > vinylRadius) {
-                            if (offset.x < centerX) { appPlayer?.seekToPrevious(); if (prefs.showGestureConfirmations) coroutineScope.launch { onFeedbackPrevTrack(true); delay(400); onFeedbackPrevTrack(false) } }
-                            else { appPlayer?.seekToNext(); if (prefs.showGestureConfirmations) coroutineScope.launch { onFeedbackNextTrack(true); delay(400); onFeedbackNextTrack(false) } }
+                            if (offset.x < centerX) { playerViewModel.playPrevious(); if (prefs.showGestureConfirmations) coroutineScope.launch { onFeedbackPrevTrack(true); delay(400); onFeedbackPrevTrack(false) } }
+                            else { playerViewModel.playNext(); if (prefs.showGestureConfirmations) coroutineScope.launch { onFeedbackNextTrack(true); delay(400); onFeedbackNextTrack(false) } }
                         } else {
                             val currentPos = appPlayer?.currentPosition ?: 0L
                             val maxDuration = appPlayer?.duration?.takeIf { it > 0 } ?: Long.MAX_VALUE
@@ -1056,7 +986,7 @@ private fun ColumnScope.PlayerVisualizerArea(
         contentAlignment = Alignment.Center
     ) {
         // Visualizer Canvas (extracted to its own composable)
-        PlayerVisualizerCanvas(
+        DesktopPlayerVisualizerCanvas(
             currentStyle = currentStyle,
             thumbnailShapeIdx = thumbnailShapeIdx,
             bassAmplitudes = bassAmplitudesState.value,

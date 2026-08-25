@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import com.example.beatpulse.theme.PaletteColors
 
 @Composable
-fun PlayerVisualizerCanvas(
+fun DesktopPlayerVisualizerCanvas(
     modifier: Modifier = Modifier,
     currentStyle: VisualizerStyle,
     thumbnailShapeIdx: Int,

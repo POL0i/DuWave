@@ -70,6 +70,7 @@ fun UnifiedLibraryScreen(
     
     val coroutineScope = rememberCoroutineScope()
     val isScanning by viewModel.isScanning.collectAsState()
+    val isOnlineServiceDown by viewModel.isOnlineServiceDown.collectAsState()
 
     val isDarkTheme = isSystemInDarkTheme()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -591,7 +592,13 @@ fun UnifiedLibraryScreen(
                                         paletteColors = paletteColors,
                                         thumbnailShapeIdx = shapeIdx,
                                         textColor = dynamicTextColor,
-                                        onClick = { onTrackClick(track, tracksToDisplay) },
+                                        onClick = { 
+                                            if (isOnlineServiceDown && track.dataPath.startsWith("youtube://")) {
+                                                // Do nothing
+                                            } else {
+                                                onTrackClick(track, tracksToDisplay)
+                                            }
+                                        },
                                         onToggleFavorite = {
                                             viewModel.toggleFavorite(track, !track.isFavorite)
                                         },
@@ -601,7 +608,8 @@ fun UnifiedLibraryScreen(
                                         onRemoveFromPlaylist = if (currentViewData.playlistId != null) { { viewModel.removeTrackFromPlaylist(currentViewData.playlistId, track.id) } } else null,
                                         onTrimTrack = if (!track.dataPath.startsWith("http")) { { trackPendingTrim = track } } else null,
                                         isPlaying = currentPlayingTrack?.id == track.id,
-                                        isActuallyPlaying = currentPlayingTrack?.id == track.id && isPlaying
+                                        isActuallyPlaying = currentPlayingTrack?.id == track.id && isPlaying,
+                                        isServiceDown = isOnlineServiceDown
                                     )
                                 }
                                 if (currentViewData.playlistId != null) {

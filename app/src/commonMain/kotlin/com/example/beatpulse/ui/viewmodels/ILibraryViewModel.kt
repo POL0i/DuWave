@@ -28,6 +28,7 @@ interface ILibraryViewModel {
     val searchQuery: MutableStateFlow<String>
     val onlineSearchResults: MutableStateFlow<List<TrackEntity>>
     val isOnlineSearchLoading: MutableStateFlow<Boolean>
+    val isOnlineServiceDown: StateFlow<Boolean>
 
     val recommendations: StateFlow<Map<String, List<TrackEntity>>>
     val isRecommendationsLoading: StateFlow<Boolean>

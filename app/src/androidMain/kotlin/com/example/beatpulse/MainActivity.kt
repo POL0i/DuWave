@@ -84,7 +84,7 @@ object NavigationKeys {
 class MainActivity : ComponentActivity() {
 
     private val visualizerManager: AudioVisualizerManager by inject()
-    private val prefs: com.example.beatpulse.data.AppPreferences by inject()
+    private val prefs: com.example.beatpulse.data.PreferencesManager by inject()
     private val musicRepository: MusicRepository by inject()
     private val equalizerManager: com.example.beatpulse.service.EqualizerManager by inject()
 
@@ -109,7 +109,7 @@ class MainActivity : ComponentActivity() {
                             if (status == android.app.DownloadManager.STATUS_SUCCESSFUL) {
                                 prefs.showToast(getString(R.string.download_completed_desc, title))
                                 kotlinx.coroutines.GlobalScope.launch {
-                                    musicRepository.scanMediaStore()
+                                    libraryViewModel.scanMediaStore()
                                 }
                             }
                         }
@@ -265,7 +265,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             val existing = musicRepository.allTracksFlow.first()
             if (existing.isEmpty()) {
-                musicRepository.scanMediaStore()
+                libraryViewModel.scanMediaStore()
             }
         }
         
@@ -300,7 +300,7 @@ class MainActivity : ComponentActivity() {
 fun MainScreen(
     visualizerManager: AudioVisualizerManager,
     equalizerManager: com.example.beatpulse.service.EqualizerManager,
-    prefs: com.example.beatpulse.data.AppPreferences,
+    prefs: com.example.beatpulse.data.PreferencesManager,
     libraryViewModel: com.example.beatpulse.ui.screens.LibraryViewModel,
     playerViewModel: PlayerViewModel
 ) {
@@ -392,12 +392,8 @@ fun MainScreen(
                         accentColor = accentColor,
                         paletteColors = paletteColors,
                         bgStyle = bgStyle,
-                        hasUsedMiniplayerGesture = prefs.hasUsedMiniplayerGesture,
-                        onMiniplayerGestureUsed = { prefs.hasUsedMiniplayerGesture = true },
-                        hasSeenTutorial = prefs.hasSeenTutorial,
-                        currentPos = exoPlayer?.currentPosition ?: 0L,
-                        duration = exoPlayer?.duration ?: 1L,
-                        albumArtBitmap = currentTrack?.let { com.example.beatpulse.ui.components.rememberAlbumArt(it) },
+                        prefs = prefs,
+                        exoPlayer = exoPlayer,
                         onPlayPauseClick = { if (exoPlayer?.isPlaying == true) exoPlayer?.pause() else exoPlayer?.play() }
                     )
                 }
@@ -459,7 +455,7 @@ fun MainScreen(
                             visualizerManager = visualizerManager,
                             equalizerManager = equalizerManager,
                             state = com.example.beatpulse.ui.components.player.PlayerScreenState(
-                                appPlayer = appPlayer,
+                                exoPlayer = exoPlayer,
                                 currentTrack = currentTrack,
                                 currentQueue = currentQueue,
                                 paletteColors = paletteColors,

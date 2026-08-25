@@ -15,8 +15,14 @@ import org.koin.core.context.startKoin
 import com.example.beatpulse.di.appModule
 
 class BeatPulseApp : Application() {
+    companion object {
+        lateinit var appContext: Application
+            private set
+    }
+
     override fun onCreate() {
         super.onCreate()
+        appContext = this
         NewPipe.init(NewPipeDownloader.getInstance(OkHttpClient.Builder()), Localization.DEFAULT, ContentCountry.DEFAULT)
         
         startKoin {

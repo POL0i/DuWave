@@ -59,4 +59,6 @@ interface AppPreferences {
     var hasUsedPlaylistSwipeGesture: Boolean
     var showGestureConfirmations: Boolean
     var streamAvatarUri: String?
+    var lastVerifiedNewPipeVersion: String
+    var lastServiceDownState: Boolean
 }

@@ -23,4 +23,7 @@ interface AppVisualizerManager {
     var isEnabled: Boolean
     fun start(sessionId: Int)
     fun stop()
+    
+    // Desktop specific implementation
+    fun processAudioBytes(pcmBuffer: ByteArray) {}
 }

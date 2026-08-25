@@ -34,7 +34,7 @@ import com.example.beatpulse.data.AppPreferences
 import com.example.beatpulse.data.TrackEntity
 
 @Composable
-fun PlayerTimerDialog(
+fun DesktopPlayerTimerDialog(
     showTimerDialog: Boolean,
     onDismissRequest: () -> Unit,
     colorVibrant: Color,
@@ -219,7 +219,7 @@ fun PlayerEqDialog(
 }
 
 @Composable
-fun PlayerEditorDialog(
+fun DesktopPlayerEditorDialog(
     showEditorDialog: Boolean,
     onDismissRequest: () -> Unit,
     colorVibrant: Color,
@@ -449,7 +449,7 @@ fun PlayerStreamConfigDialog(
 }
 
 @Composable
-fun PlayerSupportDialog(
+fun DesktopPlayerSupportDialog(
     showSupportDialog: Boolean,
     onDismissRequest: () -> Unit,
     paletteColors: com.example.beatpulse.theme.PaletteColors,

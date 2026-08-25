@@ -44,8 +44,8 @@ import com.example.beatpulse.ui.components.player.DesktopPlayerScreenCallbacks
 import com.example.beatpulse.ui.components.player.DesktopPlayerScreenState
 import com.example.beatpulse.ui.screens.DesktopLibraryScreen
 import com.example.beatpulse.ui.screens.DesktopListaGeneralScreen
-import com.example.beatpulse.ui.screens.LibraryScreen
-import com.example.beatpulse.ui.screens.UnifiedLibraryScreen
+
+
 import com.example.beatpulse.isDesktopPlatform
 import com.example.beatpulse.ui.viewmodels.ILibraryViewModel
 import com.example.beatpulse.theme.PaletteColors
@@ -225,44 +225,20 @@ fun AppScreenContent(
     ) { page ->
         when (page) {
             0 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                if (isDesktopPlatform) {
-                    DesktopLibraryScreen(
-                        libraryViewModel = libraryViewModel,
-                        playerViewModel = playerViewModel,
-                        paletteColors = paletteColors,
-                        onPageChange = onPageChange
-                    )
-                } else {
-                    UnifiedLibraryScreen(
-                        libraryViewModel = libraryViewModel,
-                        playerViewModel = playerViewModel,
-                        paletteColors = paletteColors,
-                        onPageChange = onPageChange
-                    )
-                }
+                DesktopLibraryScreen(
+                    libraryViewModel = libraryViewModel,
+                    playerViewModel = playerViewModel,
+                    paletteColors = paletteColors,
+                    onPageChange = onPageChange
+                )
             }
             1 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                if (isDesktopPlatform) {
-                    DesktopListaGeneralScreen(
-                        libraryViewModel = libraryViewModel,
-                        playerViewModel = playerViewModel,
-                        paletteColors = paletteColors,
-                        onPageChange = onPageChange
-                    )
-                } else {
-                    // Originally mobile used UnifiedLibraryScreen with selected category or a specific General screen?
-                    // Mobile didn't have a separate "Lista General" page. The mini player handled it differently or it was part of Library.
-                    // Wait, did mobile have a page 1?
-                    // Let's just fallback to UnifiedLibraryScreen or a placeholder.
-                    // In the original AppScreen, page 1 was... Wait, mobile only had page 0 (Library) and page 1 (Player)?
-                    // Wait, let's look at the original mobile code. We'll render LibraryScreen if we don't have ListaGeneral.
-                    // Mobile's ListaGeneral was just part of LibraryScreen (index 0). But since page is 1, let's render LibraryScreen for now if needed.
-                    LibraryScreen(
-                        libraryViewModel = libraryViewModel,
-                        playerViewModel = playerViewModel,
-                        paletteColors = paletteColors
-                    )
-                }
+                DesktopListaGeneralScreen(
+                    libraryViewModel = libraryViewModel,
+                    playerViewModel = playerViewModel,
+                    paletteColors = paletteColors,
+                    onPageChange = onPageChange
+                )
             }
             2 -> Box(modifier = Modifier.fillMaxSize()) {
                 DesktopPlayerScreen(

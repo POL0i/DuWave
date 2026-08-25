@@ -299,7 +299,7 @@ fun PlayerSettingsSheet(
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
-fun PlayerQueueSheet(
+fun DesktopPlayerQueueSheet(
     showQueue: Boolean,
     onDismissRequest: () -> Unit,
     colorDominant: Color,
@@ -354,7 +354,7 @@ fun PlayerQueueSheet(
 }
 
 @Composable
-fun PlayerEffectsDialog(
+fun DesktopPlayerEffectsDialog(
     showEffectsDialog: Boolean,
     onDismissRequest: () -> Unit,
     colorVibrant: Color,

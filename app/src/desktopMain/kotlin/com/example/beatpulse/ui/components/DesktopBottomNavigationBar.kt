@@ -148,7 +148,7 @@ fun DesktopBottomNavigationBar(
                 } else {
                     // Pantallas de Biblioteca/Carpetas: mostrar Mini-Reproductor si hay canción, sino 3 puntos
                     if (currentTrack != null) {
-                        MiniPlayer(
+                        DesktopMiniPlayer(
                             currentTrack = currentTrack,
                             isPlaying = isPlaying,
                             accentColor = accentColor,

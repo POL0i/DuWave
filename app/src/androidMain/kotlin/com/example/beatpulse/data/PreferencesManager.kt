@@ -266,4 +266,12 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
     override var streamAvatarUri: String?
         get() = prefs.getString("streamAvatarUri", null)
         set(value) = prefs.edit().putString("streamAvatarUri", value).apply()
+
+    override var lastVerifiedNewPipeVersion: String
+        get() = prefs.getString("lastVerifiedNewPipeVersion", "") ?: ""
+        set(value) = prefs.edit().putString("lastVerifiedNewPipeVersion", value).apply()
+
+    override var lastServiceDownState: Boolean
+        get() = prefs.getBoolean("lastServiceDownState", false)
+        set(value) = prefs.edit().putBoolean("lastServiceDownState", value).apply()
 }

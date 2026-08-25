@@ -2,6 +2,7 @@ package com.example.beatpulse.data
 
 import java.io.File
 import java.net.URL
+import kotlinx.coroutines.launch
 
 class DesktopLibraryPlatformHelper : ILibraryPlatformHelper {
     override fun scanFileToSystem(filePath: String, onCompleted: () -> Unit) {
@@ -58,9 +59,42 @@ class DesktopLibraryPlatformHelper : ILibraryPlatformHelper {
         return coversDir.absolutePath
     }
 
+    private val downloadScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+    private val okHttpClient = okhttp3.OkHttpClient()
+
     override fun downloadTrack(streamUrl: String, title: String, artist: String) {
-        // Placeholder for Desktop download implementation.
-        // Needs a JVM compatible downloader later, or we can use Ktor.
-        println("Downloading $title by $artist from $streamUrl")
+        println("Starting download: $title by $artist")
+        downloadScope.launch {
+            try {
+                val request = okhttp3.Request.Builder().url(streamUrl).build()
+                val response = okHttpClient.newCall(request).execute()
+                if (response.isSuccessful) {
+                    val musicDir = File(System.getProperty("user.home"), "Music/DuWave")
+                    if (!musicDir.exists()) musicDir.mkdirs()
+                    
+                    val safeTitle = title.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+                    val safeArtist = artist.replace(Regex("[^a-zA-Z0-9.-]"), "_")
+                    val file = File(musicDir, "${safeArtist}_-_${safeTitle}.m4a")
+                    
+                    val inputStream = response.body()?.byteStream()
+                    if (inputStream != null) {
+                        val outputStream = java.io.FileOutputStream(file)
+                        val buffer = ByteArray(8192)
+                        var bytesRead: Int
+                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                            outputStream.write(buffer, 0, bytesRead)
+                        }
+                        outputStream.close()
+                        inputStream.close()
+                        println("Download complete: ${file.absolutePath}")
+                    }
+                } else {
+                    println("Download failed with code: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                println("Error downloading track: ${e.message}")
+                e.printStackTrace()
+            }
+        }
     }
 }

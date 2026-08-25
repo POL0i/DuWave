@@ -11,6 +11,7 @@ import com.example.beatpulse.theme.PaletteColors
 import com.example.beatpulse.ui.viewmodels.PlaylistViewData
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import androidx.compose.runtime.Composable
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.Flow
@@ -77,6 +78,8 @@ class DummyAppPreferences : AppPreferences {
     override var hasUsedPlaylistSwipeGesture = true
     override var showGestureConfirmations = true
     override var streamAvatarUri: String? = null
+    override var lastVerifiedNewPipeVersion = "v0.26.5"
+    override var lastServiceDownState = false
 }
 
 
@@ -102,6 +105,7 @@ class DummyLibraryViewModel(override val prefs: AppPreferences) : com.example.be
     override val isRecommendationsLoading = MutableStateFlow(false)
     override val changeCoverSearchResults = MutableStateFlow<List<TrackEntity>>(emptyList())
     override val isChangeCoverLoading = MutableStateFlow(false)
+    override val isOnlineServiceDown = MutableStateFlow(false)
 
     override fun scanMediaStore() {}
     override fun pickFolderAndScan() {}
@@ -146,20 +150,23 @@ class DummyVisualizerManager : com.example.beatpulse.visualizer.AppVisualizerMan
     override fun stop() {}
 }
 
-class DummyEqualizerManager : com.example.beatpulse.player.AppEqualizerManager {
-    override val isEnabled = MutableStateFlow(false)
-    override val numBands = 5
-    override val currentPreset = MutableStateFlow<Short>(0)
-    override val isAutoMode = MutableStateFlow(false)
-    override val bands = MutableStateFlow<List<Short>>(emptyList())
-    override val bandLevels = MutableStateFlow<Map<Short, Short>>(emptyMap())
-    override val presets = MutableStateFlow<List<Pair<Short, String>>>(emptyList())
-    override val minLevel = MutableStateFlow<Short>(-1500)
-    override val maxLevel = MutableStateFlow<Short>(1500)
-
-    override fun getCenterFreq(band: Short): Int = 1000
-    override fun setBandLevel(band: Short, level: Short) {}
-    override fun setAutoMode(enabled: Boolean) {}
-    override fun setEnabled(enabled: Boolean) {}
-    override fun setPreset(preset: Short) {}
+@Composable
+fun PlayerSupportDialog(
+    showSupportDialog: Boolean,
+    onDismissRequest: () -> Unit,
+    paletteColors: com.example.beatpulse.theme.PaletteColors,
+    dynamicTextColor: androidx.compose.ui.graphics.Color
+) {
+    if (showSupportDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = onDismissRequest,
+            title = { androidx.compose.material3.Text("Support") },
+            text = { androidx.compose.material3.Text("DuWave Desktop Edition by Denis.") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = onDismissRequest) {
+                    androidx.compose.material3.Text("OK")
+                }
+            }
+        )
+    }
 }

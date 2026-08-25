@@ -113,8 +113,8 @@ object DownloadHelper {
                 }
                 
                 // Forzar escaneo para que se agregue inmediatamente a la librería con las etiquetas correctas
-                val musicRepo = com.example.beatpulse.data.MusicRepository(context)
-                musicRepo.scanMediaStore()
+                val scanner = org.koin.java.KoinJavaComponent.getKoin().get<com.example.beatpulse.data.ILibraryScanner>()
+                scanner.scanMusic()
                 
             } catch (e: Exception) {
                 e.printStackTrace()

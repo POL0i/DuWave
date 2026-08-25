@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -110,6 +111,7 @@ fun LibraryScreen(
     val isSearchingOnline = selectedTabIndex == 1
     val onlineSearchResults by viewModel.onlineSearchResults.collectAsState()
     val isOnlineSearchLoading by viewModel.isOnlineSearchLoading.collectAsState()
+    val isOnlineServiceDown by viewModel.isOnlineServiceDown.collectAsState()
     
     val recommendations by viewModel.recommendations.collectAsState()
     val isRecommendationsLoading by viewModel.isRecommendationsLoading.collectAsState()
@@ -212,8 +214,29 @@ fun LibraryScreen(
             }
 
             val isScanning by viewModel.isScanning.collectAsState()
+            val isOnlineServiceDown by viewModel.isOnlineServiceDown.collectAsState()
 
-            if (isScanning || isOnlineSearchLoading) {
+            if (selectedTabIndex == 1 && isOnlineServiceDown) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Card(
+                        modifier = Modifier.padding(32.dp),
+                        colors = CardDefaults.cardColors(containerColor = paletteColors.dominant)
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(24.dp)
+                        ) {
+                            Icon(Icons.Default.CloudOff, contentDescription = null, tint = paletteColors.vibrant, modifier = Modifier.size(48.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = androidx.compose.ui.res.stringResource(com.example.beatpulse.R.string.online_service_down),
+                                color = dynamicTextColor,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+                    }
+                }
+            } else if (isScanning || isOnlineSearchLoading) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         CircularProgressIndicator(color = paletteColors.vibrant)
@@ -288,7 +311,13 @@ fun LibraryScreen(
                                                 paletteColors = paletteColors,
                                                 thumbnailShapeIdx = shapeIdx,
                                                 textColor = dynamicTextColor,
-                                                onClick = { onTrackClick(track, tracks) },
+                                                onClick = { 
+                                                    if (isOnlineServiceDown && track.dataPath.startsWith("youtube://")) {
+                                                        // Do nothing
+                                                    } else {
+                                                        onTrackClick(track, tracks) 
+                                                    }
+                                                },
                                                 onToggleFavorite = { 
                                                     viewModel.toggleFavorite(track, !track.isFavorite)
                                                 },
@@ -300,7 +329,8 @@ fun LibraryScreen(
                                                 } else null,
                                                 onTrimTrack = null,
                                                 isPlaying = currentPlayingTrack?.id == track.id,
-                                                isActuallyPlaying = currentPlayingTrack?.id == track.id && isPlaying
+                                                isActuallyPlaying = currentPlayingTrack?.id == track.id && isPlaying,
+                                                isServiceDown = isOnlineServiceDown
                                             )
                                         }
                                     }
@@ -317,7 +347,13 @@ fun LibraryScreen(
                                     paletteColors = paletteColors,
                                     thumbnailShapeIdx = shapeIdx,
                                     textColor = dynamicTextColor,
-                                    onClick = { onTrackClick(track, itemsToShow) },
+                                    onClick = { 
+                                        if (isOnlineServiceDown && track.dataPath.startsWith("youtube://")) {
+                                            // Do nothing if service is down and it's an online track
+                                        } else {
+                                            onTrackClick(track, itemsToShow) 
+                                        }
+                                    },
                                     onToggleFavorite = { 
                                         viewModel.toggleFavorite(track, !track.isFavorite)
                                     },
@@ -329,7 +365,8 @@ fun LibraryScreen(
                                     } else null,
                                     onTrimTrack = if (selectedTabIndex == 0) { { trackPendingTrim = track } } else null,
                                     isPlaying = currentPlayingTrack?.id == track.id,
-                                    isActuallyPlaying = currentPlayingTrack?.id == track.id && isPlaying
+                                    isActuallyPlaying = currentPlayingTrack?.id == track.id && isPlaying,
+                                    isServiceDown = isOnlineServiceDown
                                 )
                             }
                         }
@@ -361,7 +398,7 @@ fun LibraryScreen(
         
         // Floating search bar overlay
         var isLocalSearchExpanded by remember { mutableStateOf(false) }
-        val isSearchExpanded = if (selectedTabIndex == 1) true else isLocalSearchExpanded
+        val isSearchExpanded = if (selectedTabIndex == 1 && !isOnlineServiceDown) true else isLocalSearchExpanded
         var isSortMenuExpanded by remember { mutableStateOf(false) }
         val searchOffset by animateDpAsState(
             targetValue = if (isSearchExpanded) 0.dp else 40.dp
@@ -576,11 +613,13 @@ fun TrackItem(
     onChangeCover: (() -> Unit)? = null,
     isResolving: Boolean = false,
     isPlaying: Boolean = false,
-    isActuallyPlaying: Boolean = false
+    isActuallyPlaying: Boolean = false,
+    isServiceDown: Boolean = false
 ) {
-    // Usar la paleta global para evitar recalcular colores por cada pista, lo cual traba la lista
     val accentColor = paletteColors.vibrant
     val bgColor = paletteColors.dominant
+    val isOnline = track.dataPath.startsWith("youtube://")
+    val isDisabled = isOnline && isServiceDown
     
     val bgBrush = remember(bgColor, accentColor) {
         Brush.linearGradient(colors = listOf(bgColor, accentColor.copy(alpha = 0.5f)))
@@ -598,8 +637,9 @@ fun TrackItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .then(if (isDisabled) Modifier else Modifier.clickable(onClick = onClick))
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .background(if (isDisabled) Color.Black.copy(alpha = 0.2f) else Color.Transparent),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val albumArt = rememberAlbumArt(track = track)
@@ -646,13 +686,19 @@ fun TrackItem(
             }
             val displayArtist = track.customArtist ?: track.artist
             val displayAlbum = track.customAlbum ?: track.album
-            Text(
-                text = "$displayArtist • $displayAlbum",
-                style = MaterialTheme.typography.bodySmall,
-                color = textColor.copy(alpha = 0.7f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isDisabled) {
+                    Icon(Icons.Default.CloudOff, contentDescription = null, tint = Color.Red.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+                Text(
+                    text = "$displayArtist • $displayAlbum",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isDisabled) Color.Red.copy(alpha = 0.7f) else textColor.copy(alpha = 0.7f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
         IconButton(onClick = onToggleFavorite) {
             Icon(

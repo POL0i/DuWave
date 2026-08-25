@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.atan2
 
 @Composable
-fun AdvancedSleepTimerDialog(
+fun DesktopAdvancedSleepTimerDialog(
     showDialog: Boolean,
     onDismiss: () -> Unit,
     sleepTimerSeconds: Int,

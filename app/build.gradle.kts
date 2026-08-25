@@ -20,7 +20,11 @@ kotlin {
         }
     }
     
-    jvm("desktop")
+    jvm("desktop") {
+        mainRun {
+            mainClass.set("com.example.beatpulse.MainKt")
+        }
+    }
     
     sourceSets {
         val desktopMain by getting
@@ -66,7 +70,7 @@ kotlin {
             
             implementation("com.squareup.retrofit2:retrofit:2.11.0")
             implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-            implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.4")
+            implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.5")
             
             implementation(libs.koin.core)
             implementation(libs.kmpalette.core)
@@ -84,7 +88,7 @@ kotlin {
 
 compose.desktop {
     application {
-        mainClass = "MainKt"
+        mainClass = "com.example.beatpulse.MainKt"
         nativeDistributions {
             modules("java.sql")
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb)
@@ -145,3 +149,6 @@ dependencies {
     ksp("androidx.room:room-compiler:2.7.0-alpha13")
 
 }
+
+
+

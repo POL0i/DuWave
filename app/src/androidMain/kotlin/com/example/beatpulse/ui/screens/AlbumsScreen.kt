@@ -72,6 +72,7 @@ fun AlbumsScreen(
     }
 
     val isScanning by viewModel.isScanning.collectAsState()
+    val isOnlineServiceDown by viewModel.isOnlineServiceDown.collectAsState()
     val context = androidx.compose.ui.platform.LocalContext.current
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -370,11 +371,18 @@ fun AlbumsScreen(
                                     paletteColors = paletteColors,
                                     thumbnailShapeIdx = shapeIdx,
                                     textColor = dynamicTextColor,
-                                    onClick = { onTrackClick(track, tracksToDisplay) },
+                                    onClick = { 
+                                        if (isOnlineServiceDown && track.dataPath.startsWith("youtube://")) {
+                                            // Do nothing
+                                        } else {
+                                            onTrackClick(track, tracksToDisplay)
+                                        }
+                                    },
                                     onToggleFavorite = {
                                         viewModel.toggleFavorite(track, !track.isFavorite)
                                     },
-                                    onRemoveFromPlaylist = if (currentViewData.playlistId != null) { { viewModel.removeTrackFromPlaylist(currentViewData.playlistId, track.id) } } else null
+                                    onRemoveFromPlaylist = if (currentViewData.playlistId != null) { { viewModel.removeTrackFromPlaylist(currentViewData.playlistId, track.id) } } else null,
+                                    isServiceDown = isOnlineServiceDown
                                 )
                             }
                             if (currentViewData.playlistId != null) {

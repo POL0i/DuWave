@@ -53,6 +53,10 @@ interface IPlayerViewModel {
     fun applyPreset(preset: String)
     fun updateTrackMetadata(id: Long, title: String?, artist: String?, album: String?, coverPath: String?)
     
+    fun playNext()
+    fun playPrevious()
+    fun togglePlayPause()
+
     fun toggleMicMode()
     fun toggleAutoAnalyze()
     fun toggleStreamConfigEffects()

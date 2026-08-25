@@ -33,7 +33,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 @Composable
-fun MegaminxSleepTimerDialog(
+fun DesktopMegaminxSleepTimerDialog(
     showDialog: Boolean,
     onDismiss: () -> Unit,
     sleepTimerSeconds: Int,
@@ -51,15 +51,17 @@ fun MegaminxSleepTimerDialog(
                 .background(Color.Transparent),
             contentAlignment = Alignment.Center
         ) {
-            MegaminxInteractiveFace(
+            DesktopMegaminxInteractiveFace(
                 timerSeconds = sleepTimerSeconds,
-                onAddMinutes = { 
-                    val next = sleepTimerSeconds + it * 60
-                    onSetSleepTimer(if (next < 60) 0 else next) 
+                onAddMinutes = { mins: Int -> 
+                    val next = sleepTimerSeconds + mins * 60
+                    val target = if (next < 60) 0 else next
+                    onSetSleepTimer(target) 
                 },
-                onAddHours = { 
-                    val next = sleepTimerSeconds + it * 3600
-                    onSetSleepTimer(if (next < 60) 0 else next) 
+                onAddHours = { hours: Int -> 
+                    val next = sleepTimerSeconds + hours * 3600
+                    val target = if (next < 60) 0 else next
+                    onSetSleepTimer(target) 
                 },
                 onCenterTap = {
                     if (sleepTimerSeconds > 0) {
@@ -77,7 +79,7 @@ fun MegaminxSleepTimerDialog(
 }
 
 @Composable
-fun MegaminxInteractiveFace(
+fun DesktopMegaminxInteractiveFace(
     timerSeconds: Int,
     onAddMinutes: (Int) -> Unit,
     onAddHours: (Int) -> Unit,

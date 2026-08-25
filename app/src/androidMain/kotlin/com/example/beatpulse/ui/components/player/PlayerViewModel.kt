@@ -365,20 +365,16 @@ class PlayerViewModel(
 
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                     super.onPlayerError(error)
-                    android.widget.Toast.makeText(context, "Error al reproducir: Archivo no encontrado o dañado.", android.widget.Toast.LENGTH_LONG).show()
+                    val lang = PreferencesManager.getInstance(context).appLanguage
+                    val locale = java.util.Locale(lang)
+                    val conf = context.resources.configuration
+                    conf.setLocale(locale)
+                    val localizedContext = context.createConfigurationContext(conf)
+                    val errorMsg = localizedContext.getString(com.example.beatpulse.R.string.playback_error)
+                    android.widget.Toast.makeText(context, errorMsg, android.widget.Toast.LENGTH_LONG).show()
                     val player = _playerState.value
                     if (player != null) {
-                        val index = player.currentMediaItemIndex
-                        if (index != androidx.media3.common.C.INDEX_UNSET) {
-                            player.removeMediaItem(index)
-                            val newList = _currentQueue.value.toMutableList()
-                            if (index in newList.indices) {
-                                newList.removeAt(index)
-                                _currentQueue.value = newList
-                            }
-                            player.prepare()
-                            player.play()
-                        }
+                        player.pause()
                     }
                 }
 
@@ -451,6 +447,36 @@ class PlayerViewModel(
         player.setMediaItems(mediaItems, startIndex, androidx.media3.common.C.TIME_UNSET)
         player.prepare()
         player.playWhenReady = true
+    }
+
+    fun playNext() {
+        _playerState.value?.let { player ->
+            if (player.hasNextMediaItem()) {
+                player.seekToNextMediaItem()
+            } else {
+                player.seekToNext()
+            }
+        }
+    }
+
+    fun playPrevious() {
+        _playerState.value?.let { player ->
+            if (player.hasPreviousMediaItem()) {
+                player.seekToPreviousMediaItem()
+            } else {
+                player.seekToPrevious()
+            }
+        }
+    }
+
+    fun togglePlayPause() {
+        _playerState.value?.let { player ->
+            if (player.isPlaying) {
+                player.pause()
+            } else {
+                player.play()
+            }
+        }
     }
 
     

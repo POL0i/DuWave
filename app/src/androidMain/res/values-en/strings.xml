@@ -230,4 +230,6 @@
     <string name="top_plays_title">Top Played</string>
     <string name="recently_added_title">Recently Added</string>
 
+    <string name="playback_error">Error playing: File not found or corrupted.</string>
+    <string name="online_service_down">The service is currently unavailable, please wait for a new update.</string>
 </resources>

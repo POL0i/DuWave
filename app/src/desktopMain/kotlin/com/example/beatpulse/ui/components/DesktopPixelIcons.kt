@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
-object PixelIcons {
+object DesktopPixelIcons {
     val Library = ImageVector.Builder(
         name = "PixelLibrary",
         defaultWidth = 24.dp,

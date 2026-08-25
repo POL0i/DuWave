@@ -12,6 +12,9 @@ class DesktopPlayerAdapter : AppPlayer {
     private var playbackJob: Job? = null
     
     private val listeners = mutableListOf<AppPlayerListener>()
+    
+    var equalizerManager: com.example.beatpulse.audio.RealDesktopEqualizerManager? = null
+    var audioDataCallback: ((ByteArray) -> Unit)? = null
 
     @Volatile
     private var _isPlaying = false
@@ -106,7 +109,10 @@ class DesktopPlayerAdapter : AppPlayer {
                     val bytesRead = din.read(buffer, 0, buffer.size)
                     if (bytesRead == -1) break
                     
+                    equalizerManager?.processAudioBytes(buffer, decodedFormat.sampleRate)
+                    
                     line.write(buffer, 0, bytesRead)
+                    audioDataCallback?.invoke(buffer.copyOfRange(0, bytesRead))
                     _currentPosition += (bytesRead / bytesPerMs).toLong()
                 }
                 

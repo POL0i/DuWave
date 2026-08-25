@@ -230,4 +230,6 @@
     <string name="top_plays_title">Mais Tocadas</string>
     <string name="recently_added_title">Adicionadas Recentemente</string>
 
+    <string name="playback_error">Erro ao reproduzir: Arquivo não encontrado ou corrompido.</string>
+    <string name="online_service_down">O serviço está indisponível no momento, por favor, aguarde uma nova atualização.</string>
 </resources>

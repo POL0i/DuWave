@@ -1,3 +1,4 @@
+@file:Suppress("DEPRECATION", "DEPRECATION_ERROR")
 package com.example.beatpulse.data
 
 import org.schabi.newpipe.extractor.downloader.Downloader
@@ -56,8 +57,9 @@ class NewPipeDownloader private constructor(builder: OkHttpClient.Builder) : Dow
         for (i in 0 until headersObj.size()) {
             val name = headersObj.name(i)
             val value = headersObj.value(i)
-            val list = responseHeaders.getOrPut(name) { mutableListOf() } as MutableList<String>
+            val list = responseHeaders[name]?.toMutableList() ?: mutableListOf()
             list.add(value)
+            responseHeaders[name] = list
         }
 
         val latestUrl = response.request().url().toString()

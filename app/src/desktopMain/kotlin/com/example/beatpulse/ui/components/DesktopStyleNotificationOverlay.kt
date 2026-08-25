@@ -21,7 +21,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 @Composable
-fun StyleNotificationOverlay(
+fun DesktopStyleNotificationOverlay(
     message: String?,
     onDismiss: () -> Unit
 ) {

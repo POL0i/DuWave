@@ -152,6 +152,14 @@ class LibraryViewModel(
     override val searchQuery = MutableStateFlow("")
     override val onlineSearchResults = MutableStateFlow<List<TrackEntity>>(emptyList())
     override val isOnlineSearchLoading = MutableStateFlow(false)
+    
+    override val isOnlineServiceDown: StateFlow<Boolean> = onlineRepository.isServiceDown
+
+    init {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            onlineRepository.verifyServiceStatus(prefs)
+        }
+    }
 
     override val recommendations = MutableStateFlow<Map<String, List<TrackEntity>>>(emptyMap())
     override val isRecommendationsLoading = MutableStateFlow(false)

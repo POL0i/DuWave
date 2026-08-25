@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.player.IPlayerViewModel
 import com.example.beatpulse.theme.PaletteColors
-import com.example.beatpulse.ui.components.PixelIcons
+import com.example.beatpulse.ui.components.DesktopPixelIcons
 import com.example.beatpulse.ui.viewmodels.ILibraryViewModel
 import com.example.beatpulse.ui.viewmodels.PlaylistViewData
 import com.example.beatpulse.ui.components.DesktopTrackItem
@@ -258,7 +258,7 @@ fun DesktopCategoryTab(
             val icon = when (categoryType) {
                 0 -> Icons.Default.Person
                 1 -> Icons.Default.Album
-                2 -> if (bgStyle == 8) PixelIcons.Folder else Icons.Default.Folder
+                2 -> if (bgStyle == 8) DesktopPixelIcons.Folder else Icons.Default.Folder
                 else -> Icons.Default.Folder
             }
             val displayTitle = if (categoryType == 2) key.substringAfterLast("/") else key

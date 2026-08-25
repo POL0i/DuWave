@@ -236,4 +236,6 @@
     <string name="top_plays_title">Mejores Reproducciones</string>
     <string name="recently_added_title">Últimos Agregados</string>
 
+    <string name="playback_error">Error al reproducir: Archivo no encontrado o dañado.</string>
+    <string name="online_service_down">El servicio no está disponible de momento, por favor, espera una nueva actualización.</string>
 </resources>

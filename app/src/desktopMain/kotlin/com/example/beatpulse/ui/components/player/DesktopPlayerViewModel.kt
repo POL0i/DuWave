@@ -62,6 +62,40 @@ class DesktopPlayerViewModel(
         })
     }
 
+    override fun playNext() {
+        val queue = currentQueue.value
+        val track = currentTrack.value
+        if (queue.isNotEmpty() && track != null) {
+            val idx = queue.indexOfFirst { it.id == track.id }
+            if (idx != -1 && idx < queue.size - 1) {
+                playTrack(queue[idx + 1], queue)
+            } else if (queue.isNotEmpty()) {
+                playTrack(queue.first(), queue)
+            }
+        }
+    }
+
+    override fun playPrevious() {
+        val queue = currentQueue.value
+        val track = currentTrack.value
+        if (queue.isNotEmpty() && track != null) {
+            val idx = queue.indexOfFirst { it.id == track.id }
+            if (idx > 0) {
+                playTrack(queue[idx - 1], queue)
+            } else if (queue.isNotEmpty()) {
+                playTrack(queue.last(), queue)
+            }
+        }
+    }
+
+    override fun togglePlayPause() {
+        if (isPlaying.value) {
+            appPlayer.pause()
+        } else {
+            appPlayer.play()
+        }
+    }
+
     override fun playTrack(track: TrackEntity, queue: List<TrackEntity>) {
         currentTrack.value = track
         currentQueue.value = queue

@@ -21,7 +21,7 @@ val appModule = module {
     single { com.example.beatpulse.data.getAppDatabase(androidContext()) }
     single<com.example.beatpulse.data.ILibraryScanner> { com.example.beatpulse.data.AndroidLibraryScanner(androidContext(), get<com.example.beatpulse.data.AppDatabase>().trackDao()) }
     single { MusicRepository(get(), get(), get()) }
-    single { OnlineMusicRepository(androidContext()) }
+    single<com.example.beatpulse.data.IOnlineMusicRepository> { OnlineMusicRepository() }
     single { AudioVisualizerManager(get()) }
     single { EqualizerManager(get()) }
     
