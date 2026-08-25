@@ -3,6 +3,9 @@ package com.example.beatpulse.data
 import java.io.File
 import java.net.URL
 import kotlinx.coroutines.launch
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
+import org.jaudiotagger.tag.images.ArtworkFactory
 
 class DesktopLibraryPlatformHelper : ILibraryPlatformHelper {
     override fun scanFileToSystem(filePath: String, onCompleted: () -> Unit) {
@@ -62,7 +65,7 @@ class DesktopLibraryPlatformHelper : ILibraryPlatformHelper {
     private val downloadScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
     private val okHttpClient = okhttp3.OkHttpClient()
 
-    override fun downloadTrack(streamUrl: String, title: String, artist: String) {
+    override fun downloadTrack(streamUrl: String, title: String, artist: String, coverPath: String?) {
         println("Starting download: $title by $artist")
         downloadScope.launch {
             try {
@@ -87,6 +90,27 @@ class DesktopLibraryPlatformHelper : ILibraryPlatformHelper {
                         outputStream.close()
                         inputStream.close()
                         println("Download complete: ${file.absolutePath}")
+                        
+                        // Inject ID3 Tags
+                        try {
+                            val audioFile = AudioFileIO.read(file)
+                            val tag = audioFile.tagOrCreateAndSetDefault
+                            tag.setField(FieldKey.TITLE, title)
+                            tag.setField(FieldKey.ARTIST, artist)
+                            
+                            if (coverPath != null) {
+                                val coverFile = File(coverPath)
+                                if (coverFile.exists()) {
+                                    val artwork = ArtworkFactory.createArtworkFromFile(coverFile)
+                                    tag.setField(artwork)
+                                }
+                            }
+                            
+                            audioFile.commit()
+                            println("ID3 tags injected successfully.")
+                        } catch (e: Exception) {
+                            println("Error injecting ID3 tags: ${e.message}")
+                        }
                     }
                 } else {
                     println("Download failed with code: ${response.code()}")

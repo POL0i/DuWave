@@ -288,7 +288,8 @@ class LibraryViewModel(
                         platformHelper.downloadTrack(
                             streamUrl = url,
                             title = track.customTitle ?: track.title,
-                            artist = track.customArtist ?: track.artist
+                            artist = track.customArtist ?: track.artist,
+                            coverPath = coverUrl
                         )
                         prefs.showToast(platformHelper.getLocalizedString("toast_download_started", track.title))
                     }

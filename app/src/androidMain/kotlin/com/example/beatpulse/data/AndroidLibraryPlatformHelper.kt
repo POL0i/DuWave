@@ -33,7 +33,7 @@ class AndroidLibraryPlatformHelper(private val context: Context) : ILibraryPlatf
         return coversDir.absolutePath
     }
 
-    override fun downloadTrack(streamUrl: String, title: String, artist: String) {
+    override fun downloadTrack(streamUrl: String, title: String, artist: String, coverPath: String?) {
         DownloadHelper.downloadTrack(context, streamUrl, title, artist)
     }
 }
