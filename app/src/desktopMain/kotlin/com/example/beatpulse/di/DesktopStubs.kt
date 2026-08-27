@@ -38,7 +38,11 @@ class DummyAppPreferences : AppPreferences {
     override var midMultiplier = 1.0f
     override var trebleMultiplier = 1.0f
     override var usePerBandMultiplier = false
-    override var lastMainScreenPage = 0
+    private val _lastMainScreenPageFlow = kotlinx.coroutines.flow.MutableStateFlow(0)
+    override val lastMainScreenPageFlow: kotlinx.coroutines.flow.StateFlow<Int> = _lastMainScreenPageFlow
+    override var lastMainScreenPage: Int
+        get() = _lastMainScreenPageFlow.value
+        set(value) { _lastMainScreenPageFlow.value = value }
     override var lastLibraryTab = 0
     override var lastLibraryGeneralTab = 0
     override var shuffleModeEnabled = false
@@ -76,10 +80,13 @@ class DummyAppPreferences : AppPreferences {
     override var hasUsedSeek10sGesture = true
     override var hasUsedVinylSeekGesture = true
     override var hasUsedPlaylistSwipeGesture = true
+    override var coverOffsetX = 0f
+    override var coverOffsetY = 0f
     override var showGestureConfirmations = true
     override var streamAvatarUri: String? = null
     override var lastVerifiedNewPipeVersion = "v0.26.5"
     override var lastServiceDownState = false
+    override var coverScale = 1f
 }
 
 
@@ -134,7 +141,7 @@ class DummyVisualizerManager : com.example.beatpulse.visualizer.AppVisualizerMan
     override val highAmplitudes = MutableStateFlow(FloatArray(0))
     override val combinedAmplitudes = MutableStateFlow(FloatArray(0))
     override val isAdvancedMode = MutableStateFlow(false)
-    override val filterMode = MutableStateFlow(com.example.beatpulse.visualizer.FilterMode.ALL)
+    override val filterMode: MutableStateFlow<Any> = MutableStateFlow(com.example.beatpulse.visualizer.FilterMode.ALL)
     override val sensitivity = MutableStateFlow(1.0f)
     override val reactivity = MutableStateFlow(1.0f)
     override val bassMultiplier = MutableStateFlow(1.0f)

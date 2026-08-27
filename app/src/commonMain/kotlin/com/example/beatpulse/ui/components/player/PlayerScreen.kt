@@ -150,6 +150,15 @@ data class PlayerScreenCallbacks(
 @Composable
 fun PlayerScreen(
     playerViewModel: IPlayerViewModel,
+    dynamicColorsPlus: Boolean,
+    dynamicColorsInterval: Int,
+    cleanUiMode: Boolean,
+    coverDragEnabled: Boolean,
+    coverVisibilityMode: String,
+    chromaKeyColor: String,
+    coverScale: Float,
+    coverOffsetX: Float,
+    coverOffsetY: Float,
     visualizerManager: IAudioVisualizerManager,
     equalizerManager: IEqualizerManager,
     state: PlayerScreenState,
@@ -159,6 +168,15 @@ fun PlayerScreen(
     // Delegate to the internal implementation to keep the top-level function's register count low
     PlayerScreenContent(
         playerViewModel = playerViewModel,
+        dynamicColorsPlus = dynamicColorsPlus,
+        dynamicColorsInterval = dynamicColorsInterval,
+        cleanUiMode = cleanUiMode,
+        coverDragEnabled = coverDragEnabled,
+        coverVisibilityMode = coverVisibilityMode,
+        chromaKeyColor = chromaKeyColor,
+        coverScale = coverScale,
+        coverOffsetX = coverOffsetX,
+        coverOffsetY = coverOffsetY,
         visualizerManager = visualizerManager,
         equalizerManager = equalizerManager,
         state = state,
@@ -171,6 +189,15 @@ fun PlayerScreen(
 @Composable
 private fun PlayerScreenContent(
     playerViewModel: IPlayerViewModel,
+    dynamicColorsPlus: Boolean,
+    dynamicColorsInterval: Int,
+    cleanUiMode: Boolean,
+    coverDragEnabled: Boolean,
+    coverVisibilityMode: String,
+    chromaKeyColor: String,
+    coverScale: Float,
+    coverOffsetX: Float,
+    coverOffsetY: Float,
     visualizerManager: IAudioVisualizerManager,
     equalizerManager: IEqualizerManager,
     state: PlayerScreenState,
@@ -208,7 +235,7 @@ private fun PlayerScreenContent(
     }
     LaunchedEffect(currentStyle) { prefs.visualizerStyle = currentStyle.name.lowercase() }
 
-    var isPlaying by remember { mutableStateOf(false) }
+    val isPlaying by playerViewModel.isPlaying.collectAsState()
     var currentPosition by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
     var duration by remember { androidx.compose.runtime.mutableLongStateOf(1L) }
 
@@ -268,7 +295,31 @@ private fun PlayerScreenContent(
     val combinedAmplitudesState = visualizerManager.combinedAmplitudes.collectAsState()
     var showAdvancedSettings by remember { mutableStateOf(false) }
 
-    val colorDominant by animateColorAsState(paletteColors.dominant, label = "color_dom")
+    var activeDynamicColor by remember { mutableStateOf<Color?>(null) }
+    LaunchedEffect(dynamicColorsPlus, dynamicColorsInterval, paletteColors) {
+        if (!dynamicColorsPlus) {
+            activeDynamicColor = null
+            return@LaunchedEffect
+        }
+        val colors = listOf(
+            paletteColors.dominant,
+            paletteColors.vibrant,
+            paletteColors.muted
+        )
+        if (colors.isEmpty()) {
+            activeDynamicColor = null
+            return@LaunchedEffect
+        }
+        var index = 0
+        while (true) {
+            activeDynamicColor = colors[index % colors.size]
+            index++
+            kotlinx.coroutines.delay(dynamicColorsInterval * 1000L)
+        }
+    }
+
+    val targetColor = if (dynamicColorsPlus && activeDynamicColor != null) activeDynamicColor!! else paletteColors.dominant
+    val colorDominant by animateColorAsState(targetColor, animationSpec = androidx.compose.animation.core.tween(3000), label = "color_dom")
     val colorVibrant by animateColorAsState(paletteColors.vibrant, label = "color_vib")
     val colorMuted by animateColorAsState(paletteColors.muted, label = "color_mut")
 
@@ -289,8 +340,13 @@ private fun PlayerScreenContent(
     var showEditorDialog by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
-    var isPlayingState by remember { mutableStateOf(false) }
     var showSupportDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        playerViewModel.settingsMenuRequested.collect {
+            showSettingsMenu = true
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose { }
@@ -308,9 +364,9 @@ private fun PlayerScreenContent(
     )
 
     // Position polling
-    LaunchedEffect(isPlayingState) {
+    LaunchedEffect(isPlaying) {
         while (true) {
-            // isPlaying = isPlayingState
+            // isPlaying = isPlaying
             // duration = duration
             // currentPosition = currentPosition
             if (abRepeatModeEnabled) {
@@ -319,7 +375,7 @@ private fun PlayerScreenContent(
                 if (currentPosition >= bPos && bPos > aPos) { playerViewModel.seekTo(aPos); currentPosition = aPos }
                 else if (currentPosition < aPos && bPos > aPos) { playerViewModel.seekTo(aPos); currentPosition = aPos }
             }
-            delay(if (isPlayingState) 100L else 1000L)
+            delay(if (isPlaying) 100L else 1000L)
         }
     }
 
@@ -372,7 +428,8 @@ private fun PlayerScreenContent(
         contentAlignment = Alignment.Center
     ) {
         Box(modifier = aspectModifier) {
-    val isMicModeCleanUI = isMicModeActive && !streamConfigUiVisible
+    val cleanUiMode by playerViewModel.cleanUiMode.collectAsState()
+    val isMicModeCleanUI = (isMicModeActive && !streamConfigUiVisible) || cleanUiMode
     val columnModifier = if (isMicModeCleanUI) {
         Modifier.fillMaxSize()
     } else {
@@ -451,8 +508,15 @@ private fun PlayerScreenContent(
             abPointB = abPointB,
             activeDraggingHandle = activeDraggingHandle,
             playerViewModel = playerViewModel,
+            cleanUiMode = cleanUiMode,
+            coverDragEnabled = playerViewModel.coverDragEnabled.collectAsState().value,
+            coverVisibilityMode = playerViewModel.coverVisibilityMode.collectAsState().value,
+            chromaKeyColor = playerViewModel.chromaKeyColor.collectAsState().value,
+            coverScale = playerViewModel.coverScale.collectAsState().value,
+            coverOffsetX = playerViewModel.coverOffsetX.collectAsState().value,
+            coverOffsetY = playerViewModel.coverOffsetY.collectAsState().value,
             albumArtBitmap = albumArtBitmap,
-            isPlayingState = isPlayingState,
+            isPlaying = isPlaying,
             isBuffering = isBuffering,
             isFetchingLyrics = isFetchingLyrics,
             searchFailed = searchFailed,
@@ -486,8 +550,9 @@ private fun PlayerScreenContent(
         }
 
         // Control Row
+        AnimatedVisibility(visible = !isMicModeCleanUI, enter = fadeIn(), exit = fadeOut()) {
         Row(
-            modifier = Modifier.alpha(if (!isMicModeActive || streamConfigUiVisible) 1f else 0f).fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -512,6 +577,7 @@ private fun PlayerScreenContent(
                     Icon(Icons.Default.MoreVert, contentDescription = "More Options", tint = Color.Gray, modifier = Modifier.size(28.dp))
                 }
             }
+        }
         }
     }
 
@@ -733,8 +799,15 @@ private fun ColumnScope.PlayerVisualizerArea(
     currentPosition: Long, duration: Long,
     abPointA: Float, abPointB: Float, activeDraggingHandle: String?,
     playerViewModel: IPlayerViewModel,
+    cleanUiMode: Boolean,
+    coverDragEnabled: Boolean,
+    coverVisibilityMode: String,
+    chromaKeyColor: String,
+    coverScale: Float,
+    coverOffsetX: Float,
+    coverOffsetY: Float,
     albumArtBitmap: androidx.compose.ui.graphics.ImageBitmap?,
-    isPlayingState: Boolean, isBuffering: Boolean,
+    isPlaying: Boolean, isBuffering: Boolean,
     isFetchingLyrics: Boolean, searchFailed: Boolean,
     availableLyricsResults: List<Any>, autoAnalyzeLyrics: Boolean,
     showLyricsMatches: Boolean, onShowLyricsMatches: () -> Unit
@@ -824,6 +897,8 @@ private fun ColumnScope.PlayerVisualizerArea(
     ) {
         // Visualizer Canvas (extracted to its own composable)
         PlayerVisualizerCanvas(
+            coverOffsetX = coverOffsetX,
+            coverOffsetY = coverOffsetY,
             currentStyle = currentStyle,
             thumbnailShapeIdx = thumbnailShapeIdx,
             bassAmplitudes = bassAmplitudesState.value,
@@ -845,13 +920,40 @@ private fun ColumnScope.PlayerVisualizerArea(
             onPlayheadPosChanged = { playheadPos = it }
         )
           // Central Album Art
-        Box(
-            modifier = Modifier
-                .size(160.dp)
-                .graphicsLayer { scaleX = animatedScaleAnim.value; scaleY = animatedScaleAnim.value; if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value }
-                .clip(shape)
-                .background(colorDominant.copy(alpha = 0.5f))
-                .pointerInput(Unit) {
+        if (coverVisibilityMode != "HIDDEN") {
+            val chromaColor = when (chromaKeyColor) {
+                "MAGENTA" -> Color(0xFFFF00FF)
+                "BLUE" -> Color(0xFF0000FF)
+                else -> Color(0xFF00FF00)
+            }
+            
+            Box(
+                modifier = Modifier
+                    .offset { androidx.compose.ui.unit.IntOffset(coverOffsetX.toInt(), coverOffsetY.toInt()) }
+                    .size(160.dp)
+                    .graphicsLayer { 
+                        scaleX = animatedScaleAnim.value * coverScale; 
+                        scaleY = animatedScaleAnim.value * coverScale; 
+                        if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value 
+                    }
+                    .clip(shape)
+                    .background(colorDominant.copy(alpha = 0.5f))
+                    .then(
+                        if (coverDragEnabled) {
+                            Modifier.pointerInput(Unit) {
+                                var localDragOffset = Offset.Zero
+                                detectDragGestures(
+                                    onDragStart = { localDragOffset = Offset(playerViewModel.coverOffsetX.value, playerViewModel.coverOffsetY.value) },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        localDragOffset = Offset(localDragOffset.x + dragAmount.x, localDragOffset.y + dragAmount.y)
+                                        playerViewModel.setCoverOffset(localDragOffset.x, localDragOffset.y)
+                                    }
+                                )
+                            }
+                        } else Modifier
+                    )
+                    .pointerInput(Unit) {
                     detectTapGestures(
                         onTap = { playerViewModel.togglePlayPause() },
                         onDoubleTap = { offset ->
@@ -878,19 +980,24 @@ private fun ColumnScope.PlayerVisualizerArea(
                 },
             contentAlignment = Alignment.Center
         ) {
-            AnimatedContent(targetState = albumArtBitmap, label = "album_art") { bmp ->
-                if (bmp != null) Image(bitmap = bmp, contentDescription = "Album Art", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            if (coverVisibilityMode == "CHROMA_KEY") {
+                Box(modifier = Modifier.fillMaxSize().background(chromaColor))
+            } else {
+                AnimatedContent(targetState = albumArtBitmap, label = "album_art") { bmp ->
+                    if (bmp != null) Image(bitmap = bmp, contentDescription = "Album Art", modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                }
             }
             androidx.compose.animation.AnimatedVisibility(visible = isBuffering, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = paletteColors.vibrant, modifier = Modifier.size(64.dp))
                 }
             }
-            androidx.compose.animation.AnimatedVisibility(visible = !isPlayingState && !isMicModeActive, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
+            androidx.compose.animation.AnimatedVisibility(visible = !isPlaying && !isMicModeActive && !cleanUiMode && coverVisibilityMode != "CHROMA_KEY", enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
                 Box(modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.4f)), contentAlignment = Alignment.Center) {
                     Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = "Paused", tint = Color.White, modifier = Modifier.size(64.dp))
                 }
             }
+        }
         }
         // Lyrics status
         if (autoAnalyzeLyrics) {

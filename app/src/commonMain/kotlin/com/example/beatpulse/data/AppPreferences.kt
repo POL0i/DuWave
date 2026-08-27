@@ -3,9 +3,11 @@ package com.example.beatpulse.data
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharedFlow
 
-interface AppPreferences {
+import com.example.beatpulse.ui.components.player.IPreferencesManager
+
+interface AppPreferences : IPreferencesManager {
     var appLanguage: String
-    var visualizerStyle: String
+    override var visualizerStyle: String
     var visualizerArchetype: Int
     var visualizerFftMode: String
     var isAdvancedMode: Boolean
@@ -19,7 +21,8 @@ interface AppPreferences {
     var midMultiplier: Float
     var trebleMultiplier: Float
     var usePerBandMultiplier: Boolean
-    var lastMainScreenPage: Int
+    override var lastMainScreenPage: Int
+    override val lastMainScreenPageFlow: kotlinx.coroutines.flow.StateFlow<Int>
     var lastLibraryTab: Int
     var lastLibraryGeneralTab: Int
     var shuffleModeEnabled: Boolean
@@ -29,13 +32,13 @@ interface AppPreferences {
     var eqCustomBands: String
     var eqAutoMode: Boolean
     var lastPlayedTrackPath: String?
-    var hasSeenTutorial: Boolean
+    override var hasSeenTutorial: Boolean
     var hasSeenBottomBarHint: Boolean
     var hasSeenPlayerHints: Boolean
     var hasUsedMiniplayerGesture: Boolean
     var hasUsedCoverGesture: Boolean
     var hasUsedPlaylistGesture: Boolean
-    var albumArtCenterY: Float
+    override var albumArtCenterY: Float
     var showGestureFeedback: Boolean
     var librarySortOrder: String
     var libraryScrollIndex: Int
@@ -48,16 +51,16 @@ interface AppPreferences {
     var cachedRecommendationsJson: String
     val backgroundStyleFlow: StateFlow<Int>
     var backgroundStyle: Int
-    val thumbnailShapeFlow: StateFlow<Int>
-    var thumbnailShape: Int
+    override val thumbnailShapeFlow: StateFlow<Int>
+    override var thumbnailShape: Int
     val toastFlow: SharedFlow<String>
     fun showToast(message: String)
     var autoAnalyzeLyrics: Boolean
-    var hasUsedNextPrevGesture: Boolean
-    var hasUsedSeek10sGesture: Boolean
-    var hasUsedVinylSeekGesture: Boolean
-    var hasUsedPlaylistSwipeGesture: Boolean
-    var showGestureConfirmations: Boolean
+    override var hasUsedNextPrevGesture: Boolean
+    override var hasUsedSeek10sGesture: Boolean
+    override var hasUsedVinylSeekGesture: Boolean
+    override var hasUsedPlaylistSwipeGesture: Boolean
+    override var showGestureConfirmations: Boolean
     var streamAvatarUri: String?
     var lastVerifiedNewPipeVersion: String
     var lastServiceDownState: Boolean

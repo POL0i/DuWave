@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import com.example.beatpulse.ui.LocalCoverOffset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -20,7 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.unit.dp
 import com.example.beatpulse.theme.PaletteColors
-import com.example.beatpulse.visualizer.AudioVisualizerManager
+import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
+import androidx.compose.runtime.collectAsState
 
 private const val Y2K_KAWAII_SHADER_SRC = """
     uniform float2 iResolution;
@@ -29,6 +31,8 @@ private const val Y2K_KAWAII_SHADER_SRC = """
     uniform float iSpeed;
     uniform half4 colorDominant;
     uniform half4 colorVibrant;
+    uniform float iOffsetX;
+    uniform float iOffsetY;
     
     float hash12(float2 p) {
         float3 p3  = fract(float3(p.xyx) * .1031);
@@ -37,13 +41,15 @@ private const val Y2K_KAWAII_SHADER_SRC = """
     }
     
     half4 main(in float2 fragCoord) {
-        float2 uv = (fragCoord - 0.5 * iResolution.xy) / iResolution.y;
+        float2 uv = (fragCoord.xy - 0.5 * iResolution.xy + float2(iOffsetX * iResolution.y, iOffsetY * iResolution.y)) / iResolution.y;
         float time = iTime * 0.5 * iSpeed;
         
         // Very soft background
         half3 bg = mix(colorDominant.rgb, half3(1.0, 1.0, 1.0), 0.9); 
         
         float2 gridUv = uv * 3.0;
+        gridUv.x -= (iOffsetX * 3.0);
+        gridUv.y -= (iOffsetY * 3.0);
         gridUv.y += time * 0.5; // Scroll up
         
         float2 id = floor(gridUv);
@@ -107,19 +113,20 @@ private const val Y2K_KAWAII_SHADER_SRC = """
     }
 """
 
-@SuppressLint("NewApi")
-@Composable
+actual @Composable
 fun Y2KBackground(
     paletteColors: PaletteColors,
-    visualizerManager: AudioVisualizerManager,
+    visualizerManager: IAudioVisualizerManager,
     isPlayerScreen: Boolean,
+    modifier: Modifier,
     content: @Composable () -> Unit
 ) {
+    val coverOffset = LocalCoverOffset.current
     val accentColorState = animateColorAsState(targetValue = paletteColors.lightVibrant, tween(1500), label = "y2k_acc")
     val dominantColorState = animateColorAsState(targetValue = paletteColors.dominant, tween(1500), label = "y2k_dom")
     val vibrantColorState = animateColorAsState(targetValue = paletteColors.vibrant, tween(1500), label = "y2k_vib")
 
-    val amplitudesState = visualizerManager.amplitudes.collectAsState()
+    val amplitudesState = visualizerManager.combinedAmplitudes.collectAsState()
     val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
     
@@ -181,10 +188,18 @@ fun Y2KBackground(
                 .clip(RoundedCornerShape(8.dp))
                 .background(Color.White.copy(alpha = 0.5f))
         ) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            val currentAlbumArtCenterY = com.example.beatpulse.ui.LocalAlbumArtCenterY.current
+        val currentCoverOffset = com.example.beatpulse.ui.LocalCoverOffset.current
+        Canvas(modifier = Modifier.fillMaxSize()) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && shaderBrush != null && runtimeShader != null) {
                     val dom = dominantColorState.value
                     val vib = vibrantColorState.value
+                    
+                    val dynamicOffsetX = if (isPlayerScreen) -(currentCoverOffset.x / size.height) else 0f
+                    val dynamicOffsetY = if (isPlayerScreen) {
+                    val base = if (currentAlbumArtCenterY != null) ((size.height / 2f) - currentAlbumArtCenterY) / size.height else 0f
+                    base - (currentCoverOffset.y / size.height)
+                } else 0f
                     
                     runtimeShader.setFloatUniform("iResolution", size.width, size.height)
                     runtimeShader.setFloatUniform("iTime", time * 0.5f)
@@ -192,6 +207,8 @@ fun Y2KBackground(
                     runtimeShader.setFloatUniform("iSpeed", finalSpeed)
                     runtimeShader.setFloatUniform("colorDominant", dom.red, dom.green, dom.blue, dom.alpha)
                     runtimeShader.setFloatUniform("colorVibrant", vib.red, vib.green, vib.blue, vib.alpha)
+                    runtimeShader.setFloatUniform("iOffsetX", dynamicOffsetX)
+                    runtimeShader.setFloatUniform("iOffsetY", dynamicOffsetY)
                     
                     drawRect(brush = shaderBrush, size = size)
                 } else {

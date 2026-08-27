@@ -16,7 +16,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.unit.dp
 import com.example.beatpulse.theme.PaletteColors
-import com.example.beatpulse.visualizer.AudioVisualizerManager
+import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
+import androidx.compose.runtime.collectAsState
+import com.example.beatpulse.ui.LocalCoverOffset
 
 private const val LUMINOUS_SHADER_SRC = """
     uniform float2 iResolution;
@@ -24,6 +26,8 @@ private const val LUMINOUS_SHADER_SRC = """
     uniform float iEnergy;
     uniform half4 colorVibrant;
     uniform half4 colorLightVibrant;
+    uniform float iOffsetX;
+    uniform float iOffsetY;
     
     // Hash function for random values
     float hash12(float2 p) {
@@ -33,9 +37,14 @@ private const val LUMINOUS_SHADER_SRC = """
     }
     
     half4 main(in float2 fragCoord) {
-        float2 uv = fragCoord.xy / iResolution.xy;
+                float2 uv = (fragCoord.xy + float2(iOffsetX * iResolution.y, iOffsetY * iResolution.y)) / iResolution.xy;
+        float2 uv_screen = (fragCoord.xy - 0.5 * iResolution.xy) / iResolution.y;
+        float r_screen = length(uv_screen);
         float2 p = uv * 2.0 - 1.0;
         p.x *= iResolution.x / iResolution.y;
+        
+        float2 p_screen = uv_screen * 2.0 - 1.0;
+        p_screen.x *= iResolution.x / iResolution.y;
         
         half3 col = half3(0.0, 0.0, 0.0);
         
@@ -73,26 +82,26 @@ private const val LUMINOUS_SHADER_SRC = """
         }
         
         // Background gradient based on vibrant color
-        col += mix(half3(0.05, 0.05, 0.05), colorVibrant.rgb * 0.3, 1.0 - min(1.0, length(p * 0.6))) * (1.0 + iEnergy * 0.5);
+        col += mix(half3(0.05, 0.05, 0.05), colorVibrant.rgb * 0.3, 1.0 - min(1.0, length(p_screen * 0.6))) * (1.0 + iEnergy * 0.5);
         
         return half4(col, 1.0);
     }
 """
 
-@SuppressLint("NewApi")
-@Composable
+actual @Composable
 fun LuminousBackground(
     paletteColors: PaletteColors,
-    visualizerManager: AudioVisualizerManager,
+    visualizerManager: IAudioVisualizerManager,
     isPlayerScreen: Boolean,
-    modifier: Modifier = Modifier,
+    modifier: Modifier,
     content: @Composable () -> Unit
 ) {
+    val coverOffset = LocalCoverOffset.current
     val lightVibrantState = animateColorAsState(paletteColors.lightVibrant, tween(1500), label = "lum_lv")
     val vibrantState = animateColorAsState(paletteColors.vibrant, tween(1500), label = "lum_v")
     val darkMutedState = animateColorAsState(paletteColors.darkMuted, tween(1500), label = "lum_dm")
     
-    val amplitudesState = visualizerManager.amplitudes.collectAsState()
+    val amplitudesState = visualizerManager.combinedAmplitudes.collectAsState()
 
     val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
@@ -138,30 +147,43 @@ fun LuminousBackground(
         runtimeShader?.let { ShaderBrush(it) }
     }
 
+
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
+        
+        
+        val currentAlbumArtCenterY = com.example.beatpulse.ui.LocalAlbumArtCenterY.current
+        val currentCoverOffset = com.example.beatpulse.ui.LocalCoverOffset.current
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && shaderBrush != null && runtimeShader != null) {
                 val vib = vibrantState.value
                 val lVib = lightVibrantState.value
                 
                 val finalSpeed = if (isPlayerScreen) 1.0f else 0.2f
+                val dynamicOffsetX = if (isPlayerScreen) -(currentCoverOffset.x / size.height) else 0f
+                val dynamicOffsetY = if (isPlayerScreen) {
+                    val base = if (currentAlbumArtCenterY != null) ((size.height / 2f) - currentAlbumArtCenterY) / size.height else 0f
+                    base - (currentCoverOffset.y / size.height)
+                } else 0f
                 
                 runtimeShader.setFloatUniform("iResolution", size.width, size.height)
                 runtimeShader.setFloatUniform("iTime", time * 0.5f * finalSpeed)
                 runtimeShader.setFloatUniform("iEnergy", dynamicEnergy)
                 runtimeShader.setFloatUniform("colorVibrant", vib.red, vib.green, vib.blue, vib.alpha)
                 runtimeShader.setFloatUniform("colorLightVibrant", lVib.red, lVib.green, lVib.blue, lVib.alpha)
+                runtimeShader.setFloatUniform("iOffsetX", dynamicOffsetX)
+                runtimeShader.setFloatUniform("iOffsetY", dynamicOffsetY)
                 
                 drawRect(brush = shaderBrush, size = size)
             } else {
                 val width = size.width
-                val height = size.height
-                val center = androidx.compose.ui.geometry.Offset(width / 2f, height / 2f)
+                val currentAlbumArtCenterY = if (isPlayerScreen && currentAlbumArtCenterY != null) currentAlbumArtCenterY else size.height / 2f
+                val center = androidx.compose.ui.geometry.Offset(width / 2f, currentAlbumArtCenterY)
                 drawCircle(color = vibrantState.value.copy(alpha = 0.5f), radius = 200f + dynamicEnergy * 100f, center = center)
             }
         }
         
-        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
             content()
         }
     }

@@ -68,10 +68,10 @@ fun PlayerLyricsOverlay(lyrics: kotlin.collections.List<LyricLine>, currentPosit
 }
 
 @Composable
-fun GestureFeedbackOverlay(show: Boolean, text: String, alignLeft: Boolean) {
+fun GestureFeedbackOverlay(show: Boolean, text: String, alignLeft: Boolean, coverOffsetX: Float = 0f, coverOffsetY: Float = 0f) {
     if (!show) return
     val alphaAnim = animateFloatAsState(targetValue = if (show) 1f else 0f, animationSpec = tween(durationMillis = 300))
-    Box(modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp), contentAlignment = if (alignLeft) Alignment.CenterStart else Alignment.CenterEnd) {
+    Box(modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp).offset { androidx.compose.ui.unit.IntOffset(coverOffsetX.toInt(), coverOffsetY.toInt()) }, contentAlignment = if (alignLeft) Alignment.CenterStart else Alignment.CenterEnd) {
         Box(modifier = Modifier.size(100.dp).graphicsLayer(alpha = alphaAnim.value).background(Color.White.copy(alpha = 0.2f), shape = CircleShape), contentAlignment = Alignment.Center) {
             Text(text, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp)
         }

@@ -9,6 +9,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.cancel
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import androidx.media3.session.CommandButton
@@ -22,6 +24,8 @@ import org.koin.android.ext.android.inject
 import kotlinx.coroutines.runBlocking
 
 class PlaybackService : MediaSessionService() {
+
+    private val serviceScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main + kotlinx.coroutines.Job())
 
     private val equalizerManager: EqualizerManager by inject()
     private val visualizerManager: AudioVisualizerManager by inject()
@@ -108,6 +112,25 @@ class PlaybackService : MediaSessionService() {
             }
             override fun onRepeatModeChanged(repeatMode: Int) {
                 updateCustomLayout(repeatMode)
+            }
+            override fun onPositionDiscontinuity(
+                oldPosition: androidx.media3.common.Player.PositionInfo,
+                newPosition: androidx.media3.common.Player.PositionInfo,
+                reason: Int
+            ) {
+                if (reason == androidx.media3.common.Player.DISCONTINUITY_REASON_SEEK) {
+                    val player = exoPlayer ?: return
+                    val currentVolume = player.volume
+                    player.volume = 0f
+                    (visualizerManager as? AudioVisualizerManager)?.apply {
+                        fftSink.ignoreFor(300)
+                        stop(decay = false)
+                    }
+                    serviceScope.launch {
+                        kotlinx.coroutines.delay(300)
+                        player.volume = currentVolume
+                    }
+                }
             }
         })
         exoPlayer?.let { player ->
@@ -285,6 +308,7 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        serviceScope.cancel()
         try {
             presetReverb?.release()
             presetReverb = null

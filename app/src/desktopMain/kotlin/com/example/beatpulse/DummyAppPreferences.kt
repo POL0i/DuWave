@@ -23,7 +23,11 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var midMultiplier: Float = 1f
     override var trebleMultiplier: Float = 1f
     override var usePerBandMultiplier: Boolean = false
-    override var lastMainScreenPage: Int = 0
+    private val _lastMainScreenPageFlow = MutableStateFlow(0)
+    override val lastMainScreenPageFlow: StateFlow<Int> = _lastMainScreenPageFlow
+    override var lastMainScreenPage: Int
+        get() = _lastMainScreenPageFlow.value
+        set(value) { _lastMainScreenPageFlow.value = value }
     override var lastLibraryTab: Int = 0
     override var lastLibraryGeneralTab: Int = 0
     override var shuffleModeEnabled: Boolean = false
@@ -50,12 +54,21 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var effectsPreset: String = "none"
     override var lastRecommendationsTimestamp: Long = 0L
     override var cachedRecommendationsJson: String = ""
-    override val backgroundStyleFlow: StateFlow<Int> = MutableStateFlow(0)
-    override var backgroundStyle: Int = 0
-    override val thumbnailShapeFlow: StateFlow<Int> = MutableStateFlow(0)
-    override var thumbnailShape: Int = 0
-    override val toastFlow: SharedFlow<String> = MutableSharedFlow()
-    override fun showToast(message: String) {}
+    private val _backgroundStyleFlow = MutableStateFlow(7)
+    override val backgroundStyleFlow: StateFlow<Int> = _backgroundStyleFlow
+    override var backgroundStyle: Int
+        get() = _backgroundStyleFlow.value
+        set(value) { _backgroundStyleFlow.value = value }
+    private val _thumbnailShapeFlow = MutableStateFlow(0)
+    override val thumbnailShapeFlow: StateFlow<Int> = _thumbnailShapeFlow
+    override var thumbnailShape: Int
+        get() = _thumbnailShapeFlow.value
+        set(value) { _thumbnailShapeFlow.value = value }
+    private val _toastFlow = MutableSharedFlow<String>(extraBufferCapacity = 10)
+    override val toastFlow: SharedFlow<String> = _toastFlow
+    override fun showToast(message: String) {
+        _toastFlow.tryEmit(message)
+    }
     override var autoAnalyzeLyrics: Boolean = false
     override var hasUsedNextPrevGesture: Boolean = true
     override var hasUsedSeek10sGesture: Boolean = true
@@ -65,4 +78,7 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var streamAvatarUri: String? = null
     override var lastVerifiedNewPipeVersion: String = ""
     override var lastServiceDownState: Boolean = false
+    override var coverOffsetX: Float = 0f
+    override var coverOffsetY: Float = 0f
+    override var coverScale: Float = 1f
 }

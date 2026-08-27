@@ -9,7 +9,7 @@ class RealDesktopVisualizerManager : AppVisualizerManager {
     override val highAmplitudes = MutableStateFlow(FloatArray(0))
     override val combinedAmplitudes = MutableStateFlow(FloatArray(0))
     override val isAdvancedMode = MutableStateFlow(false)
-    override val filterMode = MutableStateFlow(FilterMode.ALL)
+    override val filterMode = MutableStateFlow<Any>(FilterMode.ALL)
     override val sensitivity = MutableStateFlow(1.0f)
     override val reactivity = MutableStateFlow(1.0f)
     override val bassMultiplier = MutableStateFlow(1.0f)
@@ -73,31 +73,67 @@ class RealDesktopVisualizerManager : AppVisualizerManager {
         
         // Calculate magnitudes (only first half of frequencies is useful - Nyquist)
         val halfSize = fftSize / 2
-        val magnitudes = FloatArray(halfSize)
+        val rawMagnitudes = FloatArray(halfSize)
         for (i in 0 until halfSize) {
-            val magnitude = sqrt(real[i] * real[i] + imag[i] * imag[i])
-            // Logarithmic scaling for better visualization
-            magnitudes[i] = (log10(magnitude + 1f) * sensitivity.value * 2f).coerceIn(0f, 1f)
+            rawMagnitudes[i] = sqrt(real[i] * real[i] + imag[i] * imag[i])
         }
 
-        // Divide into bands
-        val bassEnd = (halfSize * 0.1).toInt()
-        val midEnd = (halfSize * 0.6).toInt()
+        // Downsample 512 bins to 180 bars exactly like Android to prevent UI clumping
+        val numBars = 180
+        val downsampled = FloatArray(numBars)
+        val minBin = 1.0
+        val maxBin = (halfSize * 0.75).coerceAtMost((halfSize - 1).toDouble())
 
-        val bass = magnitudes.copyOfRange(0, bassEnd)
-        val mid = magnitudes.copyOfRange(bassEnd, midEnd)
-        val high = magnitudes.copyOfRange(midEnd, halfSize)
-
-        // Smooth out transitions (apply reactivity)
-        val currentCombined = combinedAmplitudes.value
-        if (currentCombined.size == magnitudes.size) {
-            val r = reactivity.value.coerceIn(0.1f, 1.0f)
-            for (i in magnitudes.indices) {
-                magnitudes[i] = currentCombined[i] + (magnitudes[i] - currentCombined[i]) * r
+        for (i in 0 until numBars) {
+            val ratioStart = i.toDouble() / numBars
+            val ratioEnd = (i + 1).toDouble() / numBars
+            // Use logarithmic mapping to assign frequencies correctly across the spectrum
+            val startBin = (minBin * Math.pow(maxBin / minBin, ratioStart)).toInt().coerceIn(1, halfSize - 1)
+            val endBin = (minBin * Math.pow(maxBin / minBin, ratioEnd)).toInt().coerceIn(1, halfSize - 1).let {
+                if (it > startBin) it else startBin + 1
             }
+
+            var sum = 0f
+            var count = 0
+            for (j in startBin until endBin) {
+                if (j < halfSize) {
+                    sum += rawMagnitudes[j]
+                    count++
+                }
+            }
+            
+            val binVal = if (count > 0) sum / count else 0f
+            
+            // High frequencies naturally have less energy, aggressively boost them based on their bin
+            val boostLUT = 1.0f + startBin.toDouble().pow(0.65).toFloat() * 1.5f
+            val boostedValue = binVal * boostLUT
+            
+            // Base calculation for amplitude matching Android
+            val dB = 10 * log10((boostedValue * 100f + 1).toDouble()).toFloat()
+            val normalized = ((dB - 10f) / 45f) * sensitivity.value
+            val rawAmplitude = normalized.coerceIn(0f, 1.2f).toDouble().pow(1.5).toFloat()
+            
+            // Apply reactivity smoothing against previous frame
+            val currentCombined = combinedAmplitudes.value
+            val prevVal = if (currentCombined.size == numBars) currentCombined[i] else 0f
+            val react = (reactivity.value * 0.25f).coerceIn(0.01f, 1.0f) // Matches EQUILIBRADO physics mode
+            downsampled[i] = (prevVal + (rawAmplitude - prevVal) * react).coerceIn(0f, 1f)
         }
 
-        combinedAmplitudes.value = magnitudes
+        // Divide into bands for backwards compatibility with some backgrounds
+        // Matches Android BASS_COUNT = 60, MID_COUNT = 60, HIGH_COUNT = 60
+        val bassEnd = 60
+        val midEnd = 120
+
+        val bass = FloatArray(bassEnd)
+        val mid = FloatArray(midEnd - bassEnd)
+        val high = FloatArray(numBars - midEnd)
+        
+        System.arraycopy(downsampled, 0, bass, 0, bassEnd)
+        System.arraycopy(downsampled, bassEnd, mid, 0, midEnd - bassEnd)
+        System.arraycopy(downsampled, midEnd, high, 0, numBars - midEnd)
+
+        combinedAmplitudes.value = downsampled.clone()
         bassAmplitudes.value = bass
         midAmplitudes.value = mid
         highAmplitudes.value = high

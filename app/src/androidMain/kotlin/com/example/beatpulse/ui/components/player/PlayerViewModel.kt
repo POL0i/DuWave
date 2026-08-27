@@ -34,70 +34,138 @@ import kotlinx.coroutines.withContext
 import android.content.Context
 import android.content.Intent
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import android.annotation.SuppressLint
+import com.example.beatpulse.ui.components.player.IPlayerViewModel
 
 @SuppressLint("StaticFieldLeak")
 class PlayerViewModel(
     private val context: Context,
     private val repository: MusicRepository,
     val visualizerManager: AudioVisualizerManager
-) : ViewModel() {
+) : ViewModel(), IPlayerViewModel {
+
+    override val currentPosition = MutableStateFlow(0L)
+    override val duration = MutableStateFlow(0L)
+    
+    init {
+        // Poll playerState.value for currentPosition and duration
+        viewModelScope.launch {
+            while(true) {
+                if (playerState.value?.isPlaying == true) {
+                    currentPosition.value = playerState.value?.currentPosition ?: 0L
+                    duration.value = (playerState.value?.duration ?: 1L).coerceAtLeast(1L)
+                }
+                kotlinx.coroutines.delay(50)
+            }
+        }
+    }
+    override fun play() {
+        _playerState.value?.play()
+    }
+    override fun pause() {
+        _playerState.value?.pause()
+    }
+    override fun seekTo(position: Long) {
+        playerState.value?.seekTo(position)
+        currentPosition.value = position
+    }
+
+    override fun fastForward() {
+        playerState.value?.let { it.seekTo(it.currentPosition + 10000) }
+    }
+    override fun rewind() {
+        playerState.value?.let { it.seekTo(it.currentPosition - 10000) }
+    }
+
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
 
     private val _playerState = MutableStateFlow<Player?>(null)
-    val playerState: StateFlow<Player?> = _playerState
+    override val playerState: StateFlow<Player?> = _playerState
+    override var albumArtCenterY: Float? by mutableStateOf(null)
 
     private val _currentTrack = MutableStateFlow<TrackEntity?>(null)
-    val currentTrack: StateFlow<TrackEntity?> = _currentTrack
+    override val currentTrack: StateFlow<TrackEntity?> = _currentTrack
 
     private val _isPlaying = MutableStateFlow(false)
-    val isPlaying: StateFlow<Boolean> = _isPlaying
+    override val isPlaying: StateFlow<Boolean> = _isPlaying
 
-    val abRepeatModeEnabled = MutableStateFlow(false)
-    val abPointA = MutableStateFlow(0f)
-    val abPointB = MutableStateFlow(0.5f)
+    override val abRepeatModeEnabled = MutableStateFlow(false)
+    override val abPointA = MutableStateFlow(0f)
+    override val abPointB = MutableStateFlow(0.5f)
 
     private val _currentQueue = MutableStateFlow<List<TrackEntity>>(emptyList())
-    val currentQueue: StateFlow<List<TrackEntity>> = _currentQueue
+    override val currentQueue: StateFlow<List<TrackEntity>> = _currentQueue
 
     private val _paletteColors = MutableStateFlow(PaletteColors())
-    val paletteColors: StateFlow<PaletteColors> = _paletteColors
+    override val paletteColors: StateFlow<PaletteColors> = _paletteColors
 
-    private val _repeatMode = MutableStateFlow(Player.REPEAT_MODE_OFF)
-    val repeatMode: StateFlow<Int> = _repeatMode
-
-    private val _shuffleModeEnabled = MutableStateFlow(false)
-    val shuffleModeEnabled: StateFlow<Boolean> = _shuffleModeEnabled
-
-    private val _playbackSpeed = MutableStateFlow(1.0f)
-    val playbackSpeed: StateFlow<Float> = _playbackSpeed
+    override val repeatMode: MutableStateFlow<Int> = MutableStateFlow(Player.REPEAT_MODE_OFF)
+    override val shuffleModeEnabled: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    override val playbackSpeed: MutableStateFlow<Float> = MutableStateFlow(1.0f)
 
     private val _playbackPitch = MutableStateFlow(1.0f)
-    val playbackPitch: StateFlow<Float> = _playbackPitch
+    override val playbackPitch: StateFlow<Float> = _playbackPitch
 
     private val _reverbEnabled = MutableStateFlow(false)
-    val reverbEnabled: StateFlow<Boolean> = _reverbEnabled
+    override val reverbEnabled: StateFlow<Boolean> = _reverbEnabled
 
     private val _effectsPreset = MutableStateFlow("NORMAL")
-    val effectsPreset: StateFlow<String> = _effectsPreset
+    override val effectsPreset: StateFlow<String> = _effectsPreset
 
-    val isFetchingLyrics = MutableStateFlow(false)
-    val searchFailed = MutableStateFlow(false)
+    override val isFetchingLyrics = MutableStateFlow(false)
+    override val searchFailed = MutableStateFlow(false)
     
     // --- Mic/Streamer Mode State ---
-    val isMicModeActive = MutableStateFlow(false)
-    val streamConfigUiVisible = MutableStateFlow(false) // Hide UI by default in Mic Mode
-    val streamConfigEffectsVisible = MutableStateFlow(true) // Keep effects by default
+    override val isMicModeActive = MutableStateFlow(false)
+    override val streamConfigUiVisible = MutableStateFlow(false) // Hide UI by default in Mic Mode
+    override val streamConfigEffectsVisible = MutableStateFlow(true) // Keep effects by default
     val streamConfigMiniPlayerVisible = MutableStateFlow(false) // Hide mini player by default
-    val streamConfigAspectRatio = MutableStateFlow("default") // "default" or "16:9"
-    val streamAvatarUri = MutableStateFlow<String?>(PreferencesManager.getInstance(context).streamAvatarUri)
+    override val streamConfigAspectRatio = MutableStateFlow("default") // "default" or "16:9"
+    override val streamAvatarUri = MutableStateFlow<String?>(PreferencesManager.getInstance(context).streamAvatarUri)
     
-    val isWifiStreamActive = MutableStateFlow(false)
-    val wifiStreamFps = MutableStateFlow(60)
-    val wifiStreamQuality = MutableStateFlow(100)
-    val wifiStreamCustomWidth = MutableStateFlow(1920)
-    val wifiStreamCustomHeight = MutableStateFlow(1080)
+    override val isWifiStreamActive = MutableStateFlow(false)
+    override val wifiStreamFps = MutableStateFlow(60)
+    
+    override val coverVisibilityMode = MutableStateFlow("NORMAL")
+    override val chromaKeyColor = MutableStateFlow("Green")
+    override val coverDragEnabled = MutableStateFlow(false)
+    override val cleanUiMode = MutableStateFlow(false)
+    override val dynamicColorsPlus = MutableStateFlow(false)
+    override val dynamicColorsInterval = MutableStateFlow(30)
+    override val coverOffsetX = MutableStateFlow(0f)
+    override val coverOffsetY = MutableStateFlow(0f)
+    override val coverScale = MutableStateFlow(1f)
+
+    private val _supportDialogRequested = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val supportDialogRequested: kotlinx.coroutines.flow.SharedFlow<Unit> = _supportDialogRequested
+
+    override fun triggerSupportDialog() {
+        _supportDialogRequested.tryEmit(Unit)
+    }
+
+    private val _streamConfigDialogRequested = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val streamConfigDialogRequested: kotlinx.coroutines.flow.SharedFlow<Unit> = _streamConfigDialogRequested
+
+    override fun triggerStreamConfigDialog() {
+        _streamConfigDialogRequested.tryEmit(Unit)
+    }
+
+    private val _settingsMenuRequested = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val settingsMenuRequested: kotlinx.coroutines.flow.SharedFlow<Unit> = _settingsMenuRequested
+
+    override fun triggerSettingsMenu() {
+        _settingsMenuRequested.tryEmit(Unit)
+    }
+
+    init {
+        val wifiStreamQuality = MutableStateFlow(100)
+        val wifiStreamCustomWidth = MutableStateFlow(1920)
+        val wifiStreamCustomHeight = MutableStateFlow(1080)
+    }
 
     fun updateStreamAvatar(uri: String?) {
         PreferencesManager.getInstance(context).streamAvatarUri = uri
@@ -109,7 +177,7 @@ class PlayerViewModel(
         }
     }
 
-    fun toggleMicMode() {
+    override fun toggleMicMode() {
         val newState = !isMicModeActive.value
         isMicModeActive.value = newState
         if (newState) {
@@ -122,8 +190,8 @@ class PlayerViewModel(
     }
     // -------------------------------
     
-    val autoAnalyzeLyrics = MutableStateFlow(true)
-    val availableLyricsResults = MutableStateFlow<List<LrcSearchResult>>(emptyList())
+    override val autoAnalyzeLyrics = MutableStateFlow(true)
+    override val availableLyricsResults = MutableStateFlow<List<LrcSearchResult>>(emptyList())
     
     fun toggleAutoAnalyze() {
         val newState = !autoAnalyzeLyrics.value
@@ -243,14 +311,17 @@ class PlayerViewModel(
 
     init {
         val prefs = PreferencesManager.getInstance(context)
-        _repeatMode.value = prefs.repeatMode
-        _shuffleModeEnabled.value = prefs.shuffleModeEnabled
-        _playbackSpeed.value = prefs.playbackSpeed
+        repeatMode.value = prefs.repeatMode
+        shuffleModeEnabled.value = prefs.shuffleModeEnabled
+        playbackSpeed.value = prefs.playbackSpeed
         _playbackPitch.value = prefs.playbackPitch
         _reverbEnabled.value = prefs.reverbEnabled
         _effectsPreset.value = prefs.effectsPreset
         autoAnalyzeLyrics.value = prefs.autoAnalyzeLyrics
         // Push saved values to service companion flows so service can restore them
+        coverOffsetX.value = PreferencesManager.getInstance(context).coverOffsetX
+        coverOffsetY.value = PreferencesManager.getInstance(context).coverOffsetY
+        coverScale.value = PreferencesManager.getInstance(context).coverScale
         PlaybackService.playbackSpeedFlow.value = prefs.playbackSpeed
         PlaybackService.playbackPitchFlow.value = prefs.playbackPitch
         PlaybackService.reverbEnabledFlow.value = prefs.reverbEnabled
@@ -379,12 +450,12 @@ class PlayerViewModel(
                 }
 
                 override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) {
-                    _shuffleModeEnabled.value = shuffleModeEnabled
+                    this@PlayerViewModel.shuffleModeEnabled.value = shuffleModeEnabled
                     PreferencesManager.getInstance(context).shuffleModeEnabled = shuffleModeEnabled
                 }
 
                 override fun onRepeatModeChanged(repeatMode: Int) {
-                    _repeatMode.value = repeatMode
+                    this@PlayerViewModel.repeatMode.value = repeatMode
                     PreferencesManager.getInstance(context).repeatMode = repeatMode
                 }
             })
@@ -397,7 +468,7 @@ class PlayerViewModel(
             // Visualizer lifecycle is managed by MainActivity.onStart/onStop
         }
 
-    fun playTrack(track: TrackEntity, queue: List<TrackEntity>) {
+    override fun playTrack(track: TrackEntity, queue: List<TrackEntity>) {
         val player = _playerState.value ?: return
         _currentTrack.value = track
         _currentQueue.value = queue
@@ -449,7 +520,7 @@ class PlayerViewModel(
         player.playWhenReady = true
     }
 
-    fun playNext() {
+    override fun seekToNext() {
         _playerState.value?.let { player ->
             if (player.hasNextMediaItem()) {
                 player.seekToNextMediaItem()
@@ -459,7 +530,7 @@ class PlayerViewModel(
         }
     }
 
-    fun playPrevious() {
+    override fun seekToPrevious() {
         _playerState.value?.let { player ->
             if (player.hasPreviousMediaItem()) {
                 player.seekToPreviousMediaItem()
@@ -469,7 +540,7 @@ class PlayerViewModel(
         }
     }
 
-    fun togglePlayPause() {
+    override fun togglePlayPause() {
         _playerState.value?.let { player ->
             if (player.isPlaying) {
                 player.pause()
@@ -482,7 +553,7 @@ class PlayerViewModel(
     
     private suspend fun extractColors(track: TrackEntity) {
         // Check cache first — avoids re-reading the file if already processed
-        PaletteCache.get(context, track.id)?.let {
+        PaletteCache.get(track.id)?.let {
             _paletteColors.value = it
             return
         }
@@ -540,7 +611,7 @@ class PlayerViewModel(
                         lightVibrant = Color((palette.lightVibrantSwatch?.rgb ?: dominantRaw)),
                         darkMuted = Color((palette.darkMutedSwatch?.rgb ?: dominantRaw))
                     )
-                    PaletteCache.put(context, track.id, colors)
+                    PaletteCache.put(track.id, colors)
                     _paletteColors.value = colors
                 } else {
                     _paletteColors.value = PaletteColors()
@@ -577,7 +648,26 @@ class PlayerViewModel(
         }
     }
 
-    fun updateTrackMetadata(id: Long, title: String?, artist: String?, album: String?, coverPath: String?) {
+    override fun setCoverVisibilityMode(mode: String) { coverVisibilityMode.value = mode }
+    override fun setChromaKeyColor(colorStr: String) { chromaKeyColor.value = colorStr }
+    override fun setCoverDragEnabled(enabled: Boolean) { coverDragEnabled.value = enabled }
+    override fun setCleanUiMode(enabled: Boolean) { cleanUiMode.value = enabled }
+    override fun setDynamicColorsPlus(enabled: Boolean) { dynamicColorsPlus.value = enabled }
+    override fun setDynamicColorsInterval(seconds: Int) { dynamicColorsInterval.value = seconds }
+    override fun setCoverOffset(x: Float, y: Float) { 
+        coverOffsetX.value = x
+        coverOffsetY.value = y
+        val prefs = PreferencesManager.getInstance(context)
+        prefs.coverOffsetX = x
+        prefs.coverOffsetY = y 
+    }
+
+    override fun setCoverScale(scale: Float) {
+        coverScale.value = scale
+        PreferencesManager.getInstance(context).coverScale = scale
+    }
+
+    override fun updateTrackMetadata(id: Long, title: String?, artist: String?, album: String?, coverPath: String?) {
         viewModelScope.launch {
             repository.updateTrackMetadata(id, title, artist, album, coverPath)
             // Update current track if it's the one playing
@@ -594,8 +684,8 @@ class PlayerViewModel(
         }
     }
 
-    fun setSpeed(speed: Float) {
-        _playbackSpeed.value = speed
+    override fun setSpeed(speed: Float) {
+        playbackSpeed.value = speed
         _effectsPreset.value = "CUSTOM"
         val prefs = PreferencesManager.getInstance(context)
         prefs.playbackSpeed = speed
@@ -607,7 +697,7 @@ class PlayerViewModel(
         context.startService(intent)
     }
 
-    fun setPitch(pitch: Float) {
+    override fun setPitch(pitch: Float) {
         _playbackPitch.value = pitch
         _effectsPreset.value = "CUSTOM"
         val prefs = PreferencesManager.getInstance(context)
@@ -620,7 +710,7 @@ class PlayerViewModel(
         context.startService(intent)
     }
 
-    fun setReverb(enabled: Boolean) {
+    override fun setReverb(enabled: Boolean) {
         _reverbEnabled.value = enabled
         _effectsPreset.value = "CUSTOM"
         val prefs = PreferencesManager.getInstance(context)
@@ -633,7 +723,7 @@ class PlayerViewModel(
         context.startService(intent)
     }
 
-    fun applyPreset(preset: String) {
+    override fun applyPreset(preset: String) {
         val (speed, pitch, reverb) = when (preset) {
             "SLOWED" -> Triple(0.8f, 0.92f, true)
             "NIGHTCORE" -> Triple(1.25f, 1.15f, false)
@@ -641,7 +731,7 @@ class PlayerViewModel(
             "BASS" -> Triple(0.9f, 0.85f, true)
             else -> Triple(1.0f, 1.0f, false) // NORMAL
         }
-        _playbackSpeed.value = speed
+        playbackSpeed.value = speed
         _playbackPitch.value = pitch
         _reverbEnabled.value = reverb
         _effectsPreset.value = preset

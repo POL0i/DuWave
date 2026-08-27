@@ -99,9 +99,14 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
         get() = prefs.getBoolean("usePerBandMultiplier", false)
         set(value) = prefs.edit().putBoolean("usePerBandMultiplier", value).apply()
 
+    private val _lastMainScreenPageFlow = MutableStateFlow(prefs.getInt("lastMainScreenPage", 0))
+    override val lastMainScreenPageFlow: StateFlow<Int> = _lastMainScreenPageFlow
     override var lastMainScreenPage: Int
         get() = prefs.getInt("lastMainScreenPage", 0)
-        set(value) = prefs.edit().putInt("lastMainScreenPage", value).apply()
+        set(value) {
+            prefs.edit().putInt("lastMainScreenPage", value).apply()
+            _lastMainScreenPageFlow.value = value
+        }
 
     override var lastLibraryTab: Int
         get() = prefs.getInt("lastLibraryTab", 0)
@@ -274,4 +279,15 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
     override var lastServiceDownState: Boolean
         get() = prefs.getBoolean("lastServiceDownState", false)
         set(value) = prefs.edit().putBoolean("lastServiceDownState", value).apply()
+    override var coverOffsetX: Float
+        get() = prefs.getFloat("coverOffsetX", 0f)
+        set(value) = prefs.edit().putFloat("coverOffsetX", value).apply()
+
+    override var coverOffsetY: Float
+        get() = prefs.getFloat("coverOffsetY", 0f)
+        set(value) = prefs.edit().putFloat("coverOffsetY", value).apply()
+
+    override var coverScale: Float
+        get() = prefs.getFloat("coverScale", 1.0f)
+        set(value) = prefs.edit().putFloat("coverScale", value).apply()
 }

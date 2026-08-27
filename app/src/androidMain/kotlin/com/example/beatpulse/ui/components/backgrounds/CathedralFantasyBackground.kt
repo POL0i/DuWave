@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import com.example.beatpulse.ui.LocalCoverOffset
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -25,11 +26,13 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.example.beatpulse.theme.PaletteColors
-import com.example.beatpulse.visualizer.AudioVisualizerManager
+import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
+import androidx.compose.runtime.collectAsState
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
+import androidx.compose.ui.graphics.drawscope.translate
 
 private const val SHADER_SRC = """
     uniform float2 iResolution;
@@ -39,14 +42,17 @@ private const val SHADER_SRC = """
     uniform half4 colorVibrant;
     uniform half4 colorMuted;
     uniform float iOffsetY;
+    uniform float iOffsetX;
 
     mat2 rot(float a) {
         float s = sin(a), c = cos(a);
         return mat2(c, -s, s, c);
     }
 
-    half4 main(in float2 fragCoord) {
-        float2 uv = (fragCoord.xy - 0.5 * iResolution.xy + float2(0.0, iOffsetY * iResolution.y)) / iResolution.y;
+    half4 main(float2 fragCoord) {
+        float2 uv = (fragCoord.xy - 0.5 * iResolution.xy + float2(iOffsetX * iResolution.y, iOffsetY * iResolution.y)) / iResolution.y;
+        float2 uv_screen = (fragCoord.xy - 0.5 * iResolution.xy) / iResolution.y;
+        float r_screen = length(uv_screen);
         float r = length(uv);
         float a = atan(uv.y, uv.x);
         
@@ -72,7 +78,7 @@ private const val SHADER_SRC = """
         float glow = exp(-r * (4.0 - iEnergy * 2.5)) * iEnergy;
         glassColor.rgb += glow * colorVibrant.rgb;
         
-        float vignette = 1.0 - smoothstep(0.3, 1.2, r);
+        float vignette = 1.0 - smoothstep(0.3, 1.2, r_screen);
         
         // Deep space background color instead of absolute black where there is no lead
         half4 finalColor = half4(glassColor.rgb * lead * vignette, 1.0);
@@ -80,21 +86,22 @@ private const val SHADER_SRC = """
     }
 """
 
-@SuppressLint("NewApi")
-@Composable
+actual @Composable
 fun CathedralFantasyBackground(
     paletteColors: PaletteColors,
-    visualizerManager: AudioVisualizerManager,
+    visualizerManager: IAudioVisualizerManager,
     isPlayerScreen: Boolean,
-    isLibraryScreen: Boolean = false,
+    modifier: Modifier,
+    isLibraryScreen: Boolean,
     content: @Composable () -> Unit
 ) {
+    val coverOffset = LocalCoverOffset.current
     val tintColorState = animateColorAsState(targetValue = paletteColors.dominant.copy(alpha = 0.5f), animationSpec = tween(2000), label = "cathedral_tint")
     val vibrantState = animateColorAsState(targetValue = paletteColors.vibrant.copy(alpha = 0.8f), animationSpec = tween(2000), label = "cathedral_vibrant")
     val lightVibrantState = animateColorAsState(targetValue = paletteColors.lightVibrant.copy(alpha = 0.8f), animationSpec = tween(2000), label = "cathedral_lv")
     val mutedState = animateColorAsState(targetValue = paletteColors.muted, animationSpec = tween(2000), label = "cathedral_m")
 
-    val amplitudesState = visualizerManager.amplitudes.collectAsState()
+    val amplitudesState = visualizerManager.combinedAmplitudes.collectAsState()
     val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
 
@@ -143,6 +150,7 @@ fun CathedralFantasyBackground(
         runtimeShader?.let { ShaderBrush(it) }
     }
 
+
     Box(modifier = Modifier.fillMaxSize()) {
         // Fondo base si falla el shader o no es soportado
         Box(
@@ -152,6 +160,10 @@ fun CathedralFantasyBackground(
         )
 
         // Capa de dibujo de la catedral
+        
+        
+        val currentAlbumArtCenterY = com.example.beatpulse.ui.LocalAlbumArtCenterY.current
+        val currentCoverOffset = com.example.beatpulse.ui.LocalCoverOffset.current
         Canvas(modifier = Modifier.fillMaxSize()
             .graphicsLayer {
                 if (!isPlayerScreen) {
@@ -169,11 +181,15 @@ fun CathedralFantasyBackground(
                 runtimeShader.setFloatUniform("iTime", time * 0.5f)
                 runtimeShader.setFloatUniform("iEnergy", dynamicEnergy)
                 
-                val centerY = VisualizerState.albumArtCenterY
-                val dynamicOffsetY = if (isPlayerScreen && centerY != null) {
-                    ((size.height / 2f) - centerY) / size.height
+                val dynamicOffsetY = if (isPlayerScreen) {
+                    val baseOffsetY = if (currentAlbumArtCenterY != null) ((size.height / 2f) - currentAlbumArtCenterY) / size.height else 0f
+                    baseOffsetY - (currentCoverOffset.y / size.height)
+                } else 0f
+                val dynamicOffsetX = if (isPlayerScreen) {
+                    -(currentCoverOffset.x / size.height)
                 } else 0f
                 runtimeShader.setFloatUniform("iOffsetY", dynamicOffsetY)
+                runtimeShader.setFloatUniform("iOffsetX", dynamicOffsetX)
                 
                 runtimeShader.setFloatUniform("colorDominant", dom.red, dom.green, dom.blue, dom.alpha)
                 runtimeShader.setFloatUniform("colorVibrant", vib.red, vib.green, vib.blue, vib.alpha)
@@ -205,13 +221,13 @@ fun CathedralFantasyBackground(
                 drawPath(archPath, architectColor, style = Stroke(strokeWidth))
                 drawPath(archPath, glowColor, style = Stroke(strokeWidth * 4)) 
 
-                val fallbackCenterY = VisualizerState.albumArtCenterY
-                val centerY = if (isPlayerScreen && fallbackCenterY != null) {
-                    fallbackCenterY
+                translate(left = if (isPlayerScreen) currentCoverOffset.x else 0f, top = if (isPlayerScreen) currentCoverOffset.y else 0f) {
+                val currentAlbumArtCenterY = if (isPlayerScreen && currentAlbumArtCenterY != null) {
+                    currentAlbumArtCenterY
                 } else {
                     height * 0.25f
                 }
-                val roseCenter = Offset(width * 0.5f, centerY)
+                val roseCenter = Offset(width * 0.5f, currentAlbumArtCenterY)
                 val roseOuterRadius = width * 0.25f
                 val roseInnerRadius = width * 0.1f
 
@@ -227,12 +243,17 @@ fun CathedralFantasyBackground(
                     drawLine(architectColor, start, end, strokeWidth)
                 }
                 drawCircle(glowColor.copy(alpha = dynamicEnergy * 0.6f), roseOuterRadius, roseCenter)
+                }
             }
         }
 
         // Capa de cenizas (por encima del shader para que se vean)
         if (isLibraryScreen) {
-            Canvas(modifier = Modifier.fillMaxSize()
+            
+        
+        val currentAlbumArtCenterY = com.example.beatpulse.ui.LocalAlbumArtCenterY.current
+        val currentCoverOffset = com.example.beatpulse.ui.LocalCoverOffset.current
+        Canvas(modifier = Modifier.fillMaxSize()
                 .graphicsLayer {
                     scaleX = 1f + dynamicEnergy * 0.15f
                     scaleY = 1f + dynamicEnergy * 0.15f

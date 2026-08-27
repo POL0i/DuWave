@@ -53,4 +53,42 @@ interface IPlayerViewModel {
     fun setPitch(pitch: Float)
     fun setReverb(enabled: Boolean)
     fun applyPreset(preset: String)
+    val currentPosition: kotlinx.coroutines.flow.StateFlow<Long>
+    val duration: kotlinx.coroutines.flow.StateFlow<Long>
+    fun togglePlayPause()
+    fun seekTo(position: Long)
+    fun seekToNext()
+    fun seekToPrevious()
+    fun fastForward()
+    fun rewind()
+
+    val coverVisibilityMode: kotlinx.coroutines.flow.StateFlow<String>
+    val chromaKeyColor: kotlinx.coroutines.flow.StateFlow<String>
+    val coverDragEnabled: kotlinx.coroutines.flow.StateFlow<Boolean>
+    val cleanUiMode: kotlinx.coroutines.flow.StateFlow<Boolean>
+    val dynamicColorsPlus: kotlinx.coroutines.flow.StateFlow<Boolean>
+    val dynamicColorsInterval: kotlinx.coroutines.flow.StateFlow<Int>
+    val coverOffsetX: kotlinx.coroutines.flow.StateFlow<Float>
+    val coverOffsetY: kotlinx.coroutines.flow.StateFlow<Float>
+    val coverScale: kotlinx.coroutines.flow.StateFlow<Float>
+    val albumArtCenterY: Float?
+    var availableLyricsResults: kotlinx.coroutines.flow.StateFlow<List<LrcSearchResult>>
+
+    fun setCoverVisibilityMode(mode: String)
+    fun setChromaKeyColor(color: String)
+    fun setCoverDragEnabled(enabled: Boolean)
+    fun setCleanUiMode(enabled: Boolean)
+    fun setDynamicColorsPlus(enabled: Boolean)
+    fun setDynamicColorsInterval(seconds: Int)
+    fun setCoverOffset(x: Float, y: Float)
+    fun setCoverScale(scale: Float)
+
+    val supportDialogRequested: kotlinx.coroutines.flow.SharedFlow<Unit>
+    fun triggerSupportDialog()
+
+    val streamConfigDialogRequested: kotlinx.coroutines.flow.SharedFlow<Unit>
+    fun triggerStreamConfigDialog()
+
+    val settingsMenuRequested: kotlinx.coroutines.flow.SharedFlow<Unit>
+    fun triggerSettingsMenu()
 }

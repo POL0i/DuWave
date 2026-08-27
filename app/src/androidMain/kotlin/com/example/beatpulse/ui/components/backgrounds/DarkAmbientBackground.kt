@@ -16,7 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.unit.dp
 import com.example.beatpulse.theme.PaletteColors
-import com.example.beatpulse.visualizer.AudioVisualizerManager
+import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
+import androidx.compose.runtime.collectAsState
 import kotlin.random.Random
 
 private const val BLACK_METAL_SHADER_SRC = """
@@ -25,6 +26,8 @@ private const val BLACK_METAL_SHADER_SRC = """
     uniform float iEnergy;
     uniform half4 colorDominant;
     uniform half4 colorVibrant;
+    uniform float iOffsetY;
+    uniform float iOffsetX;
     
     float noise(float2 p) {
         return fract(sin(dot(p, float2(12.9898, 78.233))) * 43758.5453);
@@ -48,7 +51,7 @@ private const val BLACK_METAL_SHADER_SRC = """
     }
     
     half4 main(in float2 fragCoord) {
-        float2 uv = (fragCoord.xy - 0.5 * iResolution.xy) / iResolution.y;
+        float2 uv = (fragCoord.xy - 0.5 * iResolution.xy + float2(iOffsetX * iResolution.y, iOffsetY * iResolution.y)) / iResolution.y;
         
         // --- VEINS BACKGROUND ---
         float2 vUv = uv * 3.0 + float2(0.0, -iTime * 0.2);
@@ -65,18 +68,18 @@ private const val BLACK_METAL_SHADER_SRC = """
     }
 """
 
-@SuppressLint("NewApi")
-@Composable
+actual @Composable
 fun DarkAmbientBackground(
     paletteColors: PaletteColors,
-    visualizerManager: AudioVisualizerManager,
+    visualizerManager: IAudioVisualizerManager,
     isPlayerScreen: Boolean,
+    modifier: Modifier,
     content: @Composable () -> Unit
 ) {
     val dominantColorState = animateColorAsState(targetValue = paletteColors.dominant, animationSpec = tween(1500), label = "dominant_color")
     val vibrantColorState = animateColorAsState(targetValue = paletteColors.vibrant, animationSpec = tween(1500), label = "vibrant_color")
 
-    val amplitudesState = visualizerManager.amplitudes.collectAsState()
+    val amplitudesState = visualizerManager.combinedAmplitudes.collectAsState()
     val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
     
@@ -126,16 +129,27 @@ fun DarkAmbientBackground(
             .fillMaxSize()
             .background(Color.Black)
     ) {
+        val currentAlbumArtCenterY = com.example.beatpulse.ui.LocalAlbumArtCenterY.current
+        val currentCoverOffset = com.example.beatpulse.ui.LocalCoverOffset.current
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && shaderBrush != null && runtimeShader != null) {
                 val dom = dominantColorState.value
                 val vib = vibrantColorState.value
-                
+                val dynamicOffsetY = if (isPlayerScreen) {
+                    val base = if (currentAlbumArtCenterY != null) ((size.height / 2f) - currentAlbumArtCenterY) / size.height else 0f
+                    base - (currentCoverOffset.y / size.height)
+                } else 0f
+                val dynamicOffsetX = if (isPlayerScreen) {
+                    -(currentCoverOffset.x / size.height)
+                } else 0f
+
                 runtimeShader.setFloatUniform("iResolution", size.width, size.height)
                 runtimeShader.setFloatUniform("iTime", time * 0.5f)
                 runtimeShader.setFloatUniform("iEnergy", dynamicEnergy)
                 runtimeShader.setFloatUniform("colorDominant", dom.red, dom.green, dom.blue, dom.alpha)
                 runtimeShader.setFloatUniform("colorVibrant", vib.red, vib.green, vib.blue, vib.alpha)
+                runtimeShader.setFloatUniform("iOffsetY", dynamicOffsetY)
+                runtimeShader.setFloatUniform("iOffsetX", dynamicOffsetX)
                 
                 drawRect(brush = shaderBrush, size = size)
             } else {

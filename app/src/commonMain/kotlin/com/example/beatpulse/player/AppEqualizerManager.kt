@@ -1,21 +1,22 @@
 package com.example.beatpulse.player
 
 import kotlinx.coroutines.flow.StateFlow
+import com.example.beatpulse.ui.components.player.IEqualizerManager
 
-interface AppEqualizerManager {
-    val isEnabled: StateFlow<Boolean>
+interface AppEqualizerManager : IEqualizerManager {
+    override val isEnabled: StateFlow<Boolean>
     val numBands: Int
-    val currentPreset: StateFlow<Short>
-    val isAutoMode: StateFlow<Boolean>
-    val bands: StateFlow<List<Short>>
-    val bandLevels: StateFlow<Map<Short, Short>>
-    val presets: StateFlow<List<Pair<Short, String>>>
-    val minLevel: StateFlow<Short>
-    val maxLevel: StateFlow<Short>
+    override val currentPreset: StateFlow<Short>
+    override val isAutoMode: StateFlow<Boolean>
+    override val bands: StateFlow<List<Short>>
+    override val bandLevels: StateFlow<Map<Short, Short>>
+    override val presets: StateFlow<List<Pair<Short, String>>>
+    override val minLevel: StateFlow<Short>
+    override val maxLevel: StateFlow<Short>
 
-    fun getCenterFreq(band: Short): Int
-    fun setBandLevel(band: Short, level: Short)
-    fun setAutoMode(enabled: Boolean)
-    fun setEnabled(enabled: Boolean)
-    fun setPreset(preset: Short)
+    override fun getCenterFreq(band: Short): Int
+    override fun setBandLevel(band: Short, level: Short)
+    override fun setAutoMode(enabled: Boolean)
+    override fun setEnabled(enabled: Boolean)
+    override fun setPreset(preset: Short)
 }

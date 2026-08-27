@@ -6,7 +6,7 @@ import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.data.LrcSearchResult
 import com.example.beatpulse.player.AppPlayer
 import com.example.beatpulse.player.AppPlayerListener
-import com.example.beatpulse.player.IPlayerViewModel
+import com.example.beatpulse.ui.components.player.IPlayerViewModel
 import com.example.beatpulse.theme.PaletteColors
 import com.example.beatpulse.utils.LyricLine
 import kotlinx.coroutines.*
@@ -14,22 +14,35 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toPixelMap
 
 class DesktopPlayerViewModel(
     private val appPlayer: AppPlayer,
     private val repository: MusicRepository,
+    private val onlineRepository: com.example.beatpulse.data.IOnlineMusicRepository,
     private val prefs: AppPreferences
 ) : IPlayerViewModel {
 
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
     override val currentTrack = MutableStateFlow<TrackEntity?>(null)
-    override val currentLyrics = MutableStateFlow<List<LyricLine>>(emptyList())
-    override val albumArt = MutableStateFlow<ImageBitmap?>(null)
-    override val streamAvatar = MutableStateFlow<ImageBitmap?>(null)
+    val currentLyrics = MutableStateFlow<List<LyricLine>>(emptyList())
+    val albumArt = MutableStateFlow<ImageBitmap?>(null)
+    val streamAvatar = MutableStateFlow<ImageBitmap?>(null)
     override val currentQueue = MutableStateFlow<List<TrackEntity>>(emptyList())
+    
+    override val playerState: StateFlow<Any?> = MutableStateFlow(null)
+    override var albumArtCenterY: Float? = null
+    override val streamConfigAspectRatio: MutableStateFlow<String> = MutableStateFlow("16:9")
     override val isPlaying = MutableStateFlow(false)
-    override val paletteColors = MutableStateFlow(PaletteColors(Color.Black, Color.Black, Color.Black, Color.Black))
+    override val paletteColors = MutableStateFlow(PaletteColors(
+        dominant = Color(0xFF1E1E1E),
+        vibrant = Color(0xFF00E5FF),
+        darkVibrant = Color(0xFF00B8D4),
+        lightVibrant = Color(0xFF84FFFF),
+        muted = Color(0xFF9E9E9E),
+        darkMuted = Color(0xFF616161)
+    ))
     override val repeatMode = MutableStateFlow(0)
     override val shuffleModeEnabled = MutableStateFlow(false)
     override val playbackSpeed = MutableStateFlow(1.0f)
@@ -41,28 +54,161 @@ class DesktopPlayerViewModel(
     override val abPointB = MutableStateFlow(0f)
     override val isFetchingLyrics = MutableStateFlow(false)
     override val searchFailed = MutableStateFlow(false)
-    override val availableLyricsResults = MutableStateFlow<List<LrcSearchResult>>(emptyList())
+    override val availableLyricsResults = MutableStateFlow<List<Any>>(emptyList())
     override val autoAnalyzeLyrics = MutableStateFlow(false)
     override val isMicModeActive = MutableStateFlow(false)
     override val streamAvatarUri = MutableStateFlow<String?>(null)
     override val streamConfigUiVisible = MutableStateFlow(false)
     override val isWifiStreamActive = MutableStateFlow(false)
     override val wifiStreamFps = MutableStateFlow(30)
-    override val wifiStreamCustomWidth = MutableStateFlow(1280)
-    override val wifiStreamCustomHeight = MutableStateFlow(720)
-    override val wifiStreamQuality = MutableStateFlow(80)
     override val streamConfigEffectsVisible = MutableStateFlow(false)
-    override val streamConfigAspectRatio = MutableStateFlow("16:9")
+    
+    override val coverVisibilityMode = MutableStateFlow("NORMAL")
+    override val chromaKeyColor = MutableStateFlow("Green")
+    override val coverDragEnabled = MutableStateFlow(false)
+    override val cleanUiMode = MutableStateFlow(false)
+    override val dynamicColorsPlus = MutableStateFlow(false)
+    override val dynamicColorsInterval = MutableStateFlow(30)
+    
+    override val coverOffsetX = MutableStateFlow(prefs.coverOffsetX)
+    override val coverOffsetY = MutableStateFlow(prefs.coverOffsetY)
+    override val coverScale = MutableStateFlow(prefs.coverScale)
+
+    private val _supportDialogRequested = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val supportDialogRequested: kotlinx.coroutines.flow.SharedFlow<Unit> = _supportDialogRequested
+
+    override fun triggerSupportDialog() {
+        _supportDialogRequested.tryEmit(Unit)
+    }
+
+    private val _streamConfigDialogRequested = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val streamConfigDialogRequested: kotlinx.coroutines.flow.SharedFlow<Unit> = _streamConfigDialogRequested
+
+    override fun triggerStreamConfigDialog() {
+        _streamConfigDialogRequested.tryEmit(Unit)
+    }
+
+    private val _settingsMenuRequested = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val settingsMenuRequested: kotlinx.coroutines.flow.SharedFlow<Unit> = _settingsMenuRequested
+
+    override fun triggerSettingsMenu() {
+        _settingsMenuRequested.tryEmit(Unit)
+    }
 
     init {
         appPlayer.addListener(object : AppPlayerListener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 this@DesktopPlayerViewModel.isPlaying.value = isPlaying
+                if (isPlaying) startPositionPolling()
             }
         })
+        
+        scope.launch {
+            albumArt.collect { bitmap ->
+                if (bitmap != null) {
+                    val palette = extractPaletteFast(bitmap)
+                    paletteColors.value = palette
+                } else {
+                    paletteColors.value = PaletteColors(
+                        dominant = Color(0xFF1E1E1E),
+                        vibrant = Color(0xFF00E5FF),
+                        darkVibrant = Color(0xFF00B8D4),
+                        lightVibrant = Color(0xFF84FFFF),
+                        muted = Color(0xFF9E9E9E),
+                        darkMuted = Color(0xFF616161)
+                    )
+                }
+            }
+        }
+    }
+    
+    private fun extractPaletteFast(bitmap: ImageBitmap): PaletteColors {
+        try {
+            val pixelMap = bitmap.toPixelMap()
+            val width = pixelMap.width
+            val height = pixelMap.height
+            
+            var rSum = 0L
+            var gSum = 0L
+            var bSum = 0L
+            var count = 0
+            
+            val step = maxOf(1, width / 30)
+            
+            var maxSat = -1f
+            var vibR = 0
+            var vibG = 0
+            var vibB = 0
+            
+            for (x in 0 until width step step) {
+                for (y in 0 until height step step) {
+                    val pixel = pixelMap[x, y]
+                    val r = (pixel.red * 255).toInt()
+                    val g = (pixel.green * 255).toInt()
+                    val b = (pixel.blue * 255).toInt()
+                    
+                    rSum += r
+                    gSum += g
+                    bSum += b
+                    count++
+                    
+                    val maxC = maxOf(r, g, b)
+                    val minC = minOf(r, g, b)
+                    val sat = if (maxC == 0) 0f else (maxC - minC) / maxC.toFloat()
+                    if (sat > maxSat && maxC > 50) { 
+                        maxSat = sat
+                        vibR = r
+                        vibG = g
+                        vibB = b
+                    }
+                }
+            }
+            
+            if (count == 0) return paletteColors.value
+            
+            val avgR = (rSum / count).toInt()
+            val avgG = (gSum / count).toInt()
+            val avgB = (bSum / count).toInt()
+            
+            val dominant = Color(avgR, avgG, avgB)
+            val vibrant = if (maxSat < 0) dominant else Color(vibR, vibG, vibB)
+            
+            fun mixColor(c: Color, mix: Color, ratio: Float): Color {
+                return Color(
+                    red = c.red * (1 - ratio) + mix.red * ratio,
+                    green = c.green * (1 - ratio) + mix.green * ratio,
+                    blue = c.blue * (1 - ratio) + mix.blue * ratio,
+                    alpha = c.alpha
+                )
+            }
+            
+            return PaletteColors(
+                dominant = dominant,
+                vibrant = vibrant,
+                muted = mixColor(dominant, Color.Gray, 0.4f),
+                darkVibrant = mixColor(vibrant, Color.Black, 0.4f),
+                lightVibrant = mixColor(vibrant, Color.White, 0.4f),
+                darkMuted = mixColor(dominant, Color.Black, 0.6f)
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+            return paletteColors.value
+        }
+    }
+    
+    private var pollingJob: Job? = null
+    private fun startPositionPolling() {
+        pollingJob?.cancel()
+        pollingJob = scope.launch {
+            while (isActive && isPlaying.value) {
+                currentPosition.value = appPlayer.currentPosition
+                duration.value = appPlayer.duration
+                delay(250)
+            }
+        }
     }
 
-    override fun playNext() {
+    fun playNext() {
         val queue = currentQueue.value
         val track = currentTrack.value
         if (queue.isNotEmpty() && track != null) {
@@ -75,7 +221,7 @@ class DesktopPlayerViewModel(
         }
     }
 
-    override fun playPrevious() {
+    fun playPrevious() {
         val queue = currentQueue.value
         val track = currentTrack.value
         if (queue.isNotEmpty() && track != null) {
@@ -95,6 +241,14 @@ class DesktopPlayerViewModel(
             appPlayer.play()
         }
     }
+    
+    override fun play() {
+        appPlayer.play()
+    }
+    
+    override fun pause() {
+        appPlayer.pause()
+    }
 
     override fun playTrack(track: TrackEntity, queue: List<TrackEntity>) {
         currentTrack.value = track
@@ -103,11 +257,28 @@ class DesktopPlayerViewModel(
         scope.launch {
             repository.insertOrUpdateTrack(track)
             repository.markAsPlayed(track.id)
-            // Desktop palette extraction could be added here in the future
+            
+            val bitmap = com.example.beatpulse.ui.components.loadDesktopThumbnail(track)
+            albumArt.value = bitmap
+            
+            val streamUrl = if (track.dataPath.startsWith("youtube://")) {
+                val encryptedUrl = track.dataPath.removePrefix("youtube://")
+                onlineRepository.getStreamUrl(encryptedUrl)
+            } else {
+                track.dataPath
+            }
+
+            if (streamUrl != null) {
+                withContext(Dispatchers.Main) {
+                    (appPlayer as? com.example.beatpulse.player.DesktopPlayerAdapter)?.setTrack(streamUrl, track.duration)
+                        ?: appPlayer.setTrack(streamUrl)
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    prefs.showToast("No se pudo obtener el audio de la canción online")
+                }
+            }
         }
-        
-        appPlayer.setTrack(track.dataPath)
-        appPlayer.play()
     }
 
     override fun setSpeed(speed: Float) {
@@ -120,11 +291,11 @@ class DesktopPlayerViewModel(
         appPlayer.setPlaybackPitch(pitch)
     }
 
-    override fun setShuffleMode(enabled: Boolean) {
+    fun setShuffleMode(enabled: Boolean) {
         shuffleModeEnabled.value = enabled
     }
 
-    override fun setRepeatMode(mode: Int) {
+    fun setRepeatMode(mode: Int) {
         repeatMode.value = mode
     }
 
@@ -132,6 +303,27 @@ class DesktopPlayerViewModel(
         reverbEnabled.value = enabled
     }
 
+
+    override val currentPosition = MutableStateFlow(0L)
+    override val duration = MutableStateFlow(0L)
+    override fun seekTo(position: Long) {
+        currentPosition.value = position
+        appPlayer.seekTo(position)
+    }
+    override fun seekToNext() {
+        playNext()
+    }
+    override fun seekToPrevious() {
+        playPrevious()
+    }
+    override fun fastForward() {
+        val newPos = currentPosition.value + 10000L
+        seekTo(if (newPos > duration.value) duration.value else newPos)
+    }
+    override fun rewind() {
+        val newPos = currentPosition.value - 10000L
+        seekTo(if (newPos < 0L) 0L else newPos)
+    }
     override fun applyPreset(preset: String) {
         effectsPreset.value = preset
     }
@@ -142,23 +334,39 @@ class DesktopPlayerViewModel(
         }
     }
 
+    override fun setCoverVisibilityMode(mode: String) { coverVisibilityMode.value = mode }
+    override fun setChromaKeyColor(colorStr: String) { chromaKeyColor.value = colorStr }
+    override fun setCoverDragEnabled(enabled: Boolean) { coverDragEnabled.value = enabled }
+    override fun setCleanUiMode(enabled: Boolean) { cleanUiMode.value = enabled }
+    override fun setDynamicColorsPlus(enabled: Boolean) { dynamicColorsPlus.value = enabled }
+    override fun setDynamicColorsInterval(seconds: Int) { dynamicColorsInterval.value = seconds }
+    override fun setCoverOffset(x: Float, y: Float) {
+        coverOffsetX.value = x; prefs.coverOffsetX = x
+        coverOffsetY.value = y; prefs.coverOffsetY = y
+    }
+    
+    override fun setCoverScale(scale: Float) {
+        coverScale.value = scale
+        prefs.coverScale = scale
+    }
+
     override fun toggleMicMode() {
         isMicModeActive.value = !isMicModeActive.value
     }
 
-    override fun toggleAutoAnalyze() {
+    fun toggleAutoAnalyze() {
         autoAnalyzeLyrics.value = !autoAnalyzeLyrics.value
     }
 
-    override fun toggleStreamConfigEffects() {
+    fun toggleStreamConfigEffects() {
         streamConfigEffectsVisible.value = !streamConfigEffectsVisible.value
     }
 
-    override fun setStreamAspectRatio(ratio: String) {
+    fun setStreamAspectRatio(ratio: String) {
         streamConfigAspectRatio.value = ratio
     }
 
-    override fun updateStreamAvatar(uri: String?) {
+    fun updateStreamAvatar(uri: String?) {
         streamAvatarUri.value = uri
     }
 }

@@ -25,4 +25,35 @@ actual object SystemUtils {
             context.startActivity(intent)
         }
     }
+
+    actual fun recreateApp() {
+        // Restart the app
+        val context = BeatPulseApp.appContext
+        if (context != null) {
+            val packageManager = context.packageManager
+            val intent = packageManager.getLaunchIntentForPackage(context.packageName)
+            val componentName = intent?.component
+            val mainIntent = Intent.makeRestartActivityTask(componentName)
+            context.startActivity(mainIntent)
+            Runtime.getRuntime().exit(0)
+        }
+    }
+
+    actual fun pickImageFile(): String? {
+        // En Android esto requeriría un ActivityResultLauncher,
+        // por simplicidad y porque el scope actual es Desktop, retornamos null.
+        return null
+    }
+}
+
+@androidx.compose.runtime.Composable
+actual fun SystemBackHandler(onBack: () -> Unit) {
+    androidx.activity.compose.BackHandler(onBack = onBack)
+}
+
+@androidx.compose.runtime.Composable
+actual fun getLocalizedString(key: String): String {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val resId = context.resources.getIdentifier(key, "string", context.packageName)
+    return if (resId != 0) context.getString(resId) else key
 }

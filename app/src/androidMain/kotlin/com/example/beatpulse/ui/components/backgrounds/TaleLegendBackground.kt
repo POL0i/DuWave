@@ -16,7 +16,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.unit.dp
 import com.example.beatpulse.theme.PaletteColors
-import com.example.beatpulse.visualizer.AudioVisualizerManager
+import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
+import androidx.compose.runtime.collectAsState
+import com.example.beatpulse.ui.LocalCoverOffset
 
 private const val TALE_LEGEND_SHADER_SRC = """
     uniform float2 iResolution;
@@ -27,6 +29,7 @@ private const val TALE_LEGEND_SHADER_SRC = """
     uniform half4 colorDominant;
     uniform half4 colorVibrant;
     uniform float iOffsetY;
+    uniform float iOffsetX;
     
     // Retro resolution
     float pixelate = 110.0;
@@ -43,11 +46,11 @@ private const val TALE_LEGEND_SHADER_SRC = """
     
     half4 main(in float2 fragCoord) {
         // Screen-centered UV for the Battle Box so it doesn't shift
-        float2 uv_screen = (fragCoord - 0.5 * iResolution.xy) / iResolution.y;
+        float2 uv_screen = (fragCoord.xy - 0.5 * iResolution.xy) / iResolution.y;
         float2 puv_screen = floor(uv_screen * pixelate) / pixelate;
         
         // Offset UV for the bullets and soul so they center on the cover art
-        float2 uv = (fragCoord - 0.5 * iResolution.xy + float2(0.0, iOffsetY * iResolution.y)) / iResolution.y;
+        float2 uv = (fragCoord - 0.5 * iResolution.xy + float2(iOffsetX * iResolution.y, iOffsetY * iResolution.y)) / iResolution.y;
         float2 puv = floor(uv * pixelate) / pixelate;
         
         float time = iTime * 0.4 * iSpeed;
@@ -132,18 +135,19 @@ private const val TALE_LEGEND_SHADER_SRC = """
     }
 """
 
-@SuppressLint("NewApi")
-@Composable
+actual @Composable
 fun TaleLegendBackground(
     paletteColors: PaletteColors,
-    visualizerManager: AudioVisualizerManager,
+    visualizerManager: IAudioVisualizerManager,
     isPlayerScreen: Boolean,
+    modifier: Modifier,
     content: @Composable () -> Unit
 ) {
+    val coverOffset = LocalCoverOffset.current
     val dominantColorState = animateColorAsState(targetValue = paletteColors.dominant, tween(1500), label = "tl_dom")
     val vibrantColorState = animateColorAsState(targetValue = paletteColors.vibrant, tween(1500), label = "tl_vib")
 
-    val amplitudesState = visualizerManager.amplitudes.collectAsState()
+    val amplitudesState = visualizerManager.combinedAmplitudes.collectAsState()
     val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
     
@@ -196,23 +200,30 @@ fun TaleLegendBackground(
             .fillMaxSize()
             .background(baseBlack)
     ) {
+        
+        
+        val currentAlbumArtCenterY = com.example.beatpulse.ui.LocalAlbumArtCenterY.current
+        val currentCoverOffset = com.example.beatpulse.ui.LocalCoverOffset.current
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && shaderBrush != null && runtimeShader != null) {
                 val dom = dominantColorState.value
                 val vib = vibrantColorState.value
+                
+                val dynamicOffsetY = if (isPlayerScreen) {
+                    val baseOffsetY = if (currentAlbumArtCenterY != null) ((size.height / 2f) - currentAlbumArtCenterY) / size.height else 0f
+                    baseOffsetY - (currentCoverOffset.y / size.height)
+                } else 0f
+                val dynamicOffsetX = if (isPlayerScreen) {
+                    -(currentCoverOffset.x / size.height)
+                } else 0f
                 
                 runtimeShader.setFloatUniform("iResolution", size.width, size.height)
                 runtimeShader.setFloatUniform("iTime", time * 0.5f)
                 runtimeShader.setFloatUniform("iEnergy", dynamicEnergy)
                 runtimeShader.setFloatUniform("iSpeed", finalSpeed)
                 runtimeShader.setFloatUniform("isPlayer", if (isPlayerScreen) 1f else 0f)
-                
-                val centerY = VisualizerState.albumArtCenterY
-                val dynamicOffsetY = if (isPlayerScreen && centerY != null) {
-                    ((size.height / 2f) - centerY) / size.height
-                } else 0f
                 runtimeShader.setFloatUniform("iOffsetY", dynamicOffsetY)
-                
+                runtimeShader.setFloatUniform("iOffsetX", dynamicOffsetX)
                 runtimeShader.setFloatUniform("colorDominant", dom.red, dom.green, dom.blue, dom.alpha)
                 runtimeShader.setFloatUniform("colorVibrant", vib.red, vib.green, vib.blue, vib.alpha)
                 
@@ -220,13 +231,12 @@ fun TaleLegendBackground(
             } else {
                 val width = size.width
                 val height = size.height
-                val fallbackCenterY = VisualizerState.albumArtCenterY
-                val centerY = if (isPlayerScreen && fallbackCenterY != null) {
-                    fallbackCenterY
+                val currentAlbumArtCenterY = if (isPlayerScreen && currentAlbumArtCenterY != null) {
+                    currentAlbumArtCenterY
                 } else {
                     height / 2f
                 }
-                val center = androidx.compose.ui.geometry.Offset(width / 2f, centerY)
+                val center = androidx.compose.ui.geometry.Offset(width / 2f, currentAlbumArtCenterY)
                 drawCircle(color = vibrantColorState.value.copy(alpha = 0.5f), radius = 200f + dynamicEnergy * 100f, center = center)
             }
         }

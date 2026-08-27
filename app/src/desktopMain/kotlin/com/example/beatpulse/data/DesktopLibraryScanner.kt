@@ -9,9 +9,12 @@ class DesktopLibraryScanner(private val dao: TrackDao) : ILibraryScanner {
 
     override suspend fun scanMusic(folderPath: String?): List<TrackEntity> {
         val scannedTracks = mutableListOf<TrackEntity>()
-        if (folderPath == null) return scannedTracks
-
-        val root = File(folderPath)
+        val home = System.getProperty("user.home")
+        var root = File(folderPath ?: (home + File.separator + "Music"))
+        if (!root.exists() && folderPath == null) {
+            val localizedMusic = File(home + File.separator + "Música")
+            if (localizedMusic.exists()) root = localizedMusic
+        }
         if (!root.exists() || !root.isDirectory) return scannedTracks
 
         val supportedExtensions = setOf("mp3", "flac", "wav", "m4a", "ogg")
@@ -24,8 +27,9 @@ class DesktopLibraryScanner(private val dao: TrackDao) : ILibraryScanner {
                     val tag = audioFile.tag
 
                     val title = tag?.getFirst(FieldKey.TITLE)?.takeIf { it.isNotBlank() } ?: file.nameWithoutExtension
-                    val artist = tag?.getFirst(FieldKey.ARTIST)?.takeIf { it.isNotBlank() } ?: "Unknown Artist"
-                    val album = tag?.getFirst(FieldKey.ALBUM)?.takeIf { it.isNotBlank() } ?: "Unknown Album"
+                    // Desktop fallback translations for unknown artist/album
+                    val artist = tag?.getFirst(FieldKey.ARTIST)?.takeIf { it.isNotBlank() } ?: "Artista Desconocido"
+                    val album = tag?.getFirst(FieldKey.ALBUM)?.takeIf { it.isNotBlank() } ?: "Álbum Desconocido"
                     
                     val durationMs = header?.trackLength?.toLong()?.times(1000L) ?: 0L
                     

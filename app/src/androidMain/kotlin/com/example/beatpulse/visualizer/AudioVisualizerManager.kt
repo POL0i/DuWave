@@ -92,18 +92,18 @@ class AudioVisualizerManager(private val prefs: AppPreferences) : AppVisualizerM
     private var isRecording = false
     private var recordJob: kotlinx.coroutines.Job? = null
 
-    override var isAdvancedMode = MutableStateFlow(prefs.isAdvancedMode)
-    override var visualizerArchetype = MutableStateFlow(prefs.visualizerArchetype)
-    override var filterMode = MutableStateFlow(runCatching { FilterMode.valueOf(prefs.filterMode) }.getOrDefault(FilterMode.ALL))
-    var physicsMode = MutableStateFlow(runCatching { PhysicsMode.valueOf(prefs.physicsMode) }.getOrDefault(PhysicsMode.EQUILIBRADO))
-    override var sensitivity = MutableStateFlow(prefs.sensitivity)
-    override var reactivity = MutableStateFlow(prefs.reactivity)
+    override val isAdvancedMode = MutableStateFlow(prefs.isAdvancedMode)
+    override val visualizerArchetype = MutableStateFlow(prefs.visualizerArchetype)
+    override val filterMode = MutableStateFlow<Any>(runCatching { FilterMode.valueOf(prefs.filterMode) }.getOrDefault(FilterMode.ALL))
+    val physicsMode = MutableStateFlow(runCatching { PhysicsMode.valueOf(prefs.physicsMode) }.getOrDefault(PhysicsMode.EQUILIBRADO))
+    override val sensitivity = MutableStateFlow(prefs.sensitivity)
+    override val reactivity = MutableStateFlow(prefs.reactivity)
 
-    override var fftMode = MutableStateFlow(prefs.visualizerFftMode)
+    override val fftMode = MutableStateFlow(prefs.visualizerFftMode)
 
-    override var bassMultiplier = MutableStateFlow(prefs.bassMultiplier)
-    override var midMultiplier = MutableStateFlow(prefs.midMultiplier)
-    override var trebleMultiplier = MutableStateFlow(prefs.trebleMultiplier)
+    override val bassMultiplier = MutableStateFlow(prefs.bassMultiplier)
+    override val midMultiplier = MutableStateFlow(prefs.midMultiplier)
+    override val trebleMultiplier = MutableStateFlow(prefs.trebleMultiplier)
     
     val isSilent = MutableStateFlow(true)
     private var lastAudioTime = System.currentTimeMillis()
@@ -213,9 +213,9 @@ class AudioVisualizerManager(private val prefs: AppPreferences) : AppVisualizerM
             val ratioStart = i.toDouble() / BARS_COUNT
             val ratioEnd = (i + 1).toDouble() / BARS_COUNT
             
-            // Use cubic mapping to assign frequencies correctly across the spectrum
-            val startBin = (minBin + (maxBin - minBin) * Math.pow(ratioStart, 3.0)).toInt().coerceIn(1, numMagnitudes - 1)
-            val endBin = (minBin + (maxBin - minBin) * Math.pow(ratioEnd, 3.0)).toInt().coerceIn(1, numMagnitudes - 1)
+            // Use logarithmic mapping to assign frequencies correctly across the spectrum
+            val startBin = (minBin * Math.pow(maxBin / minBin, ratioStart)).toInt().coerceIn(1, numMagnitudes - 1)
+            val endBin = (minBin * Math.pow(maxBin / minBin, ratioEnd)).toInt().coerceIn(1, numMagnitudes - 1)
             binStartLUT[i] = startBin
             binEndLUT[i] = if (endBin > startBin) endBin else startBin + 1
             

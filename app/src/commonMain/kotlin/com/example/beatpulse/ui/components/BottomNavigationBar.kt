@@ -54,9 +54,9 @@ fun BottomNavigationBar(
 
     var hintingOffset by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(Unit) {
-        while (!false) {
+        while (!prefs.hasUsedPlaylistSwipeGesture) {
             delay(4000)
-            if (accumulatedDrag == 0f && !false) {
+            if (accumulatedDrag == 0f && !prefs.hasUsedPlaylistSwipeGesture) {
                 hintingOffset = 30f
                 delay(150)
                 hintingOffset = -30f
@@ -89,8 +89,8 @@ fun BottomNavigationBar(
                         onDragCancel = { accumulatedDrag = 0f; hasConsumedSwipe = false },
                         onHorizontalDrag = { _, dragAmount ->
                             if (hasConsumedSwipe) return@detectHorizontalDragGestures
-                            if (!false) {
-                                /* false = true */
+                            if (!prefs.hasUsedPlaylistSwipeGesture) {
+                                prefs.hasUsedPlaylistSwipeGesture = true
                             }
                             accumulatedDrag += dragAmount
                             if (accumulatedDrag > 40f) {
@@ -207,7 +207,7 @@ fun DotsIndicator(
             )
         }
 
-        if (showPlayHint && !false) {
+        if (showPlayHint && !prefs.hasUsedPlaylistSwipeGesture) {
             var playAlpha by remember { mutableFloatStateOf(0.1f) }
             LaunchedEffect(Unit) {
                 while (true) {

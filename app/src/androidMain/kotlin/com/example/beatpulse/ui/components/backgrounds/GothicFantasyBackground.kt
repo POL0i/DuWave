@@ -17,7 +17,8 @@ import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import com.example.beatpulse.theme.PaletteColors
-import com.example.beatpulse.visualizer.AudioVisualizerManager
+import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
+import androidx.compose.runtime.collectAsState
 
 private const val DARK_FANTASY_SHADER_SRC = """
     uniform float2 iResolution;
@@ -26,13 +27,13 @@ private const val DARK_FANTASY_SHADER_SRC = """
     uniform float iSpeed;
     uniform float iIntensity;
     uniform float iOffsetY;
+    uniform float iOffsetX;
     uniform half4 colorDominant;
     uniform half4 colorVibrant;
     uniform half4 colorMuted;
 
     half4 main(in float2 fragCoord) {
-        float2 uv = (fragCoord.xy - 0.5 * iResolution.xy) / iResolution.y;
-        uv.y += iOffsetY;
+        float2 uv = (fragCoord.xy - 0.5 * iResolution.xy + float2(iOffsetX * iResolution.y, iOffsetY * iResolution.y)) / iResolution.y;
         float d = length(uv);
         
         float sunRadius = 0.15 + iEnergy * 0.1;
@@ -67,23 +68,20 @@ private const val DARK_FANTASY_SHADER_SRC = """
     }
 """
 
-object VisualizerState {
-    var albumArtCenterY by mutableStateOf<Float?>(null)
-}
-
-@SuppressLint("NewApi")
-@Composable
+// VisualizerState removed
+actual @Composable
 fun GothicFantasyBackground(
     paletteColors: PaletteColors,
-    visualizerManager: AudioVisualizerManager,
+    visualizerManager: IAudioVisualizerManager,
     isPlayerScreen: Boolean,
+    modifier: Modifier,
     content: @Composable () -> Unit
 ) {
     val dominantColorState = animateColorAsState(targetValue = paletteColors.dominant, animationSpec = tween(1500), label = "dom")
     val vibrantColorState = animateColorAsState(targetValue = paletteColors.vibrant, animationSpec = tween(1500), label = "vib")
     val mutedColorState = animateColorAsState(targetValue = paletteColors.muted, animationSpec = tween(1500), label = "mut")
 
-    val amplitudesState = visualizerManager.amplitudes.collectAsState()
+    val amplitudesState = visualizerManager.combinedAmplitudes.collectAsState()
     val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
     
@@ -131,7 +129,12 @@ fun GothicFantasyBackground(
     val finalSpeed = if (isPlayerScreen) 1.0f else 0.3f
     val finalIntensity = if (isPlayerScreen) 1.0f else 0.5f
 
+
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+        
+        
+        val currentAlbumArtCenterY = com.example.beatpulse.ui.LocalAlbumArtCenterY.current
+        val currentCoverOffset = com.example.beatpulse.ui.LocalCoverOffset.current
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && shaderBrush != null && runtimeShader != null) {
                 val dom = dominantColorState.value
@@ -143,11 +146,18 @@ fun GothicFantasyBackground(
                 runtimeShader.setFloatUniform("iEnergy", dynamicEnergy)
                 runtimeShader.setFloatUniform("iSpeed", finalSpeed)
                 runtimeShader.setFloatUniform("iIntensity", finalIntensity)
-                val centerY = VisualizerState.albumArtCenterY
-                val dynamicOffsetY = if (isPlayerScreen && centerY != null) {
-                    ((size.height / 2f) - centerY) / size.height
+                
+                
+                val dynamicOffsetY = if (isPlayerScreen) {
+                    val base = if (currentAlbumArtCenterY != null) ((size.height / 2f) - currentAlbumArtCenterY) / size.height else 0f
+                    base - (currentCoverOffset.y / size.height)
                 } else 0f
+                val dynamicOffsetX = if (isPlayerScreen) {
+                    -(currentCoverOffset.x / size.height)
+                } else 0f
+                
                 runtimeShader.setFloatUniform("iOffsetY", dynamicOffsetY)
+                runtimeShader.setFloatUniform("iOffsetX", dynamicOffsetX)
                 runtimeShader.setFloatUniform("colorDominant", dom.red, dom.green, dom.blue, dom.alpha)
                 runtimeShader.setFloatUniform("colorVibrant", vib.red, vib.green, vib.blue, vib.alpha)
                 runtimeShader.setFloatUniform("colorMuted", mut.red, mut.green, mut.blue, mut.alpha)
@@ -156,13 +166,12 @@ fun GothicFantasyBackground(
             } else {
                 val width = size.width
                 val height = size.height
-                val fallbackCenterY = VisualizerState.albumArtCenterY
-                val centerY = if (isPlayerScreen && fallbackCenterY != null) {
-                    fallbackCenterY
+                val currentAlbumArtCenterY = if (isPlayerScreen && currentAlbumArtCenterY != null) {
+                    currentAlbumArtCenterY
                 } else {
                     height / 2f
                 }
-                val center = androidx.compose.ui.geometry.Offset(width / 2f, centerY)
+                val center = androidx.compose.ui.geometry.Offset(width / 2f, currentAlbumArtCenterY)
                 drawCircle(color = vibrantColorState.value.copy(alpha = 0.5f * finalIntensity), radius = 200f + dynamicEnergy * 100f, center = center)
                 drawCircle(color = Color.White.copy(alpha = finalIntensity), radius = 50f + dynamicEnergy * 50f, center = center)
             }

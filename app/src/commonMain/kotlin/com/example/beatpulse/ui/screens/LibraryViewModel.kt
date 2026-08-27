@@ -191,13 +191,17 @@ class LibraryViewModel(
                 val now = System.currentTimeMillis()
                 val cachedJson = prefs.cachedRecommendationsJson
                 val lastTime = prefs.lastRecommendationsTimestamp
-
                 val timeSinceLast = now - lastTime
-                
-                // Caching with JSON is temporarily disabled in KMP until kotlinx.serialization is added
-                // if (cachedJson.isNotEmpty() && timeSinceLast < 24 * 60 * 60 * 1000L && !forceUpdate) {
-                //     ...
-                // }
+
+                // Try to restore from cache if less than 24h old
+                if (cachedJson.isNotEmpty() && timeSinceLast < 24 * 60 * 60 * 1000L && !forceUpdate) {
+                    val restored = deserializeRecommendations(cachedJson)
+                    if (restored.isNotEmpty()) {
+                        recommendations.value = restored
+                        isRecommendationsLoading.value = false
+                        return@launch
+                    }
+                }
 
                 val topArtists = repository.getTopArtistsByPlayCount()
                 val topTracks = repository.getTop5Tracks()
@@ -230,15 +234,58 @@ class LibraryViewModel(
                 )
                 recommendations.value = newMap
 
-                // try {
-                //     // caching to json
-                // } catch (e: Exception) { ... }
+                // Save to cache
+                try {
+                    prefs.cachedRecommendationsJson = serializeRecommendations(newMap)
+                    prefs.lastRecommendationsTimestamp = now
+                } catch (e: Exception) { e.printStackTrace() }
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
                 isRecommendationsLoading.value = false
             }
         }
+    }
+
+    // Simple delimiter-based serialization for recommendations cache (no kotlinx.serialization needed)
+    private fun serializeRecommendations(map: Map<String, List<TrackEntity>>): String {
+        val sb = StringBuilder()
+        for ((category, tracks) in map) {
+            sb.append("CAT::").append(category.replace("\n", "\\n")).append("\n")
+            for (t in tracks) {
+                sb.append("T::${t.id}||${t.title.replace("||","| |")}||${t.artist.replace("||","| |")}||${t.duration}||${t.dataPath.replace("||","| |")}||${t.customCoverPath?.replace("||","| |") ?: ""}\n")
+            }
+        }
+        return sb.toString()
+    }
+
+    private fun deserializeRecommendations(data: String): Map<String, List<TrackEntity>> {
+        val result = mutableMapOf<String, MutableList<TrackEntity>>()
+        var currentCategory = ""
+        for (line in data.lines()) {
+            when {
+                line.startsWith("CAT::") -> {
+                    currentCategory = line.removePrefix("CAT::").replace("\\n", "\n")
+                    result[currentCategory] = mutableListOf()
+                }
+                line.startsWith("T::") && currentCategory.isNotEmpty() -> {
+                    val parts = line.removePrefix("T::").split("||")
+                    if (parts.size >= 5) {
+                        result[currentCategory]?.add(TrackEntity(
+                            id = parts[0].toLongOrNull() ?: 0L,
+                            title = parts[1],
+                            artist = parts[2],
+                            duration = parts[3].toLongOrNull() ?: 0L,
+                            dataPath = parts[4],
+                            folderPath = "",
+                            album = "",
+                            customCoverPath = parts.getOrNull(5)?.takeIf { it.isNotEmpty() }
+                        ))
+                    }
+                }
+            }
+        }
+        return result
     }
 
     override suspend fun searchOnlineMusic(query: String): List<TrackEntity> {
@@ -266,8 +313,10 @@ class LibraryViewModel(
                         try {
                             val coversDir = java.io.File(platformHelper.getCoversDir())
                             val destFile = java.io.File(coversDir, "cover_${System.currentTimeMillis()}.jpg")
-                            java.net.URL(coverUrl).openStream().use { input ->
-                                destFile.outputStream().use { output ->
+                            val connection = java.net.URL(coverUrl).openConnection() as java.net.HttpURLConnection
+                            connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                            connection.inputStream.use { input ->
+                                java.io.FileOutputStream(destFile).use { output ->
                                     input.copyTo(output)
                                 }
                             }
@@ -328,21 +377,51 @@ class LibraryViewModel(
 
             for (track in tracksWithoutCover) {
                 try {
-                    val minutes = track.duration / 60000
-                    val query = "${track.title} ${track.artist} $minutes min"
-                    val results = onlineRepository.searchOnlineMusic(query)
+                    var coverUrl: String? = null
                     
-                    val bestResult = results.firstOrNull { !it.customCoverPath.isNullOrEmpty() }
+                    // Try iTunes API first (Fast, high quality, independent of NewPipe)
+                    try {
+                        val query = "${track.title} ${if (track.artist != "Unknown Artist" && track.artist != "Artista Desconocido") track.artist else ""}".trim()
+                        val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+                        val itunesApi = "https://itunes.apple.com/search?term=$encodedQuery&entity=song&limit=1"
+                        
+                        val connection = java.net.URL(itunesApi).openConnection() as java.net.HttpURLConnection
+                        connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                        connection.connectTimeout = 3000
+                        connection.readTimeout = 3000
+                        
+                        val response = connection.inputStream.bufferedReader().readText()
+                        val artworkIndex = response.indexOf("\"artworkUrl100\":\"")
+                        if (artworkIndex != -1) {
+                            val start = artworkIndex + 17
+                            val end = response.indexOf("\"", start)
+                            val lowResUrl = response.substring(start, end)
+                            coverUrl = lowResUrl.replace("100x100bb", "600x600bb")
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
                     
-                    if (bestResult != null && bestResult.customCoverPath != null) {
-                        var coverUrl = bestResult.customCoverPath!!
+                    // Fallback to NewPipe search
+                    if (coverUrl == null) {
+                        val minutes = track.duration / 60000
+                        val query = "${track.title} ${track.artist} $minutes min"
+                        val results = onlineRepository.searchOnlineMusic(query)
+                        coverUrl = results.firstOrNull { !it.customCoverPath.isNullOrEmpty() }?.customCoverPath
+                    }
+                    
+                    if (coverUrl != null) {
                         // Descargar portada para guardarla localmente
                         if (coverUrl.startsWith("http://") || coverUrl.startsWith("https://")) {
                             try {
                                 val coversDir = java.io.File(platformHelper.getCoversDir())
                                 val destFile = java.io.File(coversDir, "cover_reloaded_${System.currentTimeMillis()}.jpg")
-                                java.net.URL(coverUrl).openStream().use { input ->
-                                    destFile.outputStream().use { output ->
+                                val connection = java.net.URL(coverUrl).openConnection() as java.net.HttpURLConnection
+                                connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                                connection.connectTimeout = 5000
+                                connection.readTimeout = 5000
+                                connection.inputStream.use { input ->
+                                    java.io.FileOutputStream(destFile).use { output ->
                                         input.copyTo(output)
                                     }
                                 }

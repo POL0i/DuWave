@@ -3,6 +3,8 @@ package com.example.beatpulse.ui
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -11,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -32,6 +35,10 @@ import com.example.beatpulse.utils.getLocalizedString
 import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.compose.ui.geometry.Offset
+
+val LocalCoverOffset = staticCompositionLocalOf<Offset> { Offset.Zero }
+val LocalAlbumArtCenterY = staticCompositionLocalOf<Float?> { null }
 
 @Composable
 fun AppScreen(
@@ -56,7 +63,7 @@ fun AppScreen(
     
     val isMicModeActive by playerViewModel.isMicModeActive.collectAsState()
     val streamConfigEffectsVisible by playerViewModel.streamConfigEffectsVisible.collectAsState()
-    val bgStyle = 0
+    val bgStyle by libraryViewModel.prefs.backgroundStyleFlow.collectAsState()
     val scope = rememberCoroutineScope()
 
     var globalToastMessage by remember { mutableStateOf<String?>(null) }
@@ -77,14 +84,39 @@ fun AppScreen(
         else -> Modifier.background(Color.Transparent)
     }
 
-    var currentPage by remember { mutableIntStateOf(0) }
+    var currentPage by remember { mutableIntStateOf(libraryViewModel.prefs.lastMainScreenPage) }
+    
+    val pageFlowValue by libraryViewModel.prefs.lastMainScreenPageFlow.collectAsState()
+    val initialPage = (Int.MAX_VALUE / 2) - ((Int.MAX_VALUE / 2) % 3) + libraryViewModel.prefs.lastMainScreenPage
+    val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { Int.MAX_VALUE })
+
+    LaunchedEffect(pagerState.currentPage) {
+        currentPage = pagerState.currentPage % 3
+    }
+
+    LaunchedEffect(currentPage) {
+        libraryViewModel.prefs.lastMainScreenPage = currentPage
+        if (pagerState.currentPage % 3 != currentPage) {
+            val diff = currentPage - (pagerState.currentPage % 3)
+            val optimalDiff = when (diff) {
+                2 -> -1
+                -2 -> 1
+                else -> diff
+            }
+            pagerState.animateScrollToPage(pagerState.currentPage + optimalDiff)
+        }
+    }
+
+    LaunchedEffect(pageFlowValue) {
+        if (currentPage != pageFlowValue) currentPage = pageFlowValue
+    }
 
 
     var trackToAddToPlaylist by remember { mutableStateOf<TrackEntity?>(null) }
     val playlists by libraryViewModel.playlists.collectAsState()
 
     var sleepTimerSeconds by remember { mutableIntStateOf(0) }
-    LaunchedEffect(sleepTimerSeconds) {
+    LaunchedEffect(sleepTimerSeconds > 0) {
         if (sleepTimerSeconds > 0) {
             while (sleepTimerSeconds > 0) {
                 delay(1000)
@@ -122,30 +154,12 @@ fun AppScreen(
                 }
             }
         ) { innerPadding ->
-            AnimatedContent(
-                targetState = currentPage,
-                transitionSpec = {
-                    val spec = tween<androidx.compose.ui.unit.IntOffset>(250)
-                    val specFloat = tween<Float>(250)
-                    if (targetState > initialState) {
-                        if (initialState == 0 && targetState == 2) {
-                            slideInHorizontally(animationSpec = spec) { width -> -width } + fadeIn(animationSpec = specFloat) togetherWith slideOutHorizontally(animationSpec = spec) { width -> width } + fadeOut(animationSpec = specFloat)
-                        } else {
-                            slideInHorizontally(animationSpec = spec) { width -> width } + fadeIn(animationSpec = specFloat) togetherWith slideOutHorizontally(animationSpec = spec) { width -> -width } + fadeOut(animationSpec = specFloat)
-                        }
-                    } else {
-                        if (initialState == 2 && targetState == 0) {
-                            slideInHorizontally(animationSpec = spec) { width -> width } + fadeIn(animationSpec = specFloat) togetherWith slideOutHorizontally(animationSpec = spec) { width -> -width } + fadeOut(animationSpec = specFloat)
-                        } else {
-                            slideInHorizontally(animationSpec = spec) { width -> -width } + fadeIn(animationSpec = specFloat) togetherWith slideOutHorizontally(animationSpec = spec) { width -> width } + fadeOut(animationSpec = specFloat)
-                        }
-                    }.using(SizeTransform(clip = false))
-                },
-                modifier = Modifier.fillMaxSize(),
-                label = "page_transition"
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
             ) { page ->
-                when (page) {
-                    0 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                when (page % 3) {
+                    0 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize().clipToBounds()) {
                         UnifiedLibraryScreen(
                             viewModel = libraryViewModel,
                             statsViewModel = statsViewModel,
@@ -158,7 +172,7 @@ fun AppScreen(
                             }
                         )
                     }
-                    1 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize()) {
+                    1 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize().clipToBounds()) {
                         LibraryScreen(
                             viewModel = libraryViewModel,
                             paletteColors = paletteColors,
@@ -170,10 +184,19 @@ fun AppScreen(
                             }
                         )
                     }
-                    2 -> Box(modifier = Modifier.fillMaxSize()) {
+                    2 -> Box(modifier = Modifier.fillMaxSize().clipToBounds()) {
                         PlayerScreen(
                             modifier = Modifier,
                             playerViewModel = playerViewModel,
+                            dynamicColorsPlus = playerViewModel.dynamicColorsPlus.collectAsState().value,
+                            dynamicColorsInterval = playerViewModel.dynamicColorsInterval.collectAsState().value,
+                            cleanUiMode = playerViewModel.cleanUiMode.collectAsState().value,
+                            coverDragEnabled = playerViewModel.coverDragEnabled.collectAsState().value,
+                            coverVisibilityMode = playerViewModel.coverVisibilityMode.collectAsState().value,
+                            chromaKeyColor = playerViewModel.chromaKeyColor.collectAsState().value,
+                            coverScale = playerViewModel.coverScale.collectAsState().value,
+                            coverOffsetX = playerViewModel.coverOffsetX.collectAsState().value,
+                            coverOffsetY = playerViewModel.coverOffsetY.collectAsState().value,
                             visualizerManager = visualizerManager,
                             equalizerManager = equalizerManager,
                             state = PlayerScreenState(
@@ -210,22 +233,30 @@ fun AppScreen(
     }
 
     val effectiveBgStyle = if (isMicModeActive && !streamConfigEffectsVisible) 0 else bgStyle
-
-    AnimatedContent(
-        targetState = effectiveBgStyle,
-        transitionSpec = { fadeIn(tween(1000)) togetherWith fadeOut(tween(1000)) },
-        label = "bg_transition"
-    ) { style ->
-        when (style) {
-            1 -> CyberpunkBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
-            2 -> AnimeBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
-            3 -> LuminousBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
-            4 -> Y2KBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
-            5 -> DarkAmbientBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
-            6 -> GothicFantasyBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
-            7 -> CathedralFantasyBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2, ) { content() }
-            8 -> TaleLegendBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
-            else -> Box(modifier = Modifier.fillMaxSize().then(bgModifier)) { content() }
+    
+    val coverOffsetX by playerViewModel.coverOffsetX.collectAsState()
+    val coverOffsetY by playerViewModel.coverOffsetY.collectAsState()
+    val albumArtCenterY by derivedStateOf { playerViewModel.albumArtCenterY }
+    CompositionLocalProvider(
+        LocalCoverOffset provides androidx.compose.ui.geometry.Offset(coverOffsetX, coverOffsetY),
+        LocalAlbumArtCenterY provides albumArtCenterY
+    ) {
+        AnimatedContent(
+            targetState = effectiveBgStyle,
+            transitionSpec = { fadeIn(tween(1000)) togetherWith fadeOut(tween(1000)) },
+            label = "bg_transition"
+        ) { style ->
+            when (style) {
+                1 -> CyberpunkBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                2 -> AnimeBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                3 -> LuminousBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                4 -> Y2KBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                5 -> DarkAmbientBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                6 -> GothicFantasyBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                7 -> CathedralFantasyBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2, ) { content() }
+                8 -> TaleLegendBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                else -> Box(modifier = Modifier.fillMaxSize().then(bgModifier)) { content() }
+            }
         }
     }
 
@@ -265,14 +296,16 @@ fun AppScreen(
         )
     }
 
-    var showTutorial by remember { mutableStateOf(!false) }
+    var showTutorial by remember { mutableStateOf(!prefs.hasSeenTutorial) }
+    var blurRadius by remember { mutableFloatStateOf(if (showTutorial) 30f else 0f) }
+    var blurTarget by remember { mutableFloatStateOf(if (showTutorial) 30f else 0f) }
     var showSwipeHint by remember { mutableStateOf(false) }
 
     if (showTutorial) {
         Box(
             modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)).clickable {
                 showTutorial = false
-                showTutorial = false
+                prefs.hasSeenTutorial = true
                 showSwipeHint = true
             },
             contentAlignment = Alignment.Center
