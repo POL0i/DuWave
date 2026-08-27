@@ -236,8 +236,8 @@ private fun PlayerScreenContent(
     LaunchedEffect(currentStyle) { prefs.visualizerStyle = currentStyle.name.lowercase() }
 
     val isPlaying by playerViewModel.isPlaying.collectAsState()
-    var currentPosition by remember { androidx.compose.runtime.mutableLongStateOf(0L) }
-    var duration by remember { androidx.compose.runtime.mutableLongStateOf(1L) }
+    val currentPosition by playerViewModel.currentPosition.collectAsState()
+    val duration by playerViewModel.duration.collectAsState()
 
     val abRepeatModeEnabled by playerViewModel.abRepeatModeEnabled.collectAsState()
     val abPointA by playerViewModel.abPointA.collectAsState()
@@ -372,8 +372,8 @@ private fun PlayerScreenContent(
             if (abRepeatModeEnabled) {
                 val aPos = (abPointA * duration).toLong()
                 val bPos = (abPointB * duration).toLong()
-                if (currentPosition >= bPos && bPos > aPos) { playerViewModel.seekTo(aPos); currentPosition = aPos }
-                else if (currentPosition < aPos && bPos > aPos) { playerViewModel.seekTo(aPos); currentPosition = aPos }
+                if (currentPosition >= bPos && bPos > aPos) { playerViewModel.seekTo(aPos) }
+                else if (currentPosition < aPos && bPos > aPos) { playerViewModel.seekTo(aPos) }
             }
             delay(if (isPlaying) 100L else 1000L)
         }
