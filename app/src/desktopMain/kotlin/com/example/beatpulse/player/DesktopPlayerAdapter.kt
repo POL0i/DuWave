@@ -166,6 +166,22 @@ class DesktopPlayerAdapter : AppPlayer {
                 line.start()
                 
                 val bytesPerMs = (decodedFormat.sampleRate * decodedFormat.frameSize) / 1000.0f
+                val bytesToSkip = (_currentPosition * bytesPerMs).toLong()
+                if (bytesToSkip > 0 && !uri.startsWith("http")) {
+                    var skipped = 0L
+                    while (skipped < bytesToSkip) {
+                        val s = inStream.skip(bytesToSkip - skipped)
+                        if (s <= 0) {
+                            // If skip fails, we can try reading into a dummy buffer
+                            val dummyBuffer = ByteArray(4096)
+                            val r = inStream.read(dummyBuffer, 0, minOf(4096L, bytesToSkip - skipped).toInt())
+                            if (r <= 0) break
+                            skipped += r
+                        } else {
+                            skipped += s
+                        }
+                    }
+                }
                 var totalBytesRead = (_currentPosition * bytesPerMs).toLong()
                 
                 val buffer = ByteArray(4096)
