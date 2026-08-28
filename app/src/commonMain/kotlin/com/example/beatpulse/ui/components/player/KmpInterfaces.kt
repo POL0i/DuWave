@@ -21,6 +21,8 @@ interface IPreferencesManager {
     var coverOffsetX: Float
     var coverOffsetY: Float
     var coverScale: Float
+    var isPatreonUnlocked: Boolean
+    val isPatreonUnlockedFlow: StateFlow<Boolean>
 }
 
 interface IAudioVisualizerManager {
@@ -32,6 +34,7 @@ interface IAudioVisualizerManager {
     val filterMode: MutableStateFlow<Any>
     val sensitivity: MutableStateFlow<Float>
     val reactivity: MutableStateFlow<Float>
+    val damping: MutableStateFlow<Float>
     val bassMultiplier: MutableStateFlow<Float>
     val midMultiplier: MutableStateFlow<Float>
     val trebleMultiplier: MutableStateFlow<Float>

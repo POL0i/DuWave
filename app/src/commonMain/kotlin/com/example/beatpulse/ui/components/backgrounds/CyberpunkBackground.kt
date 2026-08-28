@@ -175,11 +175,12 @@ fun CyberpunkBackground(
         // Make it much slower: flowPhase is 0..1000 over 20s. 
         // We want a slow drift.
         val flowOffset = (flowPhase * 5f) % 2000f
+        val cornerShape = RoundedCornerShape(if (isPlayerScreen) 32.dp else 12.dp)
         Box(
             modifier = modifier
                 .fillMaxSize()
                 .padding(horizontal = 8.dp, vertical = 8.dp)
-                .clip(RoundedCornerShape(32.dp))
+                .clip(cornerShape)
                 .border(
                     width = 2.dp,
                     brush = Brush.linearGradient(
@@ -192,7 +193,7 @@ fun CyberpunkBackground(
                         start = Offset(flowOffset, flowOffset),
                         end = Offset(flowOffset + 500f, flowOffset + 500f)
                     ),
-                    shape = RoundedCornerShape(32.dp)
+                    shape = cornerShape
                 )
                 .background(Color(0xFF070711).copy(alpha = 0.65f))
                 .background(

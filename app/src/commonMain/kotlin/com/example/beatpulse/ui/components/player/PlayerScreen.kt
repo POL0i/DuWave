@@ -399,7 +399,8 @@ private fun PlayerScreenContent(
         showSupportDialog = showSupportDialog,
         onDismissRequest = { showSupportDialog = false },
         paletteColors = paletteColors,
-        dynamicTextColor = dynamicTextColor
+        dynamicTextColor = dynamicTextColor,
+        prefs = prefs
     )
 
     val activeAspectRatio = if (isMicModeActive) {

@@ -87,6 +87,12 @@ class DummyAppPreferences : AppPreferences {
     override var lastVerifiedNewPipeVersion = "v0.26.5"
     override var lastServiceDownState = false
     override var coverScale = 1f
+    
+    private val _isPatreonUnlockedFlow = MutableStateFlow(false)
+    override val isPatreonUnlockedFlow: StateFlow<Boolean> = _isPatreonUnlockedFlow
+    override var isPatreonUnlocked: Boolean
+        get() = _isPatreonUnlockedFlow.value
+        set(value) { _isPatreonUnlockedFlow.value = value }
 }
 
 
@@ -144,6 +150,7 @@ class DummyVisualizerManager : com.example.beatpulse.visualizer.AppVisualizerMan
     override val filterMode: MutableStateFlow<Any> = MutableStateFlow(com.example.beatpulse.visualizer.FilterMode.ALL)
     override val sensitivity = MutableStateFlow(1.0f)
     override val reactivity = MutableStateFlow(1.0f)
+    override val damping = MutableStateFlow(0.8f)
     override val bassMultiplier = MutableStateFlow(1.0f)
     override val midMultiplier = MutableStateFlow(1.0f)
     override val trebleMultiplier = MutableStateFlow(1.0f)
@@ -162,7 +169,8 @@ fun PlayerSupportDialog(
     showSupportDialog: Boolean,
     onDismissRequest: () -> Unit,
     paletteColors: com.example.beatpulse.theme.PaletteColors,
-    dynamicTextColor: androidx.compose.ui.graphics.Color
+    dynamicTextColor: androidx.compose.ui.graphics.Color,
+    prefs: com.example.beatpulse.ui.components.player.IPreferencesManager
 ) {
     if (showSupportDialog) {
         androidx.compose.material3.AlertDialog(

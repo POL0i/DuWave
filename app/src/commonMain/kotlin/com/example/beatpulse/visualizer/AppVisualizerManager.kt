@@ -15,6 +15,7 @@ interface AppVisualizerManager : IAudioVisualizerManager {
     override val filterMode: MutableStateFlow<Any>
     override val sensitivity: MutableStateFlow<Float>
     override val reactivity: MutableStateFlow<Float>
+    override val damping: MutableStateFlow<Float>
     override val combinedAmplitudes: StateFlow<FloatArray>
     override val bassAmplitudes: StateFlow<FloatArray>
     override val midAmplitudes: StateFlow<FloatArray>

@@ -64,4 +64,6 @@ interface AppPreferences : IPreferencesManager {
     var streamAvatarUri: String?
     var lastVerifiedNewPipeVersion: String
     var lastServiceDownState: Boolean
+    override var isPatreonUnlocked: Boolean
+    override val isPatreonUnlockedFlow: StateFlow<Boolean>
 }

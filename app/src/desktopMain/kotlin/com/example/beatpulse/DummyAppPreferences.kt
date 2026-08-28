@@ -81,4 +81,9 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var coverOffsetX: Float = 0f
     override var coverOffsetY: Float = 0f
     override var coverScale: Float = 1f
+    private val _isPatreonUnlockedFlow = MutableStateFlow(false)
+    override val isPatreonUnlockedFlow: StateFlow<Boolean> = _isPatreonUnlockedFlow
+    override var isPatreonUnlocked: Boolean
+        get() = _isPatreonUnlockedFlow.value
+        set(value) { _isPatreonUnlockedFlow.value = value }
 }

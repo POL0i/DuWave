@@ -12,6 +12,7 @@ class RealDesktopVisualizerManager : AppVisualizerManager {
     override val filterMode = MutableStateFlow<Any>(FilterMode.ALL)
     override val sensitivity = MutableStateFlow(1.0f)
     override val reactivity = MutableStateFlow(1.0f)
+    override val damping = MutableStateFlow(0.8f)
     override val bassMultiplier = MutableStateFlow(1.0f)
     override val midMultiplier = MutableStateFlow(1.0f)
     override val trebleMultiplier = MutableStateFlow(1.0f)

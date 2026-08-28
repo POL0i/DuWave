@@ -290,4 +290,13 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
     override var coverScale: Float
         get() = prefs.getFloat("coverScale", 1.0f)
         set(value) = prefs.edit().putFloat("coverScale", value).apply()
+
+    private val _isPatreonUnlockedFlow = MutableStateFlow(prefs.getBoolean("isPatreonUnlocked", false))
+    override val isPatreonUnlockedFlow: StateFlow<Boolean> = _isPatreonUnlockedFlow
+    override var isPatreonUnlocked: Boolean
+        get() = _isPatreonUnlockedFlow.value
+        set(value) {
+            _isPatreonUnlockedFlow.value = value
+            prefs.edit().putBoolean("isPatreonUnlocked", value).apply()
+        }
 }

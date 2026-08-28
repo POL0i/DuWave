@@ -98,6 +98,7 @@ class AudioVisualizerManager(private val prefs: AppPreferences) : AppVisualizerM
     val physicsMode = MutableStateFlow(runCatching { PhysicsMode.valueOf(prefs.physicsMode) }.getOrDefault(PhysicsMode.EQUILIBRADO))
     override val sensitivity = MutableStateFlow(prefs.sensitivity)
     override val reactivity = MutableStateFlow(prefs.reactivity)
+    override val damping = MutableStateFlow(0.8f)
 
     override val fftMode = MutableStateFlow(prefs.visualizerFftMode)
 

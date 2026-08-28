@@ -123,6 +123,7 @@ fun AlbumsScreen(
                     
                     Row {
                         var showSettingsMenu by remember { mutableStateOf(false) }
+                        var showDesignSettings by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { showSettingsMenu = true }) {
                                 Icon(Icons.Default.Settings, contentDescription = "Ajustes", tint = paletteColors.vibrant)
@@ -143,67 +144,22 @@ fun AlbumsScreen(
                             }
                         }
                         
-                        
-                        val shapeCircle = getLocalizedString("shape_circle")
-                        val shapeSquare = getLocalizedString("shape_square")
-                        val shapeRounded = getLocalizedString("shape_rounded")
-                        val shapeSquircle = getLocalizedString("shape_squircle")
-IconButton(onClick = {
-                            val newShape = (shapeIdx + 1) % 4
-                            prefs.thumbnailShape = newShape
-                            prefs.showToast(when(newShape) {
-                                0 -> shapeCircle
-                                1 -> shapeSquare
-                                2 -> shapeRounded
-                                3 -> shapeSquircle
-                                else -> "Forma"
-                            })
-                        }) {
+                        IconButton(onClick = { showDesignSettings = true }) {
                             Icon(
-                                imageVector = when(shapeIdx) {
-                                    0 -> Icons.Default.Circle
-                                    1 -> Icons.Default.CropSquare
-                                    2 -> Icons.Default.RoundedCorner
-                                    3 -> Icons.Default.Crop
-                                    else -> Icons.Default.Circle
-                                },
-                                contentDescription = "Toggle Shape",
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = "Ajustes de Diseño",
                                 tint = paletteColors.vibrant
                             )
                         }
-                        
-                        
-                        val styleClassic = getLocalizedString("style_classic")
-                        val styleCyberpunk = getLocalizedString("style_cyberpunk")
-                        val styleAnime = getLocalizedString("style_anime")
-                        val styleLuminous = getLocalizedString("style_luminous")
-                        val styleKawaii = getLocalizedString("style_kawaii")
-                        val styleBlackMetal = getLocalizedString("style_black_metal")
-                        val styleDarkFantasy = getLocalizedString("style_dark_fantasy")
-                        val styleCathedral = getLocalizedString("style_cathedral")
-                        val styleHearts = getLocalizedString("style_hearts")
-                        val styleTaleLegend = getLocalizedString("style_tale_legend")
-IconButton(onClick = {
-                            val newStyle = (bgStyle + 1) % 9
-                            prefs.backgroundStyle = newStyle
-                            prefs.showToast(when(newStyle) {
-                                0 -> styleClassic
-                                1 -> styleCyberpunk
-                                2 -> styleAnime
-                                3 -> styleLuminous
-                                4 -> styleKawaii
-                                5 -> styleBlackMetal
-                                6 -> styleDarkFantasy
-                                7 -> styleCathedral
-                                8 -> styleHearts
-                                9 -> styleTaleLegend
-                                else -> "Estilo Modificado"
-                            })
-                        }) {
-                            Icon(
-                                imageVector = Icons.Default.Palette,
-                                contentDescription = "Toggle Background Style",
-                                tint = paletteColors.vibrant
+
+                        if (showDesignSettings) {
+                            DesignSettingsDialog(
+                                prefs = prefs,
+                                paletteColors = paletteColors,
+                                dynamicTextColor = dynamicTextColor,
+                                currentShapeIdx = shapeIdx,
+                                currentBgStyle = bgStyle,
+                                onDismiss = { showDesignSettings = false }
                             )
                         }
                     }

@@ -110,52 +110,46 @@ class DesktopPlayerAdapter : AppPlayer {
                 val inStream: java.io.InputStream
                 val decodedFormat: AudioFormat
 
-                if (uri.startsWith("http")) {
-                    val pb = ProcessBuilder(
-                        "ffmpeg",
-                        "-user_agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-                        "-loglevel", "quiet",
-                        "-ss", "${_currentPosition / 1000.0}",
-                        "-i", uri,
-                        "-f", "s16le",
-                        "-ac", "2",
-                        "-ar", "44100",
-                        "pipe:1"
-                    )
-                    pb.redirectError(ProcessBuilder.Redirect.DISCARD)
-                    process = pb.start()
-                    activeProcess = process
-                    inStream = process.inputStream
-                    decodedFormat = AudioFormat(
-                        44100.0f,
-                        16,
-                        2,
-                        true,
-                        false
-                    )
-                } else {
-                    val file = if (uri.startsWith("file://")) File(URI(uri)) else File(uri)
+                val isLocal = !uri.startsWith("http")
+                val inputUri = if (isLocal && uri.startsWith("file://")) URI(uri).path else uri
+                
+                if (isLocal) {
+                    val file = File(inputUri)
                     if (!file.exists()) {
                         _isPlaying = false
                         notifyPlayingChanged()
                         return@launch
                     }
-                    val fileStream = java.io.FileInputStream(file)
-                    val bufferedStream = java.io.BufferedInputStream(fileStream)
-                    val audioIn = AudioSystem.getAudioInputStream(bufferedStream)
-                    val baseFormat = audioIn.format
-                    decodedFormat = AudioFormat(
-                        AudioFormat.Encoding.PCM_SIGNED,
-                        baseFormat.sampleRate,
-                        16,
-                        baseFormat.channels,
-                        baseFormat.channels * 2,
-                        baseFormat.sampleRate,
-                        false
-                    )
-                    inStream = AudioSystem.getAudioInputStream(decodedFormat, audioIn)
-                    audioInputStream = audioIn
                 }
+
+                val pbArgs = mutableListOf(
+                    "ffmpeg",
+                    "-loglevel", "quiet",
+                    "-ss", "${_currentPosition / 1000.0}"
+                )
+                if (!isLocal) {
+                    pbArgs.add("-user_agent")
+                    pbArgs.add("Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+                }
+                pbArgs.addAll(listOf(
+                    "-i", inputUri,
+                    "-f", "s16le",
+                    "-ac", "2",
+                    "-ar", "44100",
+                    "pipe:1"
+                ))
+                val pb = ProcessBuilder(pbArgs)
+                pb.redirectError(ProcessBuilder.Redirect.DISCARD)
+                process = pb.start()
+                activeProcess = process
+                inStream = process.inputStream
+                decodedFormat = AudioFormat(
+                    44100.0f,
+                    16,
+                    2,
+                    true,
+                    false
+                )
                 
                 val info = DataLine.Info(SourceDataLine::class.java, decodedFormat)
                 val line = AudioSystem.getLine(info) as SourceDataLine
@@ -166,22 +160,6 @@ class DesktopPlayerAdapter : AppPlayer {
                 line.start()
                 
                 val bytesPerMs = (decodedFormat.sampleRate * decodedFormat.frameSize) / 1000.0f
-                val bytesToSkip = (_currentPosition * bytesPerMs).toLong()
-                if (bytesToSkip > 0 && !uri.startsWith("http")) {
-                    var skipped = 0L
-                    while (skipped < bytesToSkip) {
-                        val s = inStream.skip(bytesToSkip - skipped)
-                        if (s <= 0) {
-                            // If skip fails, we can try reading into a dummy buffer
-                            val dummyBuffer = ByteArray(4096)
-                            val r = inStream.read(dummyBuffer, 0, minOf(4096L, bytesToSkip - skipped).toInt())
-                            if (r <= 0) break
-                            skipped += r
-                        } else {
-                            skipped += s
-                        }
-                    }
-                }
                 var totalBytesRead = (_currentPosition * bytesPerMs).toLong()
                 
                 val buffer = ByteArray(4096)

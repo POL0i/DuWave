@@ -258,4 +258,13 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
     override var coverScale: Float
         get() = getFloat("coverScale", 1f)
         set(value) = setFloat("coverScale", value)
+
+    private val _isPatreonUnlockedFlow = MutableStateFlow(getBoolean("isPatreonUnlocked", false))
+    override val isPatreonUnlockedFlow: StateFlow<Boolean> = _isPatreonUnlockedFlow
+    override var isPatreonUnlocked: Boolean
+        get() = _isPatreonUnlockedFlow.value
+        set(value) {
+            _isPatreonUnlockedFlow.value = value
+            setBoolean("isPatreonUnlocked", value)
+        }
 }

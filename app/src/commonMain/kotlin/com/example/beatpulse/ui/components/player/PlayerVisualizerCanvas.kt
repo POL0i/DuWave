@@ -55,13 +55,15 @@ fun PlayerVisualizerCanvas(
     val wavePathR = remember { Path() }
     val progressPath = remember { Path() }
     val progressMeasure = remember { androidx.compose.ui.graphics.PathMeasure() }
+    val sharedSlimeX = remember { FloatArray(1024) }
+    val sharedSlimeY = remember { FloatArray(1024) }
 
     var lastSize = remember { Size.Zero }
     var lastShape = remember { -1 }
 
-    val sweepGradient = Brush.sweepGradient(
-        colors = listOf(colorVibrant, colorDominant, colorMuted, colorVibrant)
-    )
+    val sweepGradient = remember(colorVibrant, colorDominant, colorMuted) {
+        Brush.sweepGradient(colors = listOf(colorVibrant, colorDominant, colorMuted, colorVibrant))
+    }
 
     Canvas(modifier = modifier
         .offset { androidx.compose.ui.unit.IntOffset(coverOffsetX.toInt(), coverOffsetY.toInt()) }
@@ -147,9 +149,9 @@ fun PlayerVisualizerCanvas(
                         val pxR = outPx; val pyR = outPy; val nxR = outNx; val nyR = outNy
                         computePointAndNormal(dLeft)
                         val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
-                        drawLine(color = colorVibrantLayer, start = Offset(pxR + nxR * dist, pyR + nyR * dist), end = Offset(pxR + nxR * (dist + barLength), pyR + nyR * (dist + barLength)), strokeWidth = 8f, cap = StrokeCap.Round)
+                        drawLine(color = colorVibrantLayer, start = Offset(pxR + nxR * dist, pyR + nyR * dist), end = Offset(pxR + nxR * (dist + barLength), pyR + nyR * (dist + barLength)), strokeWidth = 12f, cap = StrokeCap.Round)
                         if (i != 0 && i != numBars - 1) {
-                            drawLine(color = colorVibrantLayer, start = Offset(pxL + nxL * dist, pyL + nyL * dist), end = Offset(pxL + nxL * (dist + barLength), pyL + nyL * (dist + barLength)), strokeWidth = 8f, cap = StrokeCap.Round)
+                            drawLine(color = colorVibrantLayer, start = Offset(pxL + nxL * dist, pyL + nyL * dist), end = Offset(pxL + nxL * (dist + barLength), pyL + nyL * (dist + barLength)), strokeWidth = 12f, cap = StrokeCap.Round)
                         }
                     }
                 }
@@ -177,10 +179,10 @@ fun PlayerVisualizerCanvas(
                         val pxR = outPx; val pyR = outPy; val nxR = outNx; val nyR = outNy
                         val dotCount = 1 + (amplitude * 8).toInt()
                         val dotSpacing = 16f
-                        val dotRadius = 5f
+                        val dotRadius = 7f
                         for (j in 0 until dotCount) {
                             val currentDist = 30f + (j * dotSpacing)
-                            val alphaVal = opacity * (1f - (j.toFloat() / 8f)).coerceAtLeast(0.3f)
+                            val alphaVal = opacity * (1f - (j.toFloat() / 8f)).coerceAtLeast(0.6f)
                             drawCircle(color = layerColor.copy(alpha = alphaVal), radius = dotRadius, center = Offset(pxR + nxR * currentDist, pyR + nyR * currentDist))
                         }
                         if (i != 0 && i != numBars - 1) {
@@ -188,7 +190,7 @@ fun PlayerVisualizerCanvas(
                             val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
                             for (j in 0 until dotCount) {
                                 val currentDist = 30f + (j * dotSpacing)
-                                val alphaVal = opacity * (1f - (j.toFloat() / 8f)).coerceAtLeast(0.3f)
+                                val alphaVal = opacity * (1f - (j.toFloat() / 8f)).coerceAtLeast(0.6f)
                                 drawCircle(color = layerColor.copy(alpha = alphaVal), radius = dotRadius, center = Offset(pxL + nxL * currentDist, pyL + nyL * currentDist))
                             }
                         }
@@ -196,8 +198,9 @@ fun PlayerVisualizerCanvas(
                 }
                 VisualizerStyle.SLIME -> {
                     val totalPoints = (numBars * 2 - 2).coerceAtLeast(0)
-                    val slimeX = FloatArray(totalPoints)
-                    val slimeY = FloatArray(totalPoints)
+                    if (totalPoints > sharedSlimeX.size) return
+                    val slimeX = sharedSlimeX
+                    val slimeY = sharedSlimeY
                     for (i in 0 until totalPoints) {
                         val ampIndex = if (i < numBars) i else (totalPoints - i)
                         val amplitude = amps[ampIndex]
@@ -219,7 +222,8 @@ fun PlayerVisualizerCanvas(
                             wavePathR.quadraticTo(slimeX[i], slimeY[i], midX, midY)
                         }
                         wavePathR.close()
-                        drawPath(path = wavePathR, brush = Brush.radialGradient(colors = listOf(layerColor.copy(alpha = opacity), layerColor.copy(alpha = opacity * 0.5f)), center = center, radius = radius + 250f))
+                        val slimeBrush = Brush.radialGradient(colors = listOf(layerColor, layerColor.copy(alpha = 0.5f)), center = center, radius = radius + 250f)
+                        drawPath(path = wavePathR, brush = slimeBrush, alpha = opacity)
                         drawPath(path = wavePathR, color = layerColor.copy(alpha = opacity), style = Stroke(width = 8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                     }
                 }
@@ -229,10 +233,10 @@ fun PlayerVisualizerCanvas(
                         val multiplicador = 1f + (i.toFloat() / numBars) * 1.5f
                         val boostedAmplitude = amplitude * multiplicador
                         val extrude = 20f + (boostedAmplitude * 300f)
-                        val sz = 1f + (boostedAmplitude * 6f)
+                        val sz = 3f + (boostedAmplitude * 8f)
                         val dRight = 0f + i * distStep
                         val dLeft = pathLength - i * distStep
-                        val timeMs = System.currentTimeMillis()
+                        val timeMs = currentPosition
                         computePointAndNormal(dRight)
                         drawCircle(color = colorVibrantLayer, radius = sz, center = Offset(outPx + outNx * extrude, outPy + outNy * extrude))
                         if (boostedAmplitude > 0.1f) {

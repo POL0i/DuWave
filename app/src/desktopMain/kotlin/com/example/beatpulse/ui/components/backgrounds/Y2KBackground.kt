@@ -171,8 +171,8 @@ fun Y2KBackground(
 
     val infiniteTransition = rememberInfiniteTransition(label = "y2k_anim")
     val time by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 100000f,
-        animationSpec = infiniteRepeatable(tween(10000000, easing = LinearEasing), RepeatMode.Restart),
+        initialValue = 0f, targetValue = 10000f,
+        animationSpec = infiniteRepeatable(tween(1000000, easing = LinearEasing), RepeatMode.Restart),
         label = "time"
     )
 
