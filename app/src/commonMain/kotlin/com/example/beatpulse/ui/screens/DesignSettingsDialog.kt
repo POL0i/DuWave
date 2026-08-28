@@ -11,6 +11,9 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Circle
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.CropSquare
@@ -84,12 +87,18 @@ fun DesignSettingsDialog(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
-                    val shapes = listOf(
+                    val shapes = mutableListOf(
                         Icons.Default.Circle to 0,
                         Icons.Default.CropSquare to 1,
                         Icons.Default.RoundedCorner to 2,
                         Icons.Default.Crop to 3
                     )
+                    val isPatreonUnlocked by prefs.isPatreonUnlockedFlow.collectAsState()
+                    if (isPatreonUnlocked) {
+                        shapes.add(Icons.Default.AccountBalance to 4)
+                        shapes.add(Icons.Default.PlayArrow to 5)
+                        shapes.add(Icons.Default.Settings to 6)
+                    }
                     
                     shapes.forEach { (icon, idx) ->
                         val isSelected = currentShapeIdx == idx
@@ -141,6 +150,8 @@ fun DesignSettingsDialog(
                 if (isPatreonUnlocked) {
                     styles.add(9 to "Muro Patreon")
                     styles.add(10 to "Fuente Oscura")
+                    styles.add(11 to "Terraria")
+                    styles.add(12 to "Zen Clear")
                 }
                 
                 LazyVerticalGrid(
@@ -216,6 +227,8 @@ fun StyleGridItem(
                     8 -> TaleLegendBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
                     9 -> RetroWallBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
                     10 -> FountainBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                    11 -> TerrariaWaterBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                    12 -> ZenClearBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
                     else -> Box(modifier = Modifier.fillMaxSize().background(paletteColors.dominant))
                 }
             }

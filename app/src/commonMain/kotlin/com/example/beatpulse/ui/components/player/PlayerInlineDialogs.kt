@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Colorize
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -622,7 +623,7 @@ fun PlayerSettingsSheet(
                     indicator = { tabPositions -> 
                         if (selectedTab < tabPositions.size) {
                             androidx.compose.material3.TabRowDefaults.Indicator(
-                                modifier = androidx.compose.material3.TabRowDefaults.tabIndicatorOffset(tabPositions[selectedTab]),
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
                                 color = colorVibrant
                             )
                         }
