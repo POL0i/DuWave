@@ -43,8 +43,8 @@ fun TerrariaWaterBackground(
             drawRect(color = Color(0xFF1B2E4A), topLeft = Offset(x = 0f, y = 0f), size = Size(width = w, height = waterLevel))
             
             // Draw Terraria water with slight bass reaction (olas diminutas)
-            val blockSize = 16f
-            val waveAmplitude = 10f + (bassAvg * 20f) // Sutil
+            val blockSize = 8f
+            val waveAmplitude = 5f + (bassAvg * 10f) // Sutil
             val waveFrequency = 0.05f
             val timeOffset = timeMs.value * 0.05f
             
@@ -60,7 +60,7 @@ fun TerrariaWaterBackground(
             }
             
             // Small pixel bubbles
-            for (i in 0..20) {
+            for (i in 0..40) {
                 val bubbleX = (i * 73 + timeMs.value * 0.1f) % w
                 val bubbleY = h - ((i * 123 + timeMs.value * 0.3f) % (h - waterLevel))
                 drawRect(color = Color(0xFF6B9CFF).copy(alpha = 0.6f), topLeft = Offset(x = bubbleX.toFloat(), y = bubbleY.toFloat()), size = Size(width = blockSize/2f, height = blockSize/2f))

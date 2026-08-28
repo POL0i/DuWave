@@ -23,6 +23,8 @@ import com.example.beatpulse.player.AppEqualizerManager
 import com.example.beatpulse.ui.components.BottomNavigationBar
 import com.example.beatpulse.ui.components.StyleNotificationOverlay
 import com.example.beatpulse.ui.components.backgrounds.*
+import com.example.beatpulse.ui.components.backgrounds.TerrariaWaterBackground
+import com.example.beatpulse.ui.components.backgrounds.ZenClearBackground
 import com.example.beatpulse.ui.components.player.PlayerScreen
 import com.example.beatpulse.ui.components.player.PlayerScreenCallbacks
 import com.example.beatpulse.ui.components.player.PlayerScreenState
@@ -256,7 +258,9 @@ fun AppScreen(
                 7 -> CathedralFantasyBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2, ) { content() }
                 8 -> TaleLegendBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
                 9 -> RetroWallBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
-                10 -> FountainBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                                10 -> FountainBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                11 -> TerrariaWaterBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                12 -> ZenClearBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
                 else -> Box(modifier = Modifier.fillMaxSize().then(bgModifier)) { content() }
             }
         }
