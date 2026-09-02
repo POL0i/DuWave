@@ -114,7 +114,7 @@ import kotlinx.coroutines.delay
 class Spark(var x: Float, var y: Float, var vx: Float, var vy: Float, var alpha: Float, val color: Color)
 
 enum class VisualizerStyle {
-    WAVE, SLIME, BARS, DOTS, PARTICLES, RINGS, AURA, BANDS
+    WAVE, SLIME, BARS, DOTS, PARTICLES, RINGS, AURA, BANDS, TERRAIN, STAR
 }
 
 enum class DragAction { NONE, DJ_SEEK, OPEN_QUEUE }
@@ -246,7 +246,7 @@ private fun PlayerScreenContent(
     val onSetSleepTimer = callbacks.onSetSleepTimer
     val onUpdateTrackMetadata = callbacks.onUpdateTrackMetadata
     val onAddToPlaylist = callbacks.onAddToPlaylist
-    val isBuffering = false
+    val isBuffering = playerViewModel.isBuffering.collectAsState().value
 
     val bassAmplitudesState = visualizerManager.bassAmplitudes.collectAsState()
     val midAmplitudesState = visualizerManager.midAmplitudes.collectAsState()
@@ -450,11 +450,15 @@ private fun PlayerScreenContent(
         }
     } else Modifier.fillMaxSize()
 
+    val terrainState = androidx.compose.runtime.remember { TerrainState() }
+
     // --- MAIN LAYOUT ---
     Box(
         modifier = modifier.fillMaxSize().drawBehind {
             if (currentStyle == VisualizerStyle.BANDS) {
                 PlayerBandsBackground(this, bassAmplitudesState.value, midAmplitudesState.value, highAmplitudesState.value, combinedAmplitudesState.value, paletteColors, bassMult, midMult, trebleMult, reactivity, visualizerArchetype)
+            } else if (currentStyle == VisualizerStyle.TERRAIN) {
+                PlayerTerrainBackground(this, bassAmplitudesState.value, midAmplitudesState.value, highAmplitudesState.value, combinedAmplitudesState.value, paletteColors, bassMult, midMult, trebleMult, reactivity, visualizerArchetype, rotationAngle, terrainState)
             }
         },
         contentAlignment = Alignment.Center
@@ -467,6 +471,8 @@ private fun PlayerScreenContent(
     } else {
         Modifier.fillMaxSize().padding(bottom = bottomPadding).then(if (isLandscape) Modifier.verticalScroll(scrollState) else Modifier)
     }
+
+
 
     Column(modifier = columnModifier) {
         // Track Info Header
@@ -491,7 +497,8 @@ private fun PlayerScreenContent(
             onToggleMicMode = {
                 playerViewModel.toggleMicMode()
             },
-            onShowStreamConfig = { showStreamConfigDialog = true }
+            onShowStreamConfig = { showStreamConfigDialog = true },
+            prefs = prefs
         )
         }
 
@@ -627,7 +634,9 @@ private fun PlayerScreenContent(
         VisualizerStyle.PARTICLES to "Partículas",
         VisualizerStyle.RINGS to "Anillos",
         VisualizerStyle.AURA to "Aura",
-        VisualizerStyle.BANDS to "Bandas"
+        VisualizerStyle.BANDS to "Bandas",
+        VisualizerStyle.TERRAIN to "Terreno 3D",
+        VisualizerStyle.STAR to "Estrella"
     )
 
     PlayerSettingsSheet(
@@ -683,6 +692,9 @@ private fun PlayerScreenContent(
         playbackPitch = state.playbackPitch, onSetPitch = onSetPitch,
         effectsPreset = state.effectsPreset, onApplyPreset = onApplyPreset
     )
+    
+
+    
     } // End aspect Box
     } // End outer Box
 }
@@ -729,6 +741,276 @@ fun PlayerBandsBackground(
     }
 }
 
+class TerrainState(
+    var history: FloatArray = FloatArray(24 * 40),
+    var lastZOffsetInt: Int = 0,
+    var accumulatedAngle: Float = 0f,
+    var previousAngle: Float = -1f
+)
+
+/** Draws TERRAIN (Synthwave 3D Grid) in the background */
+fun PlayerTerrainBackground(
+    scope: androidx.compose.ui.graphics.drawscope.DrawScope,
+    bassAmps: FloatArray, midAmps: FloatArray, highAmps: FloatArray, combinedAmps: FloatArray,
+    paletteColors: com.example.beatpulse.theme.PaletteColors,
+    bassMult: Float, midMult: Float, trebleMult: Float, reactivity: Float, visualizerArchetype: Int,
+    rotationAngle: Float,
+    terrainState: TerrainState
+) {
+    with(scope) {
+        val w = size.width; val h = size.height
+        val bassOpacity = (0.3f + bassMult * 0.4f + reactivity * 0.2f).coerceIn(0f, 1f)
+        val midOpacity = (0.4f + midMult * 0.3f + reactivity * 0.2f).coerceIn(0f, 1f)
+        val highOpacity = (0.5f + trebleMult * 0.2f + reactivity * 0.2f).coerceIn(0f, 1f)
+        
+        val numZ = 24
+        val numX = 40
+        
+        if (terrainState.history.size != numZ * numX) {
+            terrainState.history = FloatArray(numZ * numX)
+        }
+        
+        val speed = 20f
+        
+        if (terrainState.previousAngle == -1f) terrainState.previousAngle = rotationAngle
+        var delta = rotationAngle - terrainState.previousAngle
+        if (delta < -180f) delta += 360f
+        if (delta > 180f) delta -= 360f
+        terrainState.accumulatedAngle += delta
+        terrainState.previousAngle = rotationAngle
+        
+        val zOffset = (terrainState.accumulatedAngle / 360f) * speed
+        val currentZInt = zOffset.toInt()
+        val scrollZ = zOffset % 1f
+        
+        // Helper for smoothed sampling
+        fun sampleSmoothed(array: FloatArray, index: Int): Float {
+            val dataCount = array.size
+            if (dataCount == 0) return 0f
+            var sum = 0f
+            var weightSum = 0f
+            for (j in -2..2) {
+                val idx = (index + j).coerceIn(0, dataCount - 1)
+                val weight = 1f / (1f + kotlin.math.abs(j))
+                sum += array[idx] * weight
+                weightSum += weight
+            }
+            return sum / weightSum
+        }
+        
+        // Update history
+        if (currentZInt != terrainState.lastZOffsetInt) {
+            val diff = currentZInt - terrainState.lastZOffsetInt
+            if (diff > 0 && diff < numZ) {
+                // Shift array
+                val shift = diff * numX
+                terrainState.history.copyInto(terrainState.history, shift, 0, terrainState.history.size - shift)
+            } else if (diff >= numZ) {
+                terrainState.history.fill(0f)
+            }
+            terrainState.lastZOffsetInt = currentZInt
+            
+            // Insert new data at row 0 (which will be drawn at Z = far)
+            if (combinedAmps.isNotEmpty()) {
+                val dataCount = combinedAmps.size
+                for (xi in 0 until numX) {
+                    val xNormalized = xi.toFloat() / (numX - 1) // 0 to 1
+                    val distanceFromCenter = kotlin.math.abs(xNormalized - 0.5f) * 2f // 0 at center, 1 at edges
+                    
+                    var elevation = 0f
+                    if (distanceFromCenter > 0.15f) { // Leave a flat road in the middle
+                        val mountainPos = ((distanceFromCenter - 0.15f) / 0.85f).coerceIn(0f, 1f)
+                        val ampIndex = (mountainPos * (dataCount - 1)).toInt().coerceIn(0, dataCount - 1)
+                        
+                        val blended = if (visualizerArchetype == 1) {
+                            sampleSmoothed(combinedAmps, ampIndex)
+                        } else {
+                            // Three wave mode: Bass -> Outer, Mid -> Middle, High -> Inner
+                            val highWeight = (1f - mountainPos * 2f).coerceIn(0f, 1f) // 1 at inner, 0 at mid
+                            val midWeight = (1f - kotlin.math.abs(mountainPos - 0.5f) * 2f).coerceIn(0f, 1f) // peak at 0.5
+                            val bassWeight = ((mountainPos - 0.5f) * 2f).coerceIn(0f, 1f) // 0 at mid, 1 at outer
+                            
+                            val highVal = sampleSmoothed(highAmps, ampIndex)
+                            val midVal = sampleSmoothed(midAmps, ampIndex)
+                            val bassVal = sampleSmoothed(bassAmps, ampIndex)
+                            
+                            highVal * highWeight + midVal * midWeight + bassVal * bassWeight
+                        }
+                        
+                        elevation = blended * (distanceFromCenter * distanceFromCenter)
+                        if (elevation < 0.05f) elevation = 0f // Threshold noise
+                    }
+                    terrainState.history[xi] = elevation
+                }
+            } else {
+                for (xi in 0 until numX) terrainState.history[xi] = 0f
+            }
+        }
+
+           fun drawTerrainLayer(color: androidx.compose.ui.graphics.Color, isTop: Boolean, opacityMult: Float, pulseMult: Float) {
+            val ampMult = if (isTop) 2.5f else 5.0f // Top mountains are smaller
+
+            fun project(x: Float, y: Float, z: Float): androidx.compose.ui.geometry.Offset {
+                val scale = h * 0.9f / z
+                val px = w / 2f + x * scale
+                val horizonOffset = h * 0.12f // Separate horizon to not overlap cover art
+                val cameraY = 1.2f // Elevate camera so the floor spreads out into a proper grid
+                
+                // Pulse the Y height dynamically with the music!
+                val pulsedY = y * pulseMult
+                
+                // Floor (+Y goes down on screen). Ceiling (-Y goes up).
+                val screenY = if (isTop) {
+                    val baseScreenY = h / 2f - horizonOffset
+                    baseScreenY - cameraY * scale + pulsedY * ampMult * scale
+                } else {
+                    val baseScreenY = h / 2f + horizonOffset
+                    baseScreenY + cameraY * scale - pulsedY * ampMult * scale
+                }
+                return androidx.compose.ui.geometry.Offset(px, screenY)
+            }       
+
+            val strokeColor = color.copy(alpha = opacityMult)
+            
+            // Helper for 3-wave gradient coloring
+            fun getNeonColor(xi: Int): androidx.compose.ui.graphics.Color {
+                if (visualizerArchetype == 1) return color
+                
+                val xNormalized = xi.toFloat() / (numX - 1)
+                val distCenter = kotlin.math.abs(xNormalized - 0.5f) * 2f
+                val mountainPos = ((distCenter - 0.15f) / 0.85f).coerceIn(0f, 1f)
+                
+                val highW = (1f - mountainPos * 2f).coerceIn(0f, 1f)
+                val midW = (1f - kotlin.math.abs(mountainPos - 0.5f) * 2f).coerceIn(0f, 1f)
+                val bassW = ((mountainPos - 0.5f) * 2f).coerceIn(0f, 1f)
+                
+                val total = (highW + midW + bassW).coerceAtLeast(0.01f)
+                val hW = highW / total
+                val mW = midW / total
+                val bW = bassW / total
+                
+                // Use distinct colors from the cover art palette directly!
+                val bassColor = paletteColors.vibrant
+                val midColor = color
+                val highColor = paletteColors.lightVibrant
+                
+                val r = highColor.red * hW + midColor.red * mW + bassColor.red * bW
+                val g = highColor.green * hW + midColor.green * mW + bassColor.green * bW
+                val b = highColor.blue * hW + midColor.blue * mW + bassColor.blue * bW
+                return androidx.compose.ui.graphics.Color(r, g, b, 1f)
+            }
+
+            // Draw back-to-front for proper painter's algorithm occlusion.
+            for (zi in 0 until numZ - 1) {
+                val zBack = (numZ - zi).toFloat() - scrollZ
+                val zFront = (numZ - zi - 1).toFloat() - scrollZ
+                
+                // Fade out near the camera and fade IN at the horizon (fog effect)
+                val fadeBack = (zBack / 2f).coerceIn(0f, 1f) * (1f - (zBack / numZ)).coerceIn(0f, 1f)
+                val fadeFront = (zFront / 2f).coerceIn(0f, 1f) * (1f - (zFront / numZ)).coerceIn(0f, 1f)
+                
+                // Grow from 0 elevation to full elevation over the first 4 chunks
+                val growBack = ((numZ - zBack) / 4f).coerceIn(0f, 1f)
+                val growFront = ((numZ - zFront) / 4f).coerceIn(0f, 1f)
+                
+                if (fadeBack <= 0.01f && fadeFront <= 0.01f) continue
+
+                // 1. Draw filled quads
+                for (xi in 0 until numX - 1) {
+                    val elBL = terrainState.history[zi * numX + xi] * growBack
+                    val elBR = terrainState.history[zi * numX + xi + 1] * growBack
+                    val elFL = terrainState.history[(zi + 1) * numX + xi] * growFront
+                    val elFR = terrainState.history[(zi + 1) * numX + xi + 1] * growFront
+                    
+                    val xL = (xi.toFloat() / (numX - 1)) * 6f - 3f
+                    val xR = ((xi + 1).toFloat() / (numX - 1)) * 6f - 3f
+
+                    val ptBL = project(xL, elBL, zBack)
+                    val ptBR = project(xR, elBR, zBack)
+                    val ptFL = project(xL, elFL, zFront)
+                    val ptFR = project(xR, elFR, zFront)
+
+                    val quadPath = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(ptBL.x, ptBL.y)
+                        lineTo(ptBR.x, ptBR.y)
+                        lineTo(ptFR.x, ptFR.y)
+                        lineTo(ptFL.x, ptFL.y)
+                        close()
+                    }
+
+                    // Vary color based on elevation for 3D depth effect
+                    val avgY = (elBL + elBR + elFL + elFR) / 4f
+                    val intensity = (avgY / 2.5f).coerceIn(0f, 1f)
+                    
+                    val avgNeon = getNeonColor(xi)
+                    
+                    // Blend quad color with neon based on elevation
+                    val baseFill = androidx.compose.ui.graphics.lerp(
+                        paletteColors.darkMuted,
+                        avgNeon,
+                        intensity * 0.4f
+                    )
+                    // Blend quad color with background based on fadeBack (creates horizon fog effect)
+                    val quadFill = androidx.compose.ui.graphics.lerp(
+                        paletteColors.dominant,
+                        baseFill,
+                        fadeBack
+                    ).copy(alpha = 1.0f)
+
+                    drawPath(quadPath, color = quadFill, style = androidx.compose.ui.graphics.drawscope.Fill)
+                }
+
+                // 2. Draw wireframe for this row
+                val linePath = androidx.compose.ui.graphics.Path()
+                var first = true
+                for (xi in 0 until numX) {
+                    val elB = terrainState.history[zi * numX + xi] * growBack
+                    val elF = terrainState.history[(zi + 1) * numX + xi] * growFront
+                    
+                    val x = (xi.toFloat() / (numX - 1)) * 6f - 3f
+
+                    val ptB = project(x, elB, zBack)
+                    val ptF = project(x, elF, zFront)
+
+                    // Horizontal line along the back
+                    if (first) {
+                        linePath.moveTo(ptB.x, ptB.y)
+                        first = false
+                    } else {
+                        linePath.lineTo(ptB.x, ptB.y)
+                    }
+
+                    // Vertical line from back to front
+                    linePath.moveTo(ptB.x, ptB.y)
+                    linePath.lineTo(ptF.x, ptF.y)
+                    linePath.moveTo(ptF.x, ptF.y) // Move cursor to front so next lineTo doesn't connect diagonal
+                }
+                
+                val gradientColors = List(numX) { getNeonColor(it).copy(alpha = opacityMult * fadeBack) }
+                val lineBrush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                    colors = gradientColors,
+                    startX = 0f,
+                    endX = w
+                )
+                
+                drawPath(linePath, brush = lineBrush, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+            }
+        }
+
+        if (visualizerArchetype == 1) {
+            val neonColor = paletteColors.vibrant
+            val bassPulse = 1f + (bassMult * 1.5f)
+            val midPulse = 1f + (midMult * 1.5f)
+            
+            drawTerrainLayer(neonColor, isTop = true, opacityMult = midOpacity, pulseMult = midPulse)
+            drawTerrainLayer(neonColor, isTop = false, opacityMult = bassOpacity, pulseMult = bassPulse)
+        } else {
+            drawTerrainLayer(paletteColors.dominant, false, bassOpacity, 1f)
+            drawTerrainLayer(paletteColors.muted, true, highOpacity, 1f)
+        }
+    }
+}
+
 /** Track info header (title, artist, time, buttons) */
 @Composable
 private fun PlayerTrackInfoHeader(
@@ -740,20 +1022,24 @@ private fun PlayerTrackInfoHeader(
     showMicButton: Boolean, lyrics: List<com.example.beatpulse.utils.LyricLine>,
     showLyrics: Boolean, onToggleLyrics: () -> Unit,
     onShowSupport: () -> Unit, onAddToPlaylist: () -> Unit,
-    onToggleMicMode: () -> Unit, onShowStreamConfig: () -> Unit
+    onToggleMicMode: () -> Unit, onShowStreamConfig: () -> Unit,
+    prefs: com.example.beatpulse.ui.components.player.IPreferencesManager
 ) {
     AnimatedContent(targetState = currentTrack, label = "track_info") { track ->
         if (track != null) {
             Box(modifier = Modifier.alpha(if (!isMicModeActive || streamConfigUiVisible) 1f else 0f).fillMaxWidth().padding(top = 24.dp, start = 24.dp, end = 24.dp)) {
                 Column(modifier = Modifier.align(Alignment.Center).fillMaxWidth(0.6f), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(text = track.title, style = MaterialTheme.typography.titleLarge, color = Color.White, maxLines = 1, modifier = Modifier.basicMarquee())
-                    var showRemainingTime by remember { mutableStateOf(false) }
+                    var showRemainingTime by remember { mutableStateOf(prefs.showRemainingTime) }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.clickable(
                             interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                             indication = null
-                        ) { showRemainingTime = !showRemainingTime }
+                        ) { 
+                            showRemainingTime = !showRemainingTime 
+                            prefs.showRemainingTime = showRemainingTime
+                        }
                     ) {
                         Text(text = track.artist, style = MaterialTheme.typography.bodyMedium, color = colorVibrant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                         Spacer(modifier = Modifier.width(8.dp))
