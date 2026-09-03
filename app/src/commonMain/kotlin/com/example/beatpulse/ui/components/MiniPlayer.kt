@@ -18,6 +18,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,6 +36,9 @@ import com.example.beatpulse.theme.PaletteColors
 fun MiniPlayer(
     currentTrack: TrackEntity?,
     isPlaying: Boolean,
+    currentPosition: Long,
+    duration: Long,
+    prefs: com.example.beatpulse.ui.components.player.IPreferencesManager,
     accentColor: Color,
     paletteColors: PaletteColors,
     bgStyle: Int,
@@ -143,9 +148,8 @@ fun MiniPlayer(
             }
         }
 
-            var currentPos = 0L
-            var duration = 1L
-            val progress = (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
+            val safeDuration = duration.coerceAtLeast(1L)
+            val progress = (currentPosition.toFloat() / safeDuration.toFloat()).coerceIn(0f, 1f)
             
             Row(
                 modifier = Modifier
@@ -159,10 +163,19 @@ fun MiniPlayer(
                     val s = totalSeconds % 60
                     String.format("%02d:%02d", m, s)
                 }
+                var showRemainingTime by remember { mutableStateOf(prefs.showRemainingTime) }
+                val posStr = if (showRemainingTime) "-${formatTime(safeDuration - currentPosition)}" else formatTime(currentPosition)
                 Text(
-                    text = formatTime(currentPos),
+                    text = posStr,
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) { 
+                        showRemainingTime = !showRemainingTime
+                        prefs.showRemainingTime = showRemainingTime
+                    }
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Box(modifier = Modifier

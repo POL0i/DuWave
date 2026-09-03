@@ -51,7 +51,7 @@ class OnlineMusicRepository : IOnlineMusicRepository {
             }
 
             val firstValid: String? = try {
-                kotlinx.coroutines.withTimeoutOrNull(3500L) {
+                kotlinx.coroutines.withTimeoutOrNull(6000L) {
                     channel.receive()
                 }
             } catch (_: Exception) {
@@ -156,7 +156,7 @@ class OnlineMusicRepository : IOnlineMusicRepository {
                 for (item in searchExtractor.initialPage.items) {
                     if (item is org.schabi.newpipe.extractor.stream.StreamInfoItem) {
                         val videoId = item.url.substringAfter("v=").substringBefore("&")
-                        val thumbUrl = (item.thumbnails.firstOrNull()?.url ?: "").replace(Regex("=w\\d+-h\\d+[^&]*"), "=w600-h600-l90-rj")
+                        val thumbUrl = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
                         
                         results.add(
                             TrackEntity(
@@ -216,12 +216,7 @@ class OnlineMusicRepository : IOnlineMusicRepository {
                             val author = authorMatch?.groupValues?.get(1) ?: ""
                             val lengthSeconds = lengthMatch?.groupValues?.get(1)?.toLongOrNull() ?: 0L
 
-                            var thumbUrl = ""
-                            val thumbMatch = Regex("\"url\":\"(https://[^\"]+)\"").findAll(item)
-                            val firstThumb = thumbMatch.firstOrNull()?.groupValues?.get(1)
-                            if (firstThumb != null) {
-                                thumbUrl = firstThumb
-                            }
+                            val thumbUrl = "https://i.ytimg.com/vi/$videoId/hqdefault.jpg"
 
                             results.add(
                                 TrackEntity(
@@ -253,8 +248,14 @@ class OnlineMusicRepository : IOnlineMusicRepository {
         val parts = videoId.split("|")
         val actualVideoId = parts[0]
 
-        if (useInvidiousFallback) return getStreamUrlViaInvidious(actualVideoId)
+        // Try Invidious first because it is much faster on mobile
+        val invUrl = getStreamUrlViaInvidious(actualVideoId)
+        if (invUrl != null) {
+            useInvidiousFallback = true
+            return invUrl
+        }
 
+        // If all Invidious instances fail, fallback to NewPipe
         return withContext(Dispatchers.IO) {
             try {
                 val streamInfo = org.schabi.newpipe.extractor.stream.StreamInfo.getInfo(
@@ -286,33 +287,46 @@ class OnlineMusicRepository : IOnlineMusicRepository {
         fastestInvidiousInstance?.let { instancesToTry.add(it) }
         instancesToTry.addAll(INVIDIOUS_INSTANCES.filter { it != fastestInvidiousInstance })
 
-        for (instance in instancesToTry) {
-            try {
-                val proxyUrl = "$instance/latest_version?id=$videoId&itag=140&local=true"
-                val conn = URL(proxyUrl).openConnection() as HttpURLConnection
-                conn.requestMethod = "HEAD"
-                conn.connectTimeout = 4000
-                conn.readTimeout = 4000
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-                conn.instanceFollowRedirects = false // We want to see the 302 or 200
+        val channel = kotlinx.coroutines.channels.Channel<String>(instancesToTry.size)
 
-                val responseCode = conn.responseCode
-                if (responseCode == 302 || responseCode == 301) {
-                    val location = conn.getHeaderField("Location")
-                    if (location != null) {
-                        return@withContext if (location.startsWith("http")) location else "$instance$location"
+        val jobs = instancesToTry.map { instance ->
+            launch {
+                try {
+                    val proxyUrl = "$instance/latest_version?id=$videoId&itag=140&local=true"
+                    val conn = URL(proxyUrl).openConnection() as HttpURLConnection
+                    conn.requestMethod = "GET"
+                    conn.connectTimeout = 4000
+                    conn.readTimeout = 4000
+                    conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    conn.instanceFollowRedirects = true // Follow all redirects to get final URL
+
+                    val responseCode = conn.responseCode
+                    if (responseCode == 200) {
+                        val contentType = conn.contentType ?: ""
+                        if (contentType.contains("audio") || contentType.contains("video") || contentType.contains("octet-stream")) {
+                            // Use the final URL after redirects
+                            val finalUrl = conn.url?.toString() ?: proxyUrl
+                            conn.disconnect()
+                            channel.trySend(finalUrl)
+                        } else {
+                            conn.disconnect()
+                        }
+                    } else {
+                        conn.disconnect()
                     }
-                    return@withContext proxyUrl
-                } else if (responseCode == 200) {
-                    val contentType = conn.contentType ?: ""
-                    if (contentType.contains("audio") || contentType.contains("video")) {
-                        return@withContext proxyUrl
-                    }
-                }
-            } catch (_: Exception) {
-                // Try next instance
+                } catch (_: Exception) {}
             }
         }
-        null
+
+        val firstUrl = try {
+            kotlinx.coroutines.withTimeoutOrNull(8000L) {
+                channel.receive()
+            }
+        } catch (_: Exception) { null }
+
+        jobs.forEach { it.cancel() }
+        channel.close()
+
+        firstUrl
     }
 }

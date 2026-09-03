@@ -850,7 +850,19 @@ fun ChangeCoverDialog(
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable { onCoverSelected(path) }
                             ) {
-                                Box(modifier = Modifier.fillMaxSize().background(Color.Gray))
+                                val bitmap = com.example.beatpulse.ui.components.rememberStreamAvatar(path)
+                                if (bitmap != null) {
+                                    Image(
+                                        bitmap = bitmap,
+                                        contentDescription = "Cover",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                } else {
+                                    Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray), contentAlignment = Alignment.Center) {
+                                        androidx.compose.material3.CircularProgressIndicator(color = paletteColors.vibrant)
+                                    }
+                                }
                             }
                         }
                     }

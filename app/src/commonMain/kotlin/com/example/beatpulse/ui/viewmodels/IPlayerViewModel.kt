@@ -11,6 +11,7 @@ interface IPlayerViewModel {
     val currentTrack: kotlinx.coroutines.flow.StateFlow<TrackEntity?>
     val _isPlaying: kotlinx.coroutines.flow.MutableStateFlow<Boolean>
     val isPlaying: kotlinx.coroutines.flow.StateFlow<Boolean>
+    val isBuffering: kotlinx.coroutines.flow.StateFlow<Boolean>
     val abRepeatModeEnabled: kotlinx.coroutines.flow.MutableStateFlow<Boolean>
     val abPointA: kotlinx.coroutines.flow.MutableStateFlow<Float>
     val abPointB: kotlinx.coroutines.flow.MutableStateFlow<Float>
@@ -32,11 +33,14 @@ interface IPlayerViewModel {
     val isFetchingLyrics: kotlinx.coroutines.flow.MutableStateFlow<Boolean>
     val searchFailed: kotlinx.coroutines.flow.MutableStateFlow<Boolean>
     val isMicModeActive: kotlinx.coroutines.flow.MutableStateFlow<Boolean>
-    val streamConfigUiVisible: kotlinx.coroutines.flow.MutableStateFlow<Boolean>
-    val streamConfigEffectsVisible: kotlinx.coroutines.flow.MutableStateFlow<Boolean>
+    val streamConfigUiVisible: kotlinx.coroutines.flow.StateFlow<Boolean>
+    fun setStreamConfigUiVisible(visible: Boolean)
+    val streamConfigEffectsVisible: kotlinx.coroutines.flow.StateFlow<Boolean>
+    fun toggleStreamConfigEffects()
     val streamConfigMiniPlayerVisible: kotlinx.coroutines.flow.MutableStateFlow<Boolean>
     val streamConfigAspectRatio: kotlinx.coroutines.flow.MutableStateFlow<Any>
     val isWifiStreamActive: kotlinx.coroutines.flow.MutableStateFlow<Boolean>
+    val streamAvatarUri: kotlinx.coroutines.flow.StateFlow<String?>
     val wifiStreamFps: kotlinx.coroutines.flow.MutableStateFlow<Int>
     val wifiStreamQuality: kotlinx.coroutines.flow.MutableStateFlow<Int>
     val wifiStreamCustomWidth: kotlinx.coroutines.flow.MutableStateFlow<Int>

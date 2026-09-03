@@ -25,39 +25,60 @@ object ThumbnailCache {
     private val ioSemaphore = Semaphore(2)
 
     // Caché de miniaturas pequeñas (120x120) para listas
-    val thumbCache = object : AndroidLruCache<Long, ImageBitmap>(cacheSize / 2) {
-        override fun sizeOf(key: Long, bitmap: ImageBitmap): Int {
+    val thumbCache = object : AndroidLruCache<String, ImageBitmap>(cacheSize / 2) {
+        override fun sizeOf(key: String, bitmap: ImageBitmap): Int {
             return (bitmap.width * bitmap.height * 4) / 1024
         }
     }
 
     // Caché de imágenes completas (hasta 600x600) para el reproductor
-    val fullCache = object : AndroidLruCache<Long, ImageBitmap>(cacheSize) {
-        override fun sizeOf(key: Long, bitmap: ImageBitmap): Int {
+    val fullCache = object : AndroidLruCache<String, ImageBitmap>(cacheSize) {
+        override fun sizeOf(key: String, bitmap: ImageBitmap): Int {
             return (bitmap.width * bitmap.height * 4) / 1024
         }
     }
 
-    val noArtSet = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<Long, Boolean>())
+    val noArtSet = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
 
     fun getTrackFingerprint(track: TrackEntity): String {
         return Math.abs((track.title + track.artist + track.album + track.duration + (track.customCoverPath ?: "")).hashCode()).toString()
     }
 
     fun invalidateTrack(context: android.content.Context, track: TrackEntity) {
-        val trackId = track.id
-        thumbCache.remove(trackId)
-        fullCache.remove(trackId)
-        noArtSet.remove(trackId)
-        PaletteCache.remove(trackId)
-        
         val fingerprint = getTrackFingerprint(track)
+        thumbCache.remove(fingerprint)
+        fullCache.remove(fingerprint)
+        noArtSet.remove(fingerprint)
+        PaletteCache.remove(fingerprint)
+        
         java.io.File(context.cacheDir, "thumb_${fingerprint}.jpg").delete()
         java.io.File(context.cacheDir, "full_${fingerprint}.jpg").delete()
     }
 
     private suspend fun extractRawBitmap(context: android.content.Context, track: TrackEntity): ByteArray? {
         return withContext(Dispatchers.IO) {
+            val coverPath = track.customCoverPath
+            if (!coverPath.isNullOrEmpty()) {
+                if (coverPath.startsWith("http://") || coverPath.startsWith("https://")) {
+                    try {
+                        val client = okhttp3.OkHttpClient.Builder()
+                            .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                            .readTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                            .build()
+                        val request = okhttp3.Request.Builder().url(coverPath).build()
+                        val response = client.newCall(request).execute()
+                        if (response.isSuccessful) {
+                            return@withContext response.body?.bytes()
+                        }
+                    } catch (e: Exception) { e.printStackTrace() }
+                } else {
+                    val file = java.io.File(coverPath)
+                    if (file.exists()) {
+                        return@withContext file.readBytes()
+                    }
+                }
+            }
+
             try {
                 val retriever = MediaMetadataRetriever()
                 retriever.setDataSource(track.dataPath)
@@ -71,23 +92,22 @@ object ThumbnailCache {
     }
 
     suspend fun loadThumbnail(context: android.content.Context, track: TrackEntity): ImageBitmap? = withContext(Dispatchers.IO) {
-        if (noArtSet.contains(track.id)) return@withContext null
-        val cachedThumb = thumbCache.get(track.id)
-        if (cachedThumb != null) return@withContext cachedThumb
-
         val fingerprint = getTrackFingerprint(track)
+        if (noArtSet.contains(fingerprint)) return@withContext null
+        thumbCache.get(fingerprint)?.let { return@withContext it }
+
         val thumbFile = java.io.File(context.cacheDir, "thumb_${fingerprint}.jpg")
         
         if (thumbFile.exists()) {
             if (thumbFile.length() == 0L) {
-                noArtSet.add(track.id)
+                noArtSet.add(fingerprint)
                 return@withContext null
             }
             try {
                 val bitmap = BitmapFactory.decodeFile(thumbFile.absolutePath)
                 if (bitmap != null) {
                     val imageBitmap = bitmap.asImageBitmap()
-                    thumbCache.put(track.id, imageBitmap)
+                    thumbCache.put(fingerprint, imageBitmap)
                     return@withContext imageBitmap
                 }
             } catch (e: Exception) { e.printStackTrace() }
@@ -95,8 +115,7 @@ object ThumbnailCache {
 
         try {
             ioSemaphore.withPermit {
-                val cachedThumbPermit = thumbCache.get(track.id)
-                if (cachedThumbPermit != null) return@withContext cachedThumbPermit
+                thumbCache.get(fingerprint)?.let { return@withContext it }
 
                 val art = extractRawBitmap(context, track)
                 if (art != null) {
@@ -110,11 +129,11 @@ object ThumbnailCache {
                     } catch (e: Exception) { e.printStackTrace() }
 
                     val imageBitmap = scaled.asImageBitmap()
-                    thumbCache.put(track.id, imageBitmap)
+                    thumbCache.put(fingerprint, imageBitmap)
                     return@withContext imageBitmap
                 } else {
                     thumbFile.createNewFile()
-                    noArtSet.add(track.id)
+                    noArtSet.add(fingerprint)
                 }
             }
         } catch (e: Exception) {
@@ -124,23 +143,22 @@ object ThumbnailCache {
     }
 
     suspend fun loadFullArt(context: android.content.Context, track: TrackEntity): ImageBitmap? = withContext(Dispatchers.IO) {
-        if (noArtSet.contains(track.id)) return@withContext null
-        val cachedFull = fullCache.get(track.id)
-        if (cachedFull != null) return@withContext cachedFull
-
         val fingerprint = getTrackFingerprint(track)
+        if (noArtSet.contains(fingerprint)) return@withContext null
+        fullCache.get(fingerprint)?.let { return@withContext it }
+
         val fullFile = java.io.File(context.cacheDir, "full_${fingerprint}.jpg")
         
         if (fullFile.exists()) {
             if (fullFile.length() == 0L) {
-                noArtSet.add(track.id)
+                noArtSet.add(fingerprint)
                 return@withContext null
             }
             try {
                 val bitmap = BitmapFactory.decodeFile(fullFile.absolutePath)
                 if (bitmap != null) {
                     val imageBitmap = bitmap.asImageBitmap()
-                    fullCache.put(track.id, imageBitmap)
+                    fullCache.put(fingerprint, imageBitmap)
                     return@withContext imageBitmap
                 }
             } catch (e: Exception) { e.printStackTrace() }
@@ -148,14 +166,12 @@ object ThumbnailCache {
 
         try {
             ioSemaphore.withPermit {
-                val cachedFullPermit = fullCache.get(track.id)
-                if (cachedFullPermit != null) return@withContext cachedFullPermit
+                fullCache.get(fingerprint)?.let { return@withContext it }
 
                 val art = extractRawBitmap(context, track)
                 if (art != null) {
                     val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
                     
-                    // Solo escalar si es ridículamente grande para ahorrar RAM
                     val maxDimension = 600
                     val finalBitmap = if (bitmap.width > maxDimension || bitmap.height > maxDimension) {
                         val ratio = Math.min(maxDimension.toFloat() / bitmap.width, maxDimension.toFloat() / bitmap.height)
@@ -169,11 +185,11 @@ object ThumbnailCache {
                     } catch (e: Exception) { e.printStackTrace() }
 
                     val imageBitmap = finalBitmap.asImageBitmap()
-                    fullCache.put(track.id, imageBitmap)
+                    fullCache.put(fingerprint, imageBitmap)
                     return@withContext imageBitmap
                 } else {
                     fullFile.createNewFile()
-                    noArtSet.add(track.id)
+                    noArtSet.add(fingerprint)
                 }
             }
         } catch (e: Exception) {
@@ -185,19 +201,20 @@ object ThumbnailCache {
 
 // Caché en memoria para paletas de colores por track
 object PaletteCache {
-    private val lruCache = AndroidLruCache<Long, PaletteColors>(200)
+    private val lruCache = AndroidLruCache<String, PaletteColors>(200)
 
-    fun get(trackId: Long): PaletteColors? = lruCache.get(trackId)
-    fun put(trackId: Long, colors: PaletteColors) { lruCache.put(trackId, colors) }
-    fun remove(trackId: Long) { lruCache.remove(trackId) }
+    fun get(fingerprint: String): PaletteColors? = lruCache.get(fingerprint)
+    fun put(fingerprint: String, colors: PaletteColors) { lruCache.put(fingerprint, colors) }
+    fun remove(fingerprint: String) { lruCache.remove(fingerprint) }
 }
 
 @Composable
 actual fun rememberAlbumArt(track: TrackEntity): ImageBitmap? {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val initialBitmap = ThumbnailCache.thumbCache.get(track.id)
+    val fingerprint = ThumbnailCache.getTrackFingerprint(track)
+    val initialBitmap = ThumbnailCache.thumbCache.get(fingerprint)
     var bitmap by remember(track) { mutableStateOf<ImageBitmap?>(initialBitmap) }
-    val hasNoArt = ThumbnailCache.noArtSet.contains(track.id)
+    val hasNoArt = ThumbnailCache.noArtSet.contains(fingerprint)
 
     if (initialBitmap == null && !hasNoArt) {
         LaunchedEffect(track) {
@@ -212,9 +229,10 @@ actual fun rememberAlbumArt(track: TrackEntity): ImageBitmap? {
 @Composable
 actual fun rememberFullAlbumArt(track: TrackEntity): ImageBitmap? {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val initialBitmap = ThumbnailCache.fullCache.get(track.id)
+    val fingerprint = ThumbnailCache.getTrackFingerprint(track)
+    val initialBitmap = ThumbnailCache.fullCache.get(fingerprint)
     var bitmap by remember(track) { mutableStateOf<ImageBitmap?>(initialBitmap) }
-    val hasNoArt = ThumbnailCache.noArtSet.contains(track.id)
+    val hasNoArt = ThumbnailCache.noArtSet.contains(fingerprint)
 
     if (initialBitmap == null && !hasNoArt) {
         LaunchedEffect(track) {
@@ -228,14 +246,15 @@ actual fun rememberFullAlbumArt(track: TrackEntity): ImageBitmap? {
 @Composable
 actual fun rememberTrackPalette(track: TrackEntity): PaletteColors {
     val context = androidx.compose.ui.platform.LocalContext.current
-    var colors by remember(track.id) {
-        mutableStateOf(PaletteCache.get(track.id) ?: PaletteColors())
+    val fingerprint = ThumbnailCache.getTrackFingerprint(track)
+    var colors by remember(track) {
+        mutableStateOf(PaletteCache.get(fingerprint) ?: PaletteColors())
     }
 
-    LaunchedEffect(track.id) {
-        if (PaletteCache.get(track.id) == null) {
-            if (ThumbnailCache.noArtSet.contains(track.id)) {
-                PaletteCache.put(track.id, PaletteColors())
+    LaunchedEffect(track) {
+        if (PaletteCache.get(fingerprint) == null) {
+            if (ThumbnailCache.noArtSet.contains(fingerprint)) {
+                PaletteCache.put(fingerprint, PaletteColors())
             } else {
                 val imageBitmap = ThumbnailCache.loadThumbnail(context, track)
                 if (imageBitmap != null) {
@@ -250,12 +269,12 @@ actual fun rememberTrackPalette(track: TrackEntity): PaletteColors {
                                 lightVibrant = Color(palette.getLightVibrantColor(android.graphics.Color.DKGRAY)),
                                 darkMuted = Color(palette.getDarkMutedColor(android.graphics.Color.DKGRAY))
                             )
-                            PaletteCache.put(track.id, extracted)
+                            PaletteCache.put(fingerprint, extracted)
                             colors = extracted
                         } catch (_: Exception) {}
                     }
                 } else {
-                    PaletteCache.put(track.id, PaletteColors())
+                    PaletteCache.put(fingerprint, PaletteColors())
                 }
             }
         }
@@ -268,9 +287,40 @@ actual fun rememberTrackPalette(track: TrackEntity): PaletteColors {
 actual fun rememberStreamAvatar(uri: String?): ImageBitmap? {
     if (uri.isNullOrEmpty()) return null
     var bitmap by remember(uri) { mutableStateOf<ImageBitmap?>(null) }
+    val context = androidx.compose.ui.platform.LocalContext.current
     
-    // We could load via network or coil, but since we are doing manual loading right now:
-    // This is a stub for stream avatar in android since NewPipe extractor usually gets it.
-    // In a real implementation it should use Coil or similar.
+    LaunchedEffect(uri) {
+        withContext(Dispatchers.IO) {
+            try {
+                val fingerprint = Math.abs(uri.hashCode()).toString()
+                val avatarFile = java.io.File(context.cacheDir, "avatar_${fingerprint}.jpg")
+                if (avatarFile.exists() && avatarFile.length() > 0) {
+                    val bm = BitmapFactory.decodeFile(avatarFile.absolutePath)
+                    if (bm != null) {
+                        bitmap = bm.asImageBitmap()
+                        return@withContext
+                    }
+                }
+                
+                if (uri.startsWith("http://") || uri.startsWith("https://")) {
+                    val client = okhttp3.OkHttpClient()
+                    val request = okhttp3.Request.Builder().url(uri).build()
+                    val response = client.newCall(request).execute()
+                    if (response.isSuccessful) {
+                        val bytes = response.body?.bytes()
+                        if (bytes != null) {
+                            val bm = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            if (bm != null) {
+                                java.io.FileOutputStream(avatarFile).use {
+                                    bm.compress(Bitmap.CompressFormat.JPEG, 90, it)
+                                }
+                                bitmap = bm.asImageBitmap()
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) { e.printStackTrace() }
+        }
+    }
     return bitmap
 }

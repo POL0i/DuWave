@@ -3,14 +3,16 @@ package com.example.beatpulse.ui.components.backgrounds
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.ui.Modifier
 import com.example.beatpulse.theme.PaletteColors
 import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
 import kotlinx.coroutines.isActive
 
 @Composable
-fun ZenClearBackground(
+fun SandsFlowBackground(
     paletteColors: PaletteColors,
     visualizerManager: IAudioVisualizerManager,
     isPlayerScreen: Boolean,
@@ -44,9 +46,9 @@ fun ZenClearBackground(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        ZenWarpShader(
+        SandsFlowShader(
             modifier = Modifier.fillMaxSize(),
-            time = accumulatedTime * 0.5f,
+            time = accumulatedTime,
             bass = bassAvg,
             treble = trebleAvg,
             dominantColor = paletteColors.dominant,

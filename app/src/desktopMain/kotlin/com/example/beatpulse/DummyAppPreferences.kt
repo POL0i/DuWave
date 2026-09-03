@@ -86,4 +86,6 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var isPatreonUnlocked: Boolean
         get() = _isPatreonUnlockedFlow.value
         set(value) { _isPatreonUnlockedFlow.value = value }
+    override var showFps: Boolean = false
+    override var showRemainingTime: Boolean = false
 }

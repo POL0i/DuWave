@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DuWave</string>
+    <string name="swipe_to_choose">Deslize o mini-player para os lados para mudar de seção!</string>
     <string name="perm_mic_denied">As animações rítmicas estão desativadas porque não há permissão de microfone.</string>
     <string name="perm_storage_denied">A permissão de armazenamento é necessária para encontrar suas músicas.</string>
     <string name="add_to_playlist">Adicionar à Playlist</string>

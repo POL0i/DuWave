@@ -13,13 +13,52 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.delay
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 
 object DownloadHelper {
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .readTimeout(10, TimeUnit.MINUTES) // Long timeout to support pause
+        .build()
+
+    // 0 = downloading, 1 = paused, 2 = canceled
+    private val downloadStates = ConcurrentHashMap<Int, Int>()
+    private var receiverRegistered = false
+
+    private fun registerReceiverIfNeeded(context: Context) {
+        if (!receiverRegistered) {
+            val receiver = object : android.content.BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: android.content.Intent) {
+                    val id = intent.getIntExtra("id", -1)
+                    if (id != -1) {
+                        when (intent.action) {
+                            "com.example.beatpulse.PAUSE_DOWNLOAD" -> downloadStates[id] = 1
+                            "com.example.beatpulse.RESUME_DOWNLOAD" -> downloadStates[id] = 0
+                            "com.example.beatpulse.CANCEL_DOWNLOAD" -> downloadStates[id] = 2
+                        }
+                    }
+                }
+            }
+            val filter = android.content.IntentFilter().apply {
+                addAction("com.example.beatpulse.PAUSE_DOWNLOAD")
+                addAction("com.example.beatpulse.RESUME_DOWNLOAD")
+                addAction("com.example.beatpulse.CANCEL_DOWNLOAD")
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.applicationContext.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.applicationContext.registerReceiver(receiver, filter)
+            }
+            receiverRegistered = true
+        }
+    }
 
     fun downloadTrack(context: Context, streamUrl: String, title: String, artist: String, fileExtension: String = "m4a") {
+        registerReceiverIfNeeded(context)
+        
         CoroutineScope(Dispatchers.IO).launch {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val channelId = "duwave_downloads"
@@ -34,6 +73,7 @@ object DownloadHelper {
             }
 
             val notificationId = System.currentTimeMillis().toInt()
+            downloadStates[notificationId] = 0
             
             val prefs = PreferencesManager.getInstance(context)
             val color = when (prefs.backgroundStyle) {
@@ -57,8 +97,20 @@ object DownloadHelper {
                 .setProgress(100, 0, true)
                 .setOngoing(true)
 
+            // Añadir acciones iniciales (Pausar y Cancelar)
+            val pauseIntent = android.content.Intent("com.example.beatpulse.PAUSE_DOWNLOAD").apply { putExtra("id", notificationId) }
+            val pausePending = android.app.PendingIntent.getBroadcast(context, notificationId, pauseIntent, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+            builder.addAction(android.R.drawable.ic_media_pause, "Pausar", pausePending)
+            
+            val cancelIntent = android.content.Intent("com.example.beatpulse.CANCEL_DOWNLOAD").apply { putExtra("id", notificationId) }
+            val cancelPending = android.app.PendingIntent.getBroadcast(context, notificationId, cancelIntent, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancelar", cancelPending)
+
             notificationManager.notify(notificationId, builder.build())
 
+            var uri: android.net.Uri? = null
+            val resolver = context.contentResolver
+            
             try {
                 val safeTitle = title.replace(Regex("[^a-zA-Z0-9.\\- ]"), "_")
                 val safeArtist = artist.replace(Regex("[^a-zA-Z0-9.\\- ]"), "_")
@@ -69,7 +121,6 @@ object DownloadHelper {
 
                 if (!response.isSuccessful) throw Exception("Error al descargar: ${response.code}")
 
-                val resolver = context.contentResolver
                 val contentValues = ContentValues().apply {
                     put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
                     put(MediaStore.Audio.Media.TITLE, safeTitle) // Asegurar etiqueta Título
@@ -81,14 +132,66 @@ object DownloadHelper {
                     }
                 }
 
-                val uri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, contentValues)
+                uri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, contentValues)
                 if (uri != null) {
                     resolver.openOutputStream(uri)?.use { output ->
                         response.body?.byteStream()?.use { input ->
                             val buffer = ByteArray(8192)
                             var bytesRead: Int
-                            while (input.read(buffer).also { bytesRead = it } != -1) {
+                            val contentLength = response.body?.contentLength() ?: -1L
+                            var totalBytesRead = 0L
+                            var lastUpdateTime = 0L
+
+                            while (true) {
+                                val state = downloadStates[notificationId] ?: 0
+                                if (state == 2) { // Canceled
+                                    throw Exception("Descarga cancelada")
+                                }
+                                if (state == 1) { // Paused
+                                    val currentTime = System.currentTimeMillis()
+                                    if (currentTime - lastUpdateTime > 1000) {
+                                        lastUpdateTime = currentTime
+                                        builder.setContentText("$artist • Pausado")
+                                        builder.clearActions()
+                                        
+                                        val resumeIntent = android.content.Intent("com.example.beatpulse.RESUME_DOWNLOAD").apply { putExtra("id", notificationId) }
+                                        val resumePending = android.app.PendingIntent.getBroadcast(context, notificationId, resumeIntent, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
+                                        builder.addAction(android.R.drawable.ic_media_play, "Reanudar", resumePending)
+                                        
+                                        builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancelar", cancelPending)
+                                        
+                                        notificationManager.notify(notificationId, builder.build())
+                                    }
+                                    delay(500)
+                                    continue
+                                }
+
+                                // Downloading state
+                                bytesRead = input.read(buffer)
+                                if (bytesRead == -1) break
                                 output.write(buffer, 0, bytesRead)
+                                totalBytesRead += bytesRead
+                                
+                                val currentTime = System.currentTimeMillis()
+                                if (currentTime - lastUpdateTime > 500) {
+                                    lastUpdateTime = currentTime
+                                    builder.clearActions()
+                                    builder.addAction(android.R.drawable.ic_media_pause, "Pausar", pausePending)
+                                    builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancelar", cancelPending)
+                                    
+                                    if (contentLength > 0) {
+                                        val progress = ((totalBytesRead * 100) / contentLength).toInt()
+                                        val mbRead = String.format(java.util.Locale.US, "%.1f", totalBytesRead / 1024f / 1024f)
+                                        val mbTotal = String.format(java.util.Locale.US, "%.1f", contentLength / 1024f / 1024f)
+                                        builder.setProgress(100, progress, false)
+                                               .setContentText("$artist • $mbRead MB / $mbTotal MB")
+                                    } else {
+                                        val mbRead = String.format(java.util.Locale.US, "%.1f", totalBytesRead / 1024f / 1024f)
+                                        builder.setProgress(100, 0, true)
+                                               .setContentText("$artist • $mbRead MB descargados")
+                                    }
+                                    notificationManager.notify(notificationId, builder.build())
+                                }
                             }
                         }
                     }
@@ -99,7 +202,8 @@ object DownloadHelper {
                         resolver.update(uri, contentValues, null, null)
                     }
                 }
-
+                
+                builder.clearActions()
                 builder.setContentTitle(context.getString(com.example.beatpulse.R.string.download_completed))
                     .setContentText(title)
                     .setSmallIcon(android.R.drawable.stat_sys_download_done)
@@ -112,18 +216,32 @@ object DownloadHelper {
                     prefs.showToast(context.getString(com.example.beatpulse.R.string.download_completed_desc, title))
                 }
                 
-                // Forzar escaneo para que se agregue inmediatamente a la librería con las etiquetas correctas
+                // Forzar escaneo para que se agregue inmediatamente a la librería
                 val scanner = org.koin.java.KoinJavaComponent.getKoin().get<com.example.beatpulse.data.ILibraryScanner>()
                 scanner.scanMusic()
                 
             } catch (e: Exception) {
                 e.printStackTrace()
-                builder.setContentTitle("Error en la descarga")
-                    .setContentText(title)
-                    .setSmallIcon(android.R.drawable.stat_sys_warning)
-                    .setProgress(0, 0, false)
-                    .setOngoing(false)
+                builder.clearActions()
+                
+                // Cleanup partial file if canceled
+                if (e.message == "Descarga cancelada" && uri != null) {
+                    resolver.delete(uri, null, null)
+                    builder.setContentTitle("Descarga cancelada")
+                        .setContentText(title)
+                        .setSmallIcon(android.R.drawable.stat_sys_warning)
+                        .setProgress(0, 0, false)
+                        .setOngoing(false)
+                } else {
+                    builder.setContentTitle("Error en la descarga")
+                        .setContentText(title)
+                        .setSmallIcon(android.R.drawable.stat_sys_warning)
+                        .setProgress(0, 0, false)
+                        .setOngoing(false)
+                }
                 notificationManager.notify(notificationId, builder.build())
+            } finally {
+                downloadStates.remove(notificationId)
             }
         }
     }

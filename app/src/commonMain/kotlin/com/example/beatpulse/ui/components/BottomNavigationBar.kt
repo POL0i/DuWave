@@ -38,6 +38,8 @@ fun BottomNavigationBar(
     onPageChange: (Int) -> Unit,
     currentTrack: TrackEntity?,
     isPlaying: Boolean,
+    currentPosition: Long,
+    duration: Long,
     accentColor: Color,
     paletteColors: PaletteColors,
     bgStyle: Int,
@@ -147,6 +149,9 @@ fun BottomNavigationBar(
                         MiniPlayer(
                             currentTrack = currentTrack,
                             isPlaying = isPlaying,
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            prefs = prefs,
                             accentColor = accentColor,
                             paletteColors = paletteColors,
                             bgStyle = bgStyle,

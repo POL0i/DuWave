@@ -114,10 +114,15 @@ import kotlinx.coroutines.delay
 class Spark(var x: Float, var y: Float, var vx: Float, var vy: Float, var alpha: Float, val color: Color)
 
 enum class VisualizerStyle {
-    WAVE, SLIME, BARS, DOTS, PARTICLES, RINGS, AURA, BANDS, TERRAIN, STAR
+    WAVE, SLIME, BARS, DOTS, PARTICLES, RINGS, AURA, BANDS, TERRAIN, STAR, OSCILLOSCOPE, TRAP_NATION, SIDE_PERSPECTIVE_BANDS
 }
 
 enum class DragAction { NONE, DJ_SEEK, OPEN_QUEUE }
+
+class OscilloscopeState(
+    var accumulatedTime: Float = 0f,
+    var dynamicPhase: Float = 0f
+)
 
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
@@ -379,6 +384,19 @@ private fun PlayerScreenContent(
         }
     }
 
+    LaunchedEffect(Unit) {
+        playerViewModel.supportDialogRequested.collect {
+            showSupportDialog = true
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        playerViewModel.streamConfigDialogRequested.collect {
+            showStreamConfigDialog = true
+            playerViewModel.setStreamConfigUiVisible(true)
+        }
+    }
+
     DisposableEffect(Unit) {
         onDispose { }
     }
@@ -451,6 +469,7 @@ private fun PlayerScreenContent(
     } else Modifier.fillMaxSize()
 
     val terrainState = androidx.compose.runtime.remember { TerrainState() }
+    val oscilloscopeState = androidx.compose.runtime.remember { OscilloscopeState() }
 
     // --- MAIN LAYOUT ---
     Box(
@@ -459,6 +478,8 @@ private fun PlayerScreenContent(
                 PlayerBandsBackground(this, bassAmplitudesState.value, midAmplitudesState.value, highAmplitudesState.value, combinedAmplitudesState.value, paletteColors, bassMult, midMult, trebleMult, reactivity, visualizerArchetype)
             } else if (currentStyle == VisualizerStyle.TERRAIN) {
                 PlayerTerrainBackground(this, bassAmplitudesState.value, midAmplitudesState.value, highAmplitudesState.value, combinedAmplitudesState.value, paletteColors, bassMult, midMult, trebleMult, reactivity, visualizerArchetype, rotationAngle, terrainState)
+            } else if (currentStyle == VisualizerStyle.SIDE_PERSPECTIVE_BANDS) {
+                PlayerSidePerspectiveBandsBackground(this, bassAmplitudesState.value, midAmplitudesState.value, highAmplitudesState.value, combinedAmplitudesState.value, paletteColors, bassMult, midMult, trebleMult, reactivity, visualizerArchetype)
             }
         },
         contentAlignment = Alignment.Center
@@ -497,7 +518,10 @@ private fun PlayerScreenContent(
             onToggleMicMode = {
                 playerViewModel.toggleMicMode()
             },
-            onShowStreamConfig = { showStreamConfigDialog = true },
+            onShowStreamConfig = { 
+                showStreamConfigDialog = true
+                playerViewModel.setStreamConfigUiVisible(true)
+            },
             prefs = prefs
         )
         }
@@ -547,6 +571,8 @@ private fun PlayerScreenContent(
             abPointB = abPointB,
             activeDraggingHandle = activeDraggingHandle,
             playerViewModel = playerViewModel,
+            oscilloscopeState = oscilloscopeState,
+            reactivity = reactivity,
             cleanUiMode = cleanUiMode,
             coverDragEnabled = playerViewModel.coverDragEnabled.collectAsState().value,
             coverVisibilityMode = playerViewModel.coverVisibilityMode.collectAsState().value,
@@ -624,7 +650,37 @@ private fun PlayerScreenContent(
     PlayerTimerDialog(showTimerDialog = showTimerDialog, onDismissRequest = { showTimerDialog = false }, colorVibrant = colorVibrant, colorDominant = colorDominant, sleepTimerSeconds = sleepTimerSeconds, onSetSleepTimer = onSetSleepTimer)
     PlayerEqDialog(showEqDialog = showEqDialog, onDismissRequest = { showEqDialog = false }, colorVibrant = colorVibrant, colorDominant = colorDominant, equalizerManager = equalizerManager)
     PlayerEditorDialog(showEditorDialog = showEditorDialog, onDismissRequest = { showEditorDialog = false }, colorVibrant = colorVibrant, colorDominant = colorDominant, currentTrack = currentTrack, onUpdateTrackMetadata = onUpdateTrackMetadata)
-    PlayerStreamConfigDialog(showStreamConfigDialog = showStreamConfigDialog, onDismissRequest = { showStreamConfigDialog = false }, colorVibrant = colorVibrant, colorDominant = colorDominant, playerViewModel = playerViewModel)
+    PlayerStreamConfigDialog(
+        showStreamConfigDialog = showStreamConfigDialog,
+        onDismissRequest = {
+            showStreamConfigDialog = false
+            playerViewModel.setStreamConfigUiVisible(false)
+        },
+        colorVibrant = colorVibrant, colorDominant = colorDominant, playerViewModel = playerViewModel
+    )
+
+    // Floating Stream Config Button for Clean UI Mode
+    AnimatedVisibility(
+        visible = isMicModeCleanUI && isMicModeActive,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = Modifier.align(Alignment.TopEnd).padding(24.dp)
+    ) {
+        IconButton(
+            onClick = {
+                showStreamConfigDialog = true
+                playerViewModel.setStreamConfigUiVisible(true)
+            },
+            modifier = Modifier.size(36.dp).clip(CircleShape).background(paletteColors.dominant.copy(alpha = 0.5f))
+        ) {
+            Icon(
+                imageVector = Icons.Default.Close,
+                contentDescription = "Configuración de Stream",
+                tint = colorVibrant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
 
     val styleNames = mapOf(
         VisualizerStyle.WAVE to "Ondas",
@@ -636,7 +692,10 @@ private fun PlayerScreenContent(
         VisualizerStyle.AURA to "Aura",
         VisualizerStyle.BANDS to "Bandas",
         VisualizerStyle.TERRAIN to "Terreno 3D",
-        VisualizerStyle.STAR to "Estrella"
+        VisualizerStyle.STAR to "Estrella",
+        VisualizerStyle.OSCILLOSCOPE to "Osciloscopio",
+        VisualizerStyle.TRAP_NATION to "Trap Nation",
+        VisualizerStyle.SIDE_PERSPECTIVE_BANDS to "Bandas con Perspectiva"
     )
 
     PlayerSettingsSheet(
@@ -1070,7 +1129,7 @@ private fun PlayerTrackInfoHeader(
                                 Icon(imageVector = Icons.Default.Mic, contentDescription = "Modo Streamer", tint = colorVibrant, modifier = Modifier.size(20.dp))
                             }
                             2 -> IconButton(onClick = onShowStreamConfig, modifier = Modifier.padding(end = 8.dp).size(36.dp).clip(CircleShape).background(paletteColors.dominant.copy(alpha = 0.5f))) {
-                                Icon(imageVector = Icons.Default.CastConnected, contentDescription = "Configuración de Stream", tint = colorVibrant, modifier = Modifier.size(20.dp))
+                                Icon(imageVector = Icons.Default.Close, contentDescription = "Configuración de Stream", tint = colorVibrant, modifier = Modifier.size(20.dp))
                             }
                         }
                     }
@@ -1117,6 +1176,8 @@ private fun ColumnScope.PlayerVisualizerArea(
     currentPosition: Long, duration: Long,
     abPointA: Float, abPointB: Float, activeDraggingHandle: String?,
     playerViewModel: IPlayerViewModel,
+    oscilloscopeState: OscilloscopeState,
+    reactivity: Float,
     cleanUiMode: Boolean,
     coverDragEnabled: Boolean,
     coverVisibilityMode: String,
@@ -1213,6 +1274,20 @@ private fun ColumnScope.PlayerVisualizerArea(
             },
         contentAlignment = Alignment.Center
     ) {
+        // OSCILLOSCOPE BACKGROUND (Behind cover)
+        if (currentStyle == VisualizerStyle.OSCILLOSCOPE) {
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier.fillMaxSize()
+                    .offset { androidx.compose.ui.unit.IntOffset(coverOffsetX.toInt(), coverOffsetY.toInt()) }
+                    .graphicsLayer {
+                        scaleX = animatedScaleAnim.value
+                        scaleY = animatedScaleAnim.value
+                    }
+            ) {
+                PlayerOscilloscope(this, bassAmplitudesState.value, midAmplitudesState.value, highAmplitudesState.value, combinedAmplitudesState.value, paletteColors, visualizerArchetype, rotationAngle, reactivity, oscilloscopeState, isForeground = false)
+            }
+        }
+
         // Visualizer Canvas (extracted to its own composable)
         PlayerVisualizerCanvas(
             coverOffsetX = coverOffsetX,
@@ -1235,6 +1310,7 @@ private fun ColumnScope.PlayerVisualizerArea(
             abPointA = abPointA, abPointB = abPointB,
             activeDraggingHandle = activeDraggingHandle,
             animatedScale = animatedScaleAnim.value,
+            coverScale = coverScale,
             onPlayheadPosChanged = { playheadPos = it }
         )
           // Central Album Art
@@ -1247,15 +1323,7 @@ private fun ColumnScope.PlayerVisualizerArea(
             
             Box(
                 modifier = Modifier
-                    .offset { androidx.compose.ui.unit.IntOffset(coverOffsetX.toInt(), coverOffsetY.toInt()) }
                     .size(160.dp)
-                    .graphicsLayer { 
-                        scaleX = animatedScaleAnim.value * coverScale; 
-                        scaleY = animatedScaleAnim.value * coverScale; 
-                        if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value 
-                    }
-                    .clip(shape)
-                    .background(colorDominant.copy(alpha = 0.5f))
                     .then(
                         if (coverDragEnabled) {
                             Modifier.pointerInput(Unit) {
@@ -1271,12 +1339,21 @@ private fun ColumnScope.PlayerVisualizerArea(
                             }
                         } else Modifier
                     )
+                    .graphicsLayer {
+                        translationX = coverOffsetX
+                        translationY = coverOffsetY
+                        scaleX = animatedScaleAnim.value * coverScale
+                        scaleY = animatedScaleAnim.value * coverScale
+                        if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value
+                    }
+                    .clip(shape)
+                    .background(colorDominant.copy(alpha = 0.5f))
                     .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { playerViewModel.togglePlayPause() },
-                        onDoubleTap = { offset ->
-                            if (showSeek10sTutorial) onDismissSeek10sTutorial()
-                            if (offset.x < size.width / 2) {
+                        detectTapGestures(
+                            onTap = { playerViewModel.togglePlayPause() },
+                            onDoubleTap = { offset ->
+                                if (showSeek10sTutorial) onDismissSeek10sTutorial()
+                                if (offset.x < size.width / 2) {
                                 playerViewModel.seekTo((currentPosition - 10000).coerceAtLeast(0))
                                 coroutineScope.launch { onFeedbackSeekLeft(true); delay(400); onFeedbackSeekLeft(false) }
                             } else {
@@ -1332,10 +1409,226 @@ private fun ColumnScope.PlayerVisualizerArea(
             }
         }
         }
+        
+        // OSCILLOSCOPE FOREGROUND (In front of cover)
+        if (currentStyle == VisualizerStyle.OSCILLOSCOPE) {
+            androidx.compose.foundation.Canvas(
+                modifier = Modifier.fillMaxSize()
+                    .offset { androidx.compose.ui.unit.IntOffset(coverOffsetX.toInt(), coverOffsetY.toInt()) }
+                    .graphicsLayer {
+                        scaleX = animatedScaleAnim.value
+                        scaleY = animatedScaleAnim.value
+                    }
+            ) {
+                PlayerOscilloscope(this, bassAmplitudesState.value, midAmplitudesState.value, highAmplitudesState.value, combinedAmplitudesState.value, paletteColors, visualizerArchetype, rotationAngle, reactivity, oscilloscopeState, isForeground = true)
+            }
+        }
+        
         // Lyrics status
         if (autoAnalyzeLyrics) {
             PlayerLyricsStatusIndicator(isFetchingLyrics = isFetchingLyrics, searchFailed = searchFailed, availableLyricsResults = availableLyricsResults, onShowLyricsMatches = onShowLyricsMatches)
         }
+    }
+}
+
+fun PlayerOscilloscope(
+    scope: androidx.compose.ui.graphics.drawscope.DrawScope,
+    bassAmps: FloatArray, midAmps: FloatArray, highAmps: FloatArray, combinedAmps: FloatArray,
+    paletteColors: com.example.beatpulse.theme.PaletteColors,
+    visualizerArchetype: Int,
+    rotationAngle: Float,
+    reactivity: Float,
+    state: OscilloscopeState,
+    isForeground: Boolean
+) {
+    val w = scope.size.width
+    val h = scope.size.height
+    val cx = w / 2f
+    val cy = h / 2f
+    val baseR = minOf(w, h) * 0.18f
+    
+    // Only update state once per frame (when rendering background)
+    if (!isForeground) {
+        var avgCombined = 0f
+        if (combinedAmps.isNotEmpty()) avgCombined = combinedAmps.average().toFloat()
+        
+        var bassAvg = 0f
+        if (bassAmps.isNotEmpty()) bassAvg = bassAmps.average().toFloat()
+        
+        val deltaAngle = rotationAngle - (state.accumulatedTime % 360f) // roughly 0.5 per frame
+        state.accumulatedTime += (0.5f) * 0.1f + (avgCombined * 0.3f)
+        state.dynamicPhase += bassAvg * 0.2f
+    }
+    
+    fun getInterpolatedAmp(amps: FloatArray, tNormalized: Float): Float {
+        if (amps.isEmpty()) return 0f
+        val exactIdx = tNormalized * (amps.size - 1)
+        val idx0 = exactIdx.toInt().coerceIn(0, amps.size - 1)
+        val idx1 = (idx0 + 1).coerceIn(0, amps.size - 1)
+        val fraction = exactIdx - idx0
+        return amps[idx0] + (amps[idx1] - amps[idx0]) * fraction
+    }
+
+    val rotSpeedY = 0.005f
+    val rotSpeedZ = 0.003f
+    val ringAngle = rotationAngle * (kotlin.math.PI / 180.0).toFloat()
+
+    fun drawSphere(amps: FloatArray, color: androidx.compose.ui.graphics.Color, numRings: Int, radiusMod: Float, rotSpeedYMult: Float, rotSpeedZMult: Float, lineW: Float, isHorizontal: Boolean) {
+        if (amps.isEmpty()) return
+        val timeDelta = state.accumulatedTime * 0.015f * rotSpeedZMult // Faster overall speed
+        
+        // Wobble on X and Y to keep the hole mostly facing the camera
+        val currentXRot = kotlin.math.sin(timeDelta * 0.5f) * 0.4f
+        val currentYRot = kotlin.math.cos(timeDelta * 0.7f) * 0.4f
+        val currentZRot = ringAngle + timeDelta * 2.0f
+        val numPoints = 120
+        
+        for (ring in 0 until numRings) {
+            val ringT = ring.toFloat() / numRings
+            val ringOffset = ringT * kotlin.math.PI.toFloat() * 2f
+            
+            var prevX = 0f
+            var prevY = 0f
+            var prevZ = 0f
+            var hasPrev = false
+            
+            for (i in 0..numPoints) {
+                val t = (i.toFloat() / numPoints) * kotlin.math.PI.toFloat() * 2f
+                val normalizedT = i.toFloat() / numPoints
+                val mirroredT = if (normalizedT < 0.5f) normalizedT * 2f else (1f - normalizedT) * 2f
+                
+                val amp = getInterpolatedAmp(amps, mirroredT) * reactivity
+                val stretch = 1f + (amp * 4.0f)
+                val r = baseR * radiusMod * stretch
+                
+                val pX = kotlin.math.cos(t) * r
+                val pY = kotlin.math.sin(t) * r
+                
+                var sX = pX
+                var sY = pY * kotlin.math.cos(ringOffset)
+                var sZ = pY * kotlin.math.sin(ringOffset)
+                
+                if (!isHorizontal) {
+                    sY = pX * kotlin.math.cos(ringOffset)
+                    sX = pY
+                    sZ = pX * kotlin.math.sin(ringOffset)
+                }
+                
+                // 1. Z-axis rotation (spin around the cover)
+                val x1 = sX * kotlin.math.cos(currentZRot) - sY * kotlin.math.sin(currentZRot)
+                val y1 = sX * kotlin.math.sin(currentZRot) + sY * kotlin.math.cos(currentZRot)
+                val z1 = sZ
+                
+                // 2. X-axis rotation (tilt up/down)
+                val x2 = x1
+                val y2 = y1 * kotlin.math.cos(currentXRot) - z1 * kotlin.math.sin(currentXRot)
+                val z2 = y1 * kotlin.math.sin(currentXRot) + z1 * kotlin.math.cos(currentXRot)
+                
+                // 3. Y-axis rotation (tilt left/right)
+                val x3 = x2 * kotlin.math.cos(currentYRot) - z2 * kotlin.math.sin(currentYRot)
+                val y3 = y2
+                val z3 = x2 * kotlin.math.sin(currentYRot) + z2 * kotlin.math.cos(currentYRot)
+                
+                val px = cx + x3.toFloat()
+                val py = cy + y3.toFloat()
+                
+                if (hasPrev) {
+                    val avgZ = (prevZ + z3) / 2f
+                    if ((isForeground && avgZ >= 0) || (!isForeground && avgZ < 0)) {
+                        scope.drawLine(
+                            color = color,
+                            start = androidx.compose.ui.geometry.Offset(prevX, prevY),
+                            end = androidx.compose.ui.geometry.Offset(px, py),
+                            strokeWidth = lineW,
+                            cap = androidx.compose.ui.graphics.StrokeCap.Round
+                        )
+                    }
+                }
+                prevX = px
+                prevY = py
+                prevZ = z3.toFloat()
+                hasPrev = true
+            }
+        }
+    }
+
+    fun drawTorusKnot(amps: FloatArray, color: androidx.compose.ui.graphics.Color, p: Float, q: Float, lineW: Float, rotSpeedMult: Float) {
+        if (amps.isEmpty()) return
+        val timeDelta = state.accumulatedTime * 0.015f * rotSpeedMult // Faster flowing
+        
+        // Wobble on X and Y to keep the hole facing us, spin on Z
+        val currentXRot = kotlin.math.sin(timeDelta * 0.5f) * 0.4f
+        val currentYRot = kotlin.math.cos(timeDelta * 0.7f) * 0.4f
+        val currentZRot = ringAngle + timeDelta * 1.5f
+        val numPoints = 250 // Increased for smoother knot
+        
+        var prevX = 0f
+        var prevY = 0f
+        var prevZ = 0f
+        var hasPrev = false
+        
+        for (i in 0..numPoints) {
+            val normalizedT = i.toFloat() / numPoints
+            val t = normalizedT * kotlin.math.PI.toFloat() * 2f
+            val mirroredT = if (normalizedT < 0.5f) normalizedT * 2f else (1f - normalizedT) * 2f
+            
+            val amp = getInterpolatedAmp(amps, mirroredT) * reactivity
+            val stretch = 1f + (amp * 1.5f)
+            
+            // Torus knot equations
+            val r1 = baseR * 1.4f // Main radius (wraps around the album art)
+            val r2 = baseR * 0.4f * stretch // Tube radius (reacts to audio)
+            
+            val rTorus = r1 + r2 * kotlin.math.cos(q * t + timeDelta * 1.5f)
+            val lX = rTorus * kotlin.math.cos(p * t + timeDelta)
+            val lY = rTorus * kotlin.math.sin(p * t + timeDelta)
+            val lZ = r2 * kotlin.math.sin(q * t + timeDelta * 1.5f)
+            
+            // 1. Z-axis rotation (spin around the cover)
+            val x1 = lX * kotlin.math.cos(currentZRot) - lY * kotlin.math.sin(currentZRot)
+            val y1 = lX * kotlin.math.sin(currentZRot) + lY * kotlin.math.cos(currentZRot)
+            val z1 = lZ
+            
+            // 2. X-axis rotation (tilt up/down)
+            val x2 = x1
+            val y2 = y1 * kotlin.math.cos(currentXRot) - z1 * kotlin.math.sin(currentXRot)
+            val z2 = y1 * kotlin.math.sin(currentXRot) + z1 * kotlin.math.cos(currentXRot)
+            
+            // 3. Y-axis rotation (tilt left/right)
+            val x3 = x2 * kotlin.math.cos(currentYRot) - z2 * kotlin.math.sin(currentYRot)
+            val y3 = y2
+            val z3 = x2 * kotlin.math.sin(currentYRot) + z2 * kotlin.math.cos(currentYRot)
+            
+            val px = cx + x3.toFloat()
+            val py = cy + y3.toFloat()
+            
+            if (hasPrev) {
+                val avgZ = (prevZ + z3) / 2f
+                if ((isForeground && avgZ >= 0) || (!isForeground && avgZ < 0)) {
+                    scope.drawLine(
+                        color = color,
+                        start = androidx.compose.ui.geometry.Offset(prevX, prevY),
+                        end = androidx.compose.ui.geometry.Offset(px, py),
+                        strokeWidth = lineW,
+                        cap = androidx.compose.ui.graphics.StrokeCap.Round
+                    )
+                }
+            }
+            prevX = px
+            prevY = py
+            prevZ = z3.toFloat()
+            hasPrev = true
+        }
+    }
+
+    if (visualizerArchetype == 1) { // 3 waves (Torus Knots)
+        drawTorusKnot(bassAmps, paletteColors.dominant, 3f, 8f, 6f, 0.8f) // 3 lobes, 8 twists
+        drawTorusKnot(midAmps, paletteColors.vibrant, 5f, 3f, 4f, 1.2f)   // 5 lobes, 3 twists
+        drawTorusKnot(highAmps, paletteColors.muted.copy(alpha = 0.7f), 7f, 4f, 2.5f, 1.6f) // 7 lobes, 4 twists
+    } else { // 1 wave
+        drawSphere(bassAmps, paletteColors.dominant.copy(alpha=0.6f), 8, 1.2f, 0.8f, 0.5f, 3f, true)
+        drawSphere(midAmps, paletteColors.vibrant.copy(alpha=0.8f), 6, 1.0f, 1.2f, 0.7f, 4f, false)
+        drawSphere(highAmps, paletteColors.muted, 4, 0.8f, 1.5f, 1.0f, 6f, true)
     }
 }
 
@@ -1346,3 +1639,129 @@ private fun ColumnScope.PlayerVisualizerArea(
 
 
 
+
+// Pre-allocated buffers for PlayerSidePerspectiveBandsBackground to avoid GC pauses at 60 FPS
+private val sidePerspectiveSmoothedAmpsBuf = FloatArray(256)
+private val sidePerspectiveXLArr = FloatArray(256)
+private val sidePerspectiveYLArr = FloatArray(256)
+private val sidePerspectiveXRArr = FloatArray(256)
+private val sidePerspectiveYRArr = FloatArray(256)
+private val sidePerspectivePathLeft = androidx.compose.ui.graphics.Path()
+private val sidePerspectivePathRight = androidx.compose.ui.graphics.Path()
+private val sidePerspectivePathFill = androidx.compose.ui.graphics.Path()
+
+/** Draws SIDE_PERSPECTIVE_BANDS visualizer in the background (drawBehind scope) */
+fun PlayerSidePerspectiveBandsBackground(
+    scope: androidx.compose.ui.graphics.drawscope.DrawScope,
+    bassAmps: FloatArray, midAmps: FloatArray, highAmps: FloatArray, combinedAmps: FloatArray,
+    paletteColors: com.example.beatpulse.theme.PaletteColors,
+    bassMult: Float, midMult: Float, trebleMult: Float, reactivity: Float, visualizerArchetype: Int
+) {
+    with(scope) {
+        val w = size.width
+        val h = size.height
+        val bassOpacity = (0.5f + bassMult * 0.4f + reactivity * 0.2f).coerceIn(0f, 1f)
+        val midOpacity = (0.6f + midMult * 0.3f + reactivity * 0.2f).coerceIn(0f, 1f)
+        val highOpacity = (0.7f + trebleMult * 0.2f + reactivity * 0.2f).coerceIn(0f, 1f)
+        val vpX = w * 0.5f
+        val vpY = h * 0.5f
+
+        fun drawPerspectivePillar(amps: FloatArray, color: androidx.compose.ui.graphics.Color, widthMult: Float, isLeft: Boolean) {
+            val count = amps.size; if (count == 0) return
+            val sAmps = if (sidePerspectiveSmoothedAmpsBuf.size >= count) sidePerspectiveSmoothedAmpsBuf else FloatArray(count)
+            val sXL = if (sidePerspectiveXLArr.size >= count) sidePerspectiveXLArr else FloatArray(count)
+            val sYL = if (sidePerspectiveYLArr.size >= count) sidePerspectiveYLArr else FloatArray(count)
+            val sXR = if (sidePerspectiveXRArr.size >= count) sidePerspectiveXRArr else FloatArray(count)
+            val sYR = if (sidePerspectiveYRArr.size >= count) sidePerspectiveYRArr else FloatArray(count)
+            
+            for (i in 0 until count) {
+                var sum = 0f
+                var weightSum = 0f
+                // Wider smoothing radius (-8 to 8) for much more fluid organic curves
+                for (j in -8..8) {
+                    val idx = i + j
+                    if (idx in 0 until count) {
+                        val weight = 1f / (1f + kotlin.math.abs(j))
+                        sum += amps[idx] * weight
+                        weightSum += weight
+                    }
+                }
+                sAmps[i] = sum / weightSum
+            }
+            
+            // Move pillars a bit away from the edges
+            val cX = if (isLeft) w * 0.11f else w * 0.89f
+            val baseWidth = w * 0.03f
+            
+            for (i in 0 until count) {
+                val t = -0.4f + 1.8f * (i.toFloat() / (count - 1).coerceAtLeast(1))
+                val yEdge = h * (1f - t)
+                val amp = sAmps[i]
+                
+                // Deadzone to mute base noise, then a 2.8x linear multiplier.
+                val processedAmp = kotlin.math.max(0f, amp - 0.05f) * 2.8f
+                
+                val bandWidth = baseWidth + (processedAmp * w * 0.22f * widthMult)
+                val xL = cX - bandWidth / 2f
+                val xR = cX + bandWidth / 2f
+                val slope = (vpY - yEdge) / (vpX - cX)
+                sXL[i] = xL
+                sYL[i] = yEdge + (xL - cX) * slope
+                sXR[i] = xR
+                sYR[i] = yEdge + (xR - cX) * slope
+            }
+            
+            for (i in 0 until count) {
+                drawLine(
+                    color = color.copy(alpha = color.alpha * 0.5f),
+                    start = androidx.compose.ui.geometry.Offset(sXL[i], sYL[i]),
+                    end = androidx.compose.ui.geometry.Offset(sXR[i], sYR[i]),
+                    strokeWidth = 2f
+                )
+            }
+            
+            if (count > 0) {
+                sidePerspectivePathLeft.reset()
+                sidePerspectivePathLeft.moveTo(sXL[0], sYL[0])
+                for (i in 0 until count - 1) {
+                    sidePerspectivePathLeft.lineTo(sXL[i], sYL[i+1])
+                    sidePerspectivePathLeft.lineTo(sXL[i+1], sYL[i+1])
+                }
+                sidePerspectivePathRight.reset()
+                sidePerspectivePathRight.moveTo(sXR[0], sYR[0])
+                for (i in 0 until count - 1) {
+                    sidePerspectivePathRight.lineTo(sXR[i], sYR[i+1])
+                    sidePerspectivePathRight.lineTo(sXR[i+1], sYR[i+1])
+                }
+                sidePerspectivePathFill.reset()
+                sidePerspectivePathFill.moveTo(sXL[0], sYL[0])
+                for (i in 0 until count - 1) {
+                    sidePerspectivePathFill.lineTo(sXL[i], sYL[i+1])
+                    sidePerspectivePathFill.lineTo(sXL[i+1], sYL[i+1])
+                }
+                sidePerspectivePathFill.lineTo(sXR[count-1], sYR[count-1])
+                for (i in count - 1 downTo 1) {
+                    sidePerspectivePathFill.lineTo(sXR[i], sYR[i-1])
+                    sidePerspectivePathFill.lineTo(sXR[i-1], sYR[i-1])
+                }
+                sidePerspectivePathFill.close()
+                drawPath(sidePerspectivePathFill, color.copy(alpha = color.alpha * 0.2f), style = androidx.compose.ui.graphics.drawscope.Fill)
+                drawPath(sidePerspectivePathLeft, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f, join = androidx.compose.ui.graphics.StrokeJoin.Miter))
+                drawPath(sidePerspectivePathRight, color, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f, join = androidx.compose.ui.graphics.StrokeJoin.Miter))
+            }
+        }
+
+        val drawBandLayer = { amps: FloatArray, color: androidx.compose.ui.graphics.Color, widthMult: Float ->
+            drawPerspectivePillar(amps, color, widthMult, true)
+            drawPerspectivePillar(amps, color, widthMult, false)
+        }
+
+        if (visualizerArchetype == 1) {
+            drawBandLayer(combinedAmps, paletteColors.vibrant.copy(alpha = maxOf(bassOpacity, midOpacity, highOpacity)), 1.5f)
+        } else {
+            drawBandLayer(bassAmps, paletteColors.dominant.copy(alpha = bassOpacity * 0.8f), 0.9f)
+            drawBandLayer(midAmps, paletteColors.vibrant.copy(alpha = midOpacity), 1.3f)
+            drawBandLayer(highAmps, paletteColors.muted.copy(alpha = highOpacity), 0.7f)
+        }
+    }
+}

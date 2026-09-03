@@ -17,7 +17,10 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.beatpulse.ui.components.player.IPreferencesManager
+import com.example.beatpulse.data.AppPreferences
 import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.player.AppEqualizerManager
 import com.example.beatpulse.ui.components.BottomNavigationBar
@@ -25,6 +28,7 @@ import com.example.beatpulse.ui.components.StyleNotificationOverlay
 import com.example.beatpulse.ui.components.backgrounds.*
 import com.example.beatpulse.ui.components.backgrounds.TerrariaWaterBackground
 import com.example.beatpulse.ui.components.backgrounds.ZenClearBackground
+import com.example.beatpulse.ui.components.backgrounds.SandsFlowBackground
 import com.example.beatpulse.ui.components.player.PlayerScreen
 import com.example.beatpulse.ui.components.player.PlayerScreenCallbacks
 import com.example.beatpulse.ui.components.player.PlayerScreenState
@@ -62,6 +66,8 @@ fun AppScreen(
     val playbackPitch by playerViewModel.playbackPitch.collectAsState()
     val reverbEnabled by playerViewModel.reverbEnabled.collectAsState()
     val effectsPreset by playerViewModel.effectsPreset.collectAsState()
+    val currentPosition by playerViewModel.currentPosition.collectAsState()
+    val duration by playerViewModel.duration.collectAsState()
     
     val isMicModeActive by playerViewModel.isMicModeActive.collectAsState()
     val streamConfigEffectsVisible by playerViewModel.streamConfigEffectsVisible.collectAsState()
@@ -147,6 +153,8 @@ fun AppScreen(
                         onPageChange = { currentPage = it },
                         currentTrack = currentTrack,
                         isPlaying = isPlaying,
+                        currentPosition = currentPosition,
+                        duration = duration,
                         accentColor = accentColor,
                         paletteColors = paletteColors,
                         bgStyle = bgStyle,
@@ -258,10 +266,12 @@ fun AppScreen(
                 7 -> CathedralFantasyBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2, ) { content() }
                 8 -> TaleLegendBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
                 9 -> RetroWallBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
-                                10 -> FountainBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                10 -> FountainBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
                 11 -> TerrariaWaterBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
                 12 -> ZenClearBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
-                else -> Box(modifier = Modifier.fillMaxSize().then(bgModifier)) { content() }
+                13 -> SandsFlowBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                14 -> com.example.beatpulse.ui.components.backgrounds.LullabyEyesBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                else -> { Box(modifier = Modifier.fillMaxSize().then(bgModifier)) { content() } }
             }
         }
     }
@@ -303,6 +313,41 @@ fun AppScreen(
     }
 
     var showTutorial by remember { mutableStateOf(!prefs.hasSeenTutorial) }
+
+    val showFps by playerViewModel.showFps.collectAsState()
+    var currentFps by remember { mutableStateOf(0) }
+    LaunchedEffect(showFps) {
+        if (showFps) {
+            var frameCount = 0
+            var lastTime = kotlinx.coroutines.currentCoroutineContext()[kotlinx.coroutines.Job]?.let { 0L } ?: System.nanoTime()
+            while (true) {
+                withFrameNanos { frameTimeNanos ->
+                    frameCount++
+                    val elapsed = frameTimeNanos - lastTime
+                    if (elapsed >= 1_000_000_000L) {
+                        currentFps = ((frameCount * 1_000_000_000.0) / elapsed).toInt()
+                        frameCount = 0
+                        lastTime = frameTimeNanos
+                    }
+                }
+            }
+        }
+    }
+
+    if (showFps) {
+        Box(modifier = Modifier.fillMaxSize().padding(top = 80.dp, end = 24.dp), contentAlignment = Alignment.TopEnd) {
+            Text(
+                text = "$currentFps FPS",
+                color = Color.Green,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+        }
+    }
+
     var blurRadius by remember { mutableFloatStateOf(if (showTutorial) 30f else 0f) }
     var blurTarget by remember { mutableFloatStateOf(if (showTutorial) 30f else 0f) }
     var showSwipeHint by remember { mutableStateOf(false) }
@@ -322,9 +367,9 @@ fun AppScreen(
                 Text(text = getLocalizedString("welcome_body"), color = Color.White, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(32.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Button(onClick = { ; SystemUtils.recreateApp() }, colors = ButtonDefaults.buttonColors(containerColor = if ("es" == "es") paletteColors.vibrant else Color.DarkGray)) { Text("🇲🇽 ES") }
-                    Button(onClick = { ; SystemUtils.recreateApp() }, colors = ButtonDefaults.buttonColors(containerColor = if ("es" == "en") paletteColors.vibrant else Color.DarkGray)) { Text("🇬🇧 EN") }
-                    Button(onClick = { ; SystemUtils.recreateApp() }, colors = ButtonDefaults.buttonColors(containerColor = if ("es" == "pt") paletteColors.vibrant else Color.DarkGray)) { Text("🇧🇷 PT") }
+                    Button(onClick = { (prefs as AppPreferences).appLanguage = "es"; SystemUtils.recreateApp() }, colors = ButtonDefaults.buttonColors(containerColor = if ((prefs as AppPreferences).appLanguage == "es") paletteColors.vibrant else Color.DarkGray)) { Text("🇲🇽 ES") }
+                    Button(onClick = { (prefs as AppPreferences).appLanguage = "en"; SystemUtils.recreateApp() }, colors = ButtonDefaults.buttonColors(containerColor = if ((prefs as AppPreferences).appLanguage == "en") paletteColors.vibrant else Color.DarkGray)) { Text("🇬🇧 EN") }
+                    Button(onClick = { (prefs as AppPreferences).appLanguage = "pt"; SystemUtils.recreateApp() }, colors = ButtonDefaults.buttonColors(containerColor = if ((prefs as AppPreferences).appLanguage == "pt") paletteColors.vibrant else Color.DarkGray)) { Text("🇧🇷 PT") }
                 }
             }
         }
@@ -343,7 +388,7 @@ fun AppScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 160.dp).padding(horizontal = 24.dp)) {
                 Box(modifier = Modifier.offset(x = offsetX.dp).size(24.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text("¡Desliza el minirreproductor a la derecha para elegir una canción!", color = Color.White, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+                Text(getLocalizedString("swipe_to_choose"), color = Color.White, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
             }
         }
     }

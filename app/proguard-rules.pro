@@ -49,4 +49,8 @@
 -dontwarn javax.script.**
 -dontwarn jdk.dynalink.**
 -dontwarn org.schabi.newpipe.extractor.**
+-keep class org.schabi.newpipe.extractor.** { *; }
 -keep class org.mozilla.javascript.** { *; }
+# Ktor references java.lang.management which doesn't exist on Android
+-dontwarn java.lang.management.ManagementFactory
+-dontwarn java.lang.management.RuntimeMXBean

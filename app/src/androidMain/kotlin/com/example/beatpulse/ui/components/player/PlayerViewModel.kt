@@ -50,18 +50,7 @@ class PlayerViewModel(
     override val currentPosition = MutableStateFlow(0L)
     override val duration = MutableStateFlow(0L)
     
-    init {
-        // Poll playerState.value for currentPosition and duration
-        viewModelScope.launch {
-            while(true) {
-                if (playerState.value?.isPlaying == true) {
-                    currentPosition.value = playerState.value?.currentPosition ?: 0L
-                    duration.value = (playerState.value?.duration ?: 1L).coerceAtLeast(1L)
-                }
-                kotlinx.coroutines.delay(50)
-            }
-        }
-    }
+
     override fun play() {
         _playerState.value?.play()
     }
@@ -92,6 +81,7 @@ class PlayerViewModel(
 
     private val _isPlaying = MutableStateFlow(false)
     override val isPlaying: StateFlow<Boolean> = _isPlaying
+    override val isBuffering: StateFlow<Boolean> = PlaybackService.isBufferingFlow
 
     override val abRepeatModeEnabled = MutableStateFlow(false)
     override val abPointA = MutableStateFlow(0f)
@@ -121,8 +111,10 @@ class PlayerViewModel(
     
     // --- Mic/Streamer Mode State ---
     override val isMicModeActive = MutableStateFlow(false)
-    override val streamConfigUiVisible = MutableStateFlow(false) // Hide UI by default in Mic Mode
+    override val streamConfigUiVisible = MutableStateFlow(false)
+    override fun setStreamConfigUiVisible(visible: Boolean) { streamConfigUiVisible.value = visible }
     override val streamConfigEffectsVisible = MutableStateFlow(true) // Keep effects by default
+    override fun toggleStreamConfigEffects() { streamConfigEffectsVisible.value = !streamConfigEffectsVisible.value }
     val streamConfigMiniPlayerVisible = MutableStateFlow(false) // Hide mini player by default
     override val streamConfigAspectRatio = MutableStateFlow("default") // "default" or "16:9"
     override val streamAvatarUri = MutableStateFlow<String?>(PreferencesManager.getInstance(context).streamAvatarUri)
@@ -139,6 +131,8 @@ class PlayerViewModel(
     override val coverOffsetX = MutableStateFlow(0f)
     override val coverOffsetY = MutableStateFlow(0f)
     override val coverScale = MutableStateFlow(1f)
+    
+    override val showFps = MutableStateFlow(PreferencesManager.getInstance(context).showFps)
 
     private val _supportDialogRequested = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     override val supportDialogRequested: kotlinx.coroutines.flow.SharedFlow<Unit> = _supportDialogRequested
@@ -162,6 +156,16 @@ class PlayerViewModel(
     }
 
     init {
+        // Poll playerState.value for currentPosition and duration
+        viewModelScope.launch {
+            while(true) {
+                if (playerState.value?.isPlaying == true) {
+                    currentPosition.value = playerState.value?.currentPosition ?: 0L
+                    duration.value = (playerState.value?.duration ?: 1L).coerceAtLeast(1L)
+                }
+                kotlinx.coroutines.delay(50)
+            }
+        }
         val wifiStreamQuality = MutableStateFlow(100)
         val wifiStreamCustomWidth = MutableStateFlow(1920)
         val wifiStreamCustomHeight = MutableStateFlow(1080)
@@ -472,6 +476,7 @@ class PlayerViewModel(
         val player = _playerState.value ?: return
         _currentTrack.value = track
         _currentQueue.value = queue
+        currentPosition.value = 0L
         
         viewModelScope.launch {
             repository.insertOrUpdateTrack(track)
@@ -482,11 +487,17 @@ class PlayerViewModel(
 
         val startIndex = queue.indexOfFirst { it.id == track.id }.coerceAtLeast(0)
         val mediaItems = queue.map { 
+            val rawUri = if (it.dataPath.startsWith("youtube://")) {
+                val videoId = it.dataPath.removePrefix("youtube://").substringBefore("|")
+                "youtube://$videoId"
+            } else {
+                it.dataPath
+            }
             MediaItem.Builder()
-                .setUri(android.net.Uri.parse(it.dataPath))
+                .setUri(android.net.Uri.parse(rawUri))
                 .setRequestMetadata(
                     MediaItem.RequestMetadata.Builder()
-                        .setMediaUri(android.net.Uri.parse(it.dataPath))
+                        .setMediaUri(android.net.Uri.parse(rawUri))
                         .build()
                 )
                 .setMediaId(it.id.toString())
@@ -515,7 +526,7 @@ class PlayerViewModel(
                 .build()
         }
         
-        player.setMediaItems(mediaItems, startIndex, androidx.media3.common.C.TIME_UNSET)
+        player.setMediaItems(mediaItems, startIndex, 0L)
         player.prepare()
         player.playWhenReady = true
     }
@@ -552,8 +563,9 @@ class PlayerViewModel(
 
     
     private suspend fun extractColors(track: TrackEntity) {
+        val fingerprint = com.example.beatpulse.ui.components.ThumbnailCache.getTrackFingerprint(track)
         // Check cache first — avoids re-reading the file if already processed
-        PaletteCache.get(track.id)?.let {
+        PaletteCache.get(fingerprint)?.let {
             _paletteColors.value = it
             return
         }
@@ -611,7 +623,7 @@ class PlayerViewModel(
                         lightVibrant = Color((palette.lightVibrantSwatch?.rgb ?: dominantRaw)),
                         darkMuted = Color((palette.darkMutedSwatch?.rgb ?: dominantRaw))
                     )
-                    PaletteCache.put(track.id, colors)
+                    PaletteCache.put(fingerprint, colors)
                     _paletteColors.value = colors
                 } else {
                     _paletteColors.value = PaletteColors()

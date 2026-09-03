@@ -1,5 +1,6 @@
 package com.example.beatpulse.ui.components.player
 
+import kotlinx.coroutines.flow.MutableStateFlow
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateColor
 import androidx.compose.animation.core.*
@@ -370,7 +371,7 @@ fun PlayerStreamConfigDialog(
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                         IconToggleButton(
                             checked = streamConfigEffectsVisible,
-                            onCheckedChange = {  }
+                            onCheckedChange = { playerViewModel.toggleStreamConfigEffects() }
                         ) {
                             Icon(
                                 imageVector = if (streamConfigEffectsVisible) Icons.Filled.AutoAwesome else Icons.Filled.Block,
@@ -432,6 +433,21 @@ fun PlayerStreamConfigDialog(
                     }
                 }
                 
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = { 
+                        val path = com.example.beatpulse.utils.SystemUtils.pickImageFile()
+                        if (path != null) {
+                            playerViewModel.updateStreamAvatar(path)
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = colorDominant.copy(alpha=0.5f)),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, colorVibrant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Seleccionar Imagen de Portada Personalizada", color = Color.White)
+                }
+
                 HorizontalDivider(color = Color.DarkGray)
 
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -442,6 +458,55 @@ fun PlayerStreamConfigDialog(
                         valueRange = 0.5f..2.5f,
                         colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
                     )
+                }
+                
+                val availableAudioDevices by playerViewModel.availableAudioDevices.collectAsState()
+                val selectedAudioDevice by playerViewModel.selectedAudioDevice.collectAsState()
+                if (availableAudioDevices.isNotEmpty()) {
+                    HorizontalDivider(color = Color.DarkGray)
+                    Text("Dispositivo de Audio (Solo Escritorio)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    var expanded by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(
+                            onClick = { expanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(selectedAudioDevice ?: "Seleccionar dispositivo", color = Color.White)
+                        }
+                        DropdownMenu(
+                            expanded = expanded,
+                            onDismissRequest = { expanded = false },
+                            modifier = Modifier.background(Color.DarkGray)
+                        ) {
+                            availableAudioDevices.forEach { device ->
+                                DropdownMenuItem(
+                                    text = { Text(device, color = Color.White) },
+                                    onClick = {
+                                        playerViewModel.selectAudioDevice(device)
+                                        expanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    Text(
+                        "Nota: Para capturar el audio del sistema (loopback):\n- En Linux: Usa 'pavucontrol' (Control de volumen), ve a la pestaña 'Grabación', y cambia la fuente de captura de Java a 'Monitor de...'\n- En Windows: Habilita 'Mezcla estéreo' (Stereo Mix) en tus dispositivos de grabación y selecciónalo aquí.",
+                        color = Color.Gray.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = {
+                        playerViewModel.toggleMicMode() // Exit Mic Mode
+                        onDismissRequest() // Close dialog
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Salir del Modo Streamer/Micrófono", color = Color.White)
                 }
 
             }
@@ -947,6 +1012,25 @@ fun PlayerSettingsSheet(
                             onValueChange = { playerViewModel.setCoverScale(it) },
                             valueRange = 0.5f..2.5f,
                             colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    val showFps by playerViewModel.showFps.collectAsState()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Mostrar Contador de FPS", color = Color.White)
+                        Switch(
+                            checked = showFps,
+                            onCheckedChange = {
+                                prefs.showFps = it
+                                (playerViewModel.showFps as? MutableStateFlow)?.value = it
+                            },
+                            colors = SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorDominant)
                         )
                     }
 

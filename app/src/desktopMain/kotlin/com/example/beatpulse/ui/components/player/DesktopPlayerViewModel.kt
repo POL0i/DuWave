@@ -34,7 +34,9 @@ class DesktopPlayerViewModel(
     override val playerState: StateFlow<Any?> = MutableStateFlow(null)
     override var albumArtCenterY: Float? = null
     override val streamConfigAspectRatio: MutableStateFlow<String> = MutableStateFlow("16:9")
-    override val isPlaying = MutableStateFlow(false)
+    private val _isPlaying = MutableStateFlow(false)
+    override val isPlaying: kotlinx.coroutines.flow.StateFlow<Boolean> = _isPlaying
+    override val isBuffering = MutableStateFlow(false)
     override val paletteColors = MutableStateFlow(PaletteColors(
         dominant = Color(0xFF1E1E1E),
         vibrant = Color(0xFF00E5FF),
@@ -59,9 +61,10 @@ class DesktopPlayerViewModel(
     override val isMicModeActive = MutableStateFlow(false)
     override val streamAvatarUri = MutableStateFlow<String?>(null)
     override val streamConfigUiVisible = MutableStateFlow(false)
+    override fun setStreamConfigUiVisible(visible: Boolean) { streamConfigUiVisible.value = visible }
+    override val streamConfigEffectsVisible = MutableStateFlow(true)
     override val isWifiStreamActive = MutableStateFlow(false)
     override val wifiStreamFps = MutableStateFlow(30)
-    override val streamConfigEffectsVisible = MutableStateFlow(false)
     
     override val coverVisibilityMode = MutableStateFlow("NORMAL")
     override val chromaKeyColor = MutableStateFlow("Green")
@@ -73,6 +76,14 @@ class DesktopPlayerViewModel(
     override val coverOffsetX = MutableStateFlow(prefs.coverOffsetX)
     override val coverOffsetY = MutableStateFlow(prefs.coverOffsetY)
     override val coverScale = MutableStateFlow(prefs.coverScale)
+    override val showFps = MutableStateFlow(prefs.showFps)
+
+    override val availableAudioDevices = MutableStateFlow<List<String>>(emptyList())
+    override val selectedAudioDevice = MutableStateFlow<String?>(null)
+
+    override fun selectAudioDevice(name: String?) {
+        selectedAudioDevice.value = name
+    }
 
     private val _supportDialogRequested = kotlinx.coroutines.flow.MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     override val supportDialogRequested: kotlinx.coroutines.flow.SharedFlow<Unit> = _supportDialogRequested
@@ -96,9 +107,26 @@ class DesktopPlayerViewModel(
     }
 
     init {
+        try {
+            val mixers = javax.sound.sampled.AudioSystem.getMixerInfo()
+            val devices = mutableListOf<String>()
+            for (info in mixers) {
+                val mixer = javax.sound.sampled.AudioSystem.getMixer(info)
+                if (mixer.targetLineInfo.isNotEmpty()) {
+                    devices.add(info.name)
+                }
+            }
+            availableAudioDevices.value = devices
+            if (devices.isNotEmpty()) {
+                selectedAudioDevice.value = devices.first()
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+
         appPlayer.addListener(object : AppPlayerListener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                this@DesktopPlayerViewModel.isPlaying.value = isPlaying
+                this@DesktopPlayerViewModel._isPlaying.value = isPlaying
                 if (isPlaying) startPositionPolling()
             }
         })
@@ -358,7 +386,7 @@ class DesktopPlayerViewModel(
         autoAnalyzeLyrics.value = !autoAnalyzeLyrics.value
     }
 
-    fun toggleStreamConfigEffects() {
+    override fun toggleStreamConfigEffects() {
         streamConfigEffectsVisible.value = !streamConfigEffectsVisible.value
     }
 
@@ -366,7 +394,7 @@ class DesktopPlayerViewModel(
         streamConfigAspectRatio.value = ratio
     }
 
-    fun updateStreamAvatar(uri: String?) {
+    override fun updateStreamAvatar(uri: String?) {
         streamAvatarUri.value = uri
     }
 }

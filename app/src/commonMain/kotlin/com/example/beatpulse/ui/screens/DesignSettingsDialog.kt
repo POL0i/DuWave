@@ -8,8 +8,21 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CutCornerShape
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.window.Dialog
+import androidx.compose.material3.Surface
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.PlayArrow
@@ -62,77 +75,42 @@ fun DesignSettingsDialog(
     currentBgStyle: Int,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                getLocalizedString("design_settings").takeIf { it.isNotBlank() && it != "design_settings" } ?: "Ajustes de Diseño",
-                color = dynamicTextColor,
-                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                // Shape Selector
-                Text(
-                    getLocalizedString("thumbnail_shape").takeIf { it.isNotBlank() && it != "thumbnail_shape" } ?: "Marco de Miniatura",
-                    color = dynamicTextColor,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    val shapes = mutableListOf(
-                        Icons.Default.Circle to 0,
-                        Icons.Default.CropSquare to 1,
-                        Icons.Default.RoundedCorner to 2,
-                        Icons.Default.Crop to 3
-                    )
-                    val isPatreonUnlocked by prefs.isPatreonUnlockedFlow.collectAsState()
-                    if (isPatreonUnlocked) {
-                        shapes.add(Icons.Default.AccountBalance to 4)
-                        shapes.add(Icons.Default.PlayArrow to 5)
-                        shapes.add(Icons.Default.Settings to 6)
-                    }
-                    
-                    shapes.forEach { (icon, idx) ->
-                        val isSelected = currentShapeIdx == idx
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(if (isSelected) paletteColors.vibrant.copy(alpha = 0.2f) else Color.Transparent)
-                                .clickable { prefs.thumbnailShape = idx }
-                                .border(
-                                    width = if (isSelected) 2.dp else 0.dp,
-                                    color = if (isSelected) paletteColors.vibrant else Color.Transparent,
-                                    shape = CircleShape
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = icon,
-                                contentDescription = null,
-                                tint = if (isSelected) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.7f),
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    }
+    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+    
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss
+    ) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = paletteColors.dominant,
+            modifier = Modifier
+                .focusRequester(focusRequester)
+                .focusable()
+                .onKeyEvent { event ->
+                    if (event.type == KeyEventType.KeyDown && event.isAltPressed) {
+                        false
+                    } else false
                 }
-                
-                Divider(color = dynamicTextColor.copy(alpha = 0.1f))
-                
-                // Style Selector
+                .fillMaxWidth(0.9f)
+                .widthIn(max = 360.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
                 Text(
-                    getLocalizedString("visual_style").takeIf { it.isNotBlank() && it != "visual_style" } ?: "Estilo Visual",
+                    getLocalizedString("design_settings").takeIf { it.isNotBlank() && it != "design_settings" } ?: "Ajustes de Diseño",
                     color = dynamicTextColor,
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                 )
+                
+                Spacer(modifier = Modifier.height(24.dp))
                 
                 val styles = listOf(
                     0 to (getLocalizedString("style_classic").takeIf { it != "style_classic" } ?: "Clásico"),
@@ -143,7 +121,8 @@ fun DesignSettingsDialog(
                     5 to (getLocalizedString("style_black_metal").takeIf { it != "style_black_metal" } ?: "Black Metal"),
                     6 to (getLocalizedString("style_dark_fantasy").takeIf { it != "style_dark_fantasy" } ?: "Fantasía Oscura"),
                     7 to (getLocalizedString("style_cathedral").takeIf { it != "style_cathedral" } ?: "Catedral"),
-                    8 to (getLocalizedString("style_tale_legend").takeIf { it != "style_tale_legend" } ?: "Leyenda")
+                    8 to (getLocalizedString("style_tale_legend").takeIf { it != "style_tale_legend" } ?: "Leyenda"),
+                    14 to "Ojos Lullaby"
                 ).map { (id, name) -> id to name.removePrefix("Estilo: ").trim() }.toMutableList()
                 
                 val isPatreonUnlocked by prefs.isPatreonUnlockedFlow.collectAsState()
@@ -152,39 +131,155 @@ fun DesignSettingsDialog(
                     styles.add(10 to "Fuente Oscura")
                     styles.add(11 to "Terraria")
                     styles.add(12 to "Zen Clear")
+                    styles.add(13 to "Mareas de Arena")
                 }
                 
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 90.dp),
-                    modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                val chunkedStyles = styles.chunked(4)
+                val pagerState = rememberPagerState(pageCount = { chunkedStyles.size })
+                
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(380.dp) // Más largo, ensures all 7 shapes fit without clipping
+                        .onKeyEvent { event ->
+                            if (event.type == KeyEventType.KeyDown && event.isAltPressed) {
+                                if (event.key == Key.DirectionRight) {
+                                    val next = (pagerState.currentPage + 1) % pagerState.pageCount
+                                    coroutineScope.launch { pagerState.animateScrollToPage(next) }
+                                    return@onKeyEvent true
+                                } else if (event.key == Key.DirectionLeft) {
+                                    val prev = if (pagerState.currentPage - 1 < 0) pagerState.pageCount - 1 else pagerState.currentPage - 1
+                                    coroutineScope.launch { pagerState.animateScrollToPage(prev) }
+                                    return@onKeyEvent true
+                                }
+                            }
+                            false
+                        },
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    
-                    items(styles) { item ->
-                        val idx = item.first
-                        val name = item.second
-                        val isSelected = currentBgStyle == idx
+                    // Left Column: Thumbnail Shapes
+                    Column(
+                        modifier = Modifier
+                            .width(48.dp)
+                            .fillMaxHeight()
+                            .verticalScroll(rememberScrollState()),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        val shapeIndices = mutableListOf(0, 1, 2, 3)
+                        if (isPatreonUnlocked) {
+                            shapeIndices.addAll(listOf(4, 5, 6))
+                        }
                         
-                        StyleGridItem(
-                            idx = idx,
-                            name = name,
-                            isSelected = isSelected,
-                            paletteColors = paletteColors,
-                            dynamicTextColor = dynamicTextColor,
-                            prefs = prefs
+                        shapeIndices.forEach { idx ->
+                            val isSelected = currentShapeIdx == idx
+                            val shapeForThumb = when (idx) {
+                                1 -> androidx.compose.ui.graphics.RectangleShape
+                                2 -> RoundedCornerShape(4.dp)
+                                3 -> RoundedCornerShape(8.dp)
+                                4 -> CutCornerShape(topStart = 16.dp, bottomEnd = 16.dp)
+                                5 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                                6 -> CutCornerShape(8.dp)
+                                else -> CircleShape
+                            }
+                            
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(shapeForThumb)
+                                    .background(if (isSelected) paletteColors.vibrant.copy(alpha = 0.5f) else Color.Transparent)
+                                    .clickable { prefs.thumbnailShape = idx }
+                                    .border(
+                                        width = 2.dp,
+                                        color = if (isSelected) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.3f),
+                                        shape = shapeForThumb
+                                    )
+                            )
+                        }
+                    }
+                    
+                    // Right Column: Visual Styles
+                    Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                        Text(
+                            getLocalizedString("visual_style").takeIf { it.isNotBlank() && it != "visual_style" } ?: "Estilo Visual",
+                            color = dynamicTextColor,
+                            style = MaterialTheme.typography.titleMedium
                         )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxWidth().weight(1f)
+                        ) { page ->
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(2),
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(chunkedStyles[page]) { item ->
+                                    val idx = item.first
+                                    val name = item.second
+                                    val isSelected = currentBgStyle == idx
+                                    
+                                    StyleGridItem(
+                                        idx = idx,
+                                        name = name,
+                                        isSelected = isSelected,
+                                        paletteColors = paletteColors,
+                                        dynamicTextColor = dynamicTextColor,
+                                        prefs = prefs
+                                    )
+                                }
+                            }
+                        }
+                        
+                        // Dots and Close button aligned at the bottom
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            // Left spacer to push dots to center relative to the available space
+                            Spacer(modifier = Modifier.weight(1f))
+                            
+                            // Dots
+                            Row(horizontalArrangement = Arrangement.Center) {
+                                repeat(chunkedStyles.size) { iteration ->
+                                    val color = if (pagerState.currentPage == iteration) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.3f)
+                                    Box(
+                                        modifier = Modifier
+                                            .padding(horizontal = 6.dp)
+                                            .clip(CircleShape)
+                                            .background(color)
+                                            .size(10.dp)
+                                            .clickable {
+                                                coroutineScope.launch { pagerState.animateScrollToPage(iteration) }
+                                            }
+                                    )
+                                }
+                            }
+                            
+                            // Close Button
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                                Text(
+                                    text = getLocalizedString("close").takeIf { it != "close" } ?: "Cerrar",
+                                    color = paletteColors.vibrant,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .clickable { onDismiss() }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(getLocalizedString("close").takeIf { it != "close" } ?: "Cerrar", color = paletteColors.vibrant)
-            }
-        },
-        containerColor = paletteColors.dominant
-    )
+        }
+    }
 }
 
 @Composable
@@ -206,7 +301,7 @@ fun StyleGridItem(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f) // Square box for preview
+                .height(115.dp) // Estirado para rellenar el espacio vacío
                 .clip(RoundedCornerShape(12.dp))
                 .border(
                     width = if (isSelected) 3.dp else 1.dp,
@@ -229,6 +324,8 @@ fun StyleGridItem(
                     10 -> FountainBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
                     11 -> TerrariaWaterBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
                     12 -> ZenClearBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                    13 -> SandsFlowBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                    14 -> com.example.beatpulse.ui.components.backgrounds.LullabyEyesBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
                     else -> Box(modifier = Modifier.fillMaxSize().background(paletteColors.dominant))
                 }
             }

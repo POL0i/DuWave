@@ -57,7 +57,12 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
-        val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(this)
+        val httpDataSourceFactory = androidx.media3.datasource.DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(15000)
+        val dataSourceFactory = androidx.media3.datasource.DefaultDataSource.Factory(this, httpDataSourceFactory)
         val resolvingDataSourceFactory = androidx.media3.datasource.ResolvingDataSource.Factory(
             dataSourceFactory,
             androidx.media3.datasource.ResolvingDataSource.Resolver { dataSpec ->
@@ -75,7 +80,6 @@ class PlaybackService : MediaSessionService() {
             }
         )
         val extractorsFactory = androidx.media3.extractor.DefaultExtractorsFactory()
-            .setConstantBitrateSeekingEnabled(true)
         val mediaSourceFactory = androidx.media3.exoplayer.source.DefaultMediaSourceFactory(resolvingDataSourceFactory, extractorsFactory)
 
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()

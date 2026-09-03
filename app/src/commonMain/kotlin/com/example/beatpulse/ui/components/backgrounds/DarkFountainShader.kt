@@ -29,7 +29,7 @@ const val DARK_FOUNTAIN_SKSL = """
     float fbm(vec2 p) {
         float value = 0.0;
         float amplitude = 0.5;
-        for (int i = 0; i < 4; i++) {
+        for (int i = 0; i < 2; i++) { // Optimized: reduced octaves from 4 to 2
             value += amplitude * noise(p);
             p *= 2.0;
             amplitude *= 0.5;
@@ -38,9 +38,9 @@ const val DARK_FOUNTAIN_SKSL = """
     }
 
     vec4 main(vec2 fragCoord) {
-        // Pixelation effect
-        float pixelsY = 100.0;
-        float pixelSize = u_resolution.y / pixelsY;
+        // Pixelation effect (optimized: larger blocks mean less detail to render perceptually, though math is still per-pixel)
+        float pixelsY = 70.0;
+        float pixelSize = max(1.0, u_resolution.y / pixelsY);
         vec2 pCoord = floor(fragCoord / pixelSize) * pixelSize;
         
         vec2 uv = pCoord / u_resolution.xy;
@@ -97,7 +97,8 @@ const val DARK_FOUNTAIN_SKSL = """
             
             float sharpDirt = step(0.5, dirt);
             
-            float holes = fbm(vec2(p.x * 4.0 + time * 1.0, p.y * 3.0 + time * 2.0));
+            // Reused simpler math for holes instead of full FBM
+            float holes = noise(vec2(p.x * 4.0 + time * 1.0, p.y * 3.0 + time * 2.0));
             float sharpHoles = step(0.65, holes);
             
             vec4 dirtColor = mix(u_dominant * 0.4, u_vibrant, sharpDirt);

@@ -1,6 +1,8 @@
 package com.example.beatpulse.visualizer
 
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.isActive
 import kotlin.math.*
 
 class RealDesktopVisualizerManager : AppVisualizerManager {
@@ -26,8 +28,59 @@ class RealDesktopVisualizerManager : AppVisualizerManager {
     private val sampleBuffer = FloatArray(fftSize)
     private var sampleIndex = 0
 
-    override fun startMicMode(context: Any) {}
-    override fun stopMicMode() {}
+    private var captureJob: kotlinx.coroutines.Job? = null
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
+    private var targetDataLine: javax.sound.sampled.TargetDataLine? = null
+
+    override fun startMicMode(context: Any) {
+        if (targetDataLine != null) return
+        val deviceName = context as? String
+        
+        try {
+            val format = javax.sound.sampled.AudioFormat(44100f, 16, 2, true, false)
+            val info = javax.sound.sampled.DataLine.Info(javax.sound.sampled.TargetDataLine::class.java, format)
+            
+            val mixers = javax.sound.sampled.AudioSystem.getMixerInfo()
+            val mixerInfo = mixers.find { it.name == deviceName }
+            
+            val mixer = if (mixerInfo != null) javax.sound.sampled.AudioSystem.getMixer(mixerInfo) else null
+            
+            // Allow fallback to default TargetDataLine if specific mixer isn't compatible or found
+            targetDataLine = try {
+                if (mixer != null) mixer.getLine(info) as javax.sound.sampled.TargetDataLine
+                else javax.sound.sampled.AudioSystem.getLine(info) as javax.sound.sampled.TargetDataLine
+            } catch (e: Exception) {
+                javax.sound.sampled.AudioSystem.getLine(info) as javax.sound.sampled.TargetDataLine
+            }
+            
+            targetDataLine?.open(format)
+            targetDataLine?.start()
+            isEnabled = true
+            
+            captureJob = scope.launch {
+                val buffer = ByteArray(2048)
+                while (isActive && targetDataLine != null) {
+                    val read = targetDataLine?.read(buffer, 0, buffer.size) ?: 0
+                    if (read > 0) {
+                        processAudioBytes(buffer.copyOfRange(0, read))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            targetDataLine?.close()
+            targetDataLine = null
+        }
+    }
+    
+    override fun stopMicMode() {
+        captureJob?.cancel()
+        captureJob = null
+        targetDataLine?.stop()
+        targetDataLine?.close()
+        targetDataLine = null
+    }
+
     override fun start(sessionId: Int) { isEnabled = true }
     override fun stop() {
         isEnabled = false

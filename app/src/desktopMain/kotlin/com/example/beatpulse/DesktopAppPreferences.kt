@@ -267,4 +267,12 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
             _isPatreonUnlockedFlow.value = value
             setBoolean("isPatreonUnlocked", value)
         }
+
+    override var showFps: Boolean
+        get() = getBoolean("showFps", false)
+        set(value) = setBoolean("showFps", value)
+
+    override var showRemainingTime: Boolean
+        get() = getBoolean("showRemainingTime", false)
+        set(value) = setBoolean("showRemainingTime", value)
 }

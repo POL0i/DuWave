@@ -41,7 +41,7 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
 
     override var appLanguage: String
         get() = prefs.getString(KEY_LANGUAGE, "es") ?: "es"
-        set(value) = prefs.edit().putString(KEY_LANGUAGE, value).apply()
+        set(value) { prefs.edit().putString(KEY_LANGUAGE, value).commit() }
 
     override var visualizerStyle: String
         get() = prefs.getString("visualizerStyle", "BARS") ?: "BARS"
@@ -299,4 +299,12 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
             _isPatreonUnlockedFlow.value = value
             prefs.edit().putBoolean("isPatreonUnlocked", value).apply()
         }
+
+    override var showFps: Boolean
+        get() = prefs.getBoolean("showFps", false)
+        set(value) = prefs.edit().putBoolean("showFps", value).apply()
+
+    override var showRemainingTime: Boolean
+        get() = prefs.getBoolean("showRemainingTime", false)
+        set(value) = prefs.edit().putBoolean("showRemainingTime", value).apply()
 }

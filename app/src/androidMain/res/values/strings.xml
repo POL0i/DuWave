@@ -238,4 +238,5 @@
 
     <string name="playback_error">Error al reproducir: Archivo no encontrado o dañado.</string>
     <string name="online_service_down">El servicio no está disponible de momento, por favor, espera una nueva actualización.</string>
+    <string name="swipe_to_choose">¡Desliza el minirreproductor a los lados para cambiar de sección!</string>
 </resources>

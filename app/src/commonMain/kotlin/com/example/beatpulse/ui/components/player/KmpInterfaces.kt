@@ -11,6 +11,7 @@ interface IPreferencesManager {
     var visualizerStyle: String
     var thumbnailShape: Int
     var lastMainScreenPage: Int
+    var showRemainingTime: Boolean
     val lastMainScreenPageFlow: kotlinx.coroutines.flow.StateFlow<Int>
     var hasUsedPlaylistSwipeGesture: Boolean
     var hasUsedVinylSeekGesture: Boolean
@@ -23,6 +24,7 @@ interface IPreferencesManager {
     var coverScale: Float
     var isPatreonUnlocked: Boolean
     val isPatreonUnlockedFlow: StateFlow<Boolean>
+    var showFps: Boolean
 }
 
 interface IAudioVisualizerManager {
@@ -53,9 +55,12 @@ interface IPlayerViewModel {
     val isWifiStreamActive: StateFlow<Boolean>
     val searchFailed: StateFlow<Boolean>
     val streamAvatarUri: StateFlow<String?>
+    fun updateStreamAvatar(uri: String?)
     val streamConfigAspectRatio: StateFlow<String>
-    val streamConfigEffectsVisible: StateFlow<Boolean>
     val streamConfigUiVisible: StateFlow<Boolean>
+    fun setStreamConfigUiVisible(visible: Boolean)
+    val streamConfigEffectsVisible: StateFlow<Boolean>
+    fun toggleStreamConfigEffects()
     val wifiStreamFps: StateFlow<Int>
     val coverVisibilityMode: StateFlow<String>
     val chromaKeyColor: StateFlow<String>
@@ -63,9 +68,15 @@ interface IPlayerViewModel {
     val cleanUiMode: StateFlow<Boolean>
     val dynamicColorsPlus: StateFlow<Boolean>
     val dynamicColorsInterval: StateFlow<Int>
+    val showFps: StateFlow<Boolean>
+    
+    val availableAudioDevices: StateFlow<List<String>>
+    val selectedAudioDevice: StateFlow<String?>
+    fun selectAudioDevice(name: String?)
 
     val playerState: StateFlow<Any?>
     val isPlaying: StateFlow<Boolean>
+    val isBuffering: StateFlow<Boolean>
     var albumArtCenterY: Float?
     val currentTrack: StateFlow<TrackEntity?>
     val currentQueue: StateFlow<List<TrackEntity>>

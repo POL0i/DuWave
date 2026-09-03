@@ -66,4 +66,5 @@ interface AppPreferences : IPreferencesManager {
     var lastServiceDownState: Boolean
     override var isPatreonUnlocked: Boolean
     override val isPatreonUnlockedFlow: StateFlow<Boolean>
+    override var showFps: Boolean
 }

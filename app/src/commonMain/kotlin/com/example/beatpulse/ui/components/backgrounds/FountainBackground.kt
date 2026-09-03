@@ -44,11 +44,13 @@ fun FountainBackground(
     )
 
     var timeMillis by remember { mutableStateOf(0L) }
-    LaunchedEffect(Unit) {
-        val startTime = withFrameNanos { it / 1_000_000L }
-        while (true) {
-            withFrameNanos { frameTime ->
-                timeMillis = (frameTime / 1_000_000L) - startTime
+    LaunchedEffect(isPlayerScreen) {
+        if (isPlayerScreen) {
+            val startTime = withFrameNanos { it / 1_000_000L } - timeMillis
+            while (true) {
+                withFrameNanos { frameTime ->
+                    timeMillis = (frameTime / 1_000_000L) - startTime
+                }
             }
         }
     }
@@ -71,7 +73,7 @@ fun FountainBackground(
         ) {
             val timeSecs = timeMillis / 1000f
             val timeMod = timeSecs // Fixed teleportation by not scaling absolute time with treble
-            val numParticles = 30 + (avgTreble * 30).toInt()
+            val numParticles = 15 + (avgTreble * 15).toInt()
 
             // Back Particles
             Canvas(modifier = Modifier.fillMaxSize()) {

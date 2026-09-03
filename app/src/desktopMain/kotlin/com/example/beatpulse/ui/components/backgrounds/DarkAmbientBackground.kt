@@ -62,19 +62,23 @@ private const val BLACK_METAL_SHADER_SRC = """
     
     float fbm(float2 p) {
         float v = 0.0, f = 1.0, a = 0.5;
-        for(int i=0; i<4; i++) {
+        for(int i=0; i<2; i++) {
             v += a * smoothNoise(p * f);
             f *= 2.0; a *= 0.5;
         }
         return v;
     }
     
-    half4 main(float2 fragCoord) {
+    half4 main(in float2 fragCoord) {
         float2 uv = (fragCoord.xy - 0.5 * iResolution.xy + float2(iOffsetX * iResolution.y, iOffsetY * iResolution.y)) / iResolution.y;
         
-        // --- VEINS BACKGROUND ---
+        // --- VEINS BACKGROUND (Optimized) ---
         float2 vUv = uv * 3.0 + float2(0.0, -iTime * 0.2);
-        float n = fbm(vUv + fbm(vUv * 2.0 + iTime*0.1));
+        
+        // Use sine for displacement instead of another fbm
+        float2 displace = float2(sin(vUv.y * 2.0 + iTime * 0.1), cos(vUv.x * 2.0 + iTime * 0.1));
+        float n = fbm(vUv + displace);
+        
         float veins = smoothstep(0.05 + iEnergy*0.1, 0.0, abs(n - 0.5));
         
         half3 veinColor = mix(colorDominant.rgb, colorVibrant.rgb, iEnergy * 0.5);

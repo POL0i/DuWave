@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.beatpulse.utils.LyricLine
+import com.example.beatpulse.utils.getLocalizedString
 
 
 @Composable
@@ -102,7 +103,7 @@ fun GestureTutorialOverlay(showNextPrev: Boolean, showSeek10s: Boolean, showViny
         }
         if (showPlaylistSwipe) {
             Box(modifier = Modifier.align(Alignment.Center).offset(y = 80.dp + (-dotOffset * 60).dp).graphicsLayer { alpha = 1f - dotOffset }) { Box(modifier = Modifier.size(24.dp).background(Color.White, CircleShape)) }
-            Text("Desliza hacia arriba para abrir la lista", color = Color.White, modifier = Modifier.align(Alignment.Center).offset(y = 160.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(8.dp))
+            Text(getLocalizedString("gesture_playlist_swipe"), color = Color.White, modifier = Modifier.align(Alignment.Center).offset(y = 160.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(8.dp))
         }
     }
 }

@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 import com.example.beatpulse.ui.viewmodels.ILibraryViewModel
 import com.example.beatpulse.ui.viewmodels.PlaylistViewData
@@ -155,6 +157,9 @@ class LibraryViewModel(
     
     override val isOnlineServiceDown: StateFlow<Boolean> = onlineRepository.isServiceDown
 
+    private val searchCache = mutableMapOf<String, List<TrackEntity>>()
+    private val searchCacheLock = Mutex()
+
     init {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             onlineRepository.verifyServiceStatus(prefs)
@@ -172,8 +177,97 @@ class LibraryViewModel(
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             isChangeCoverLoading.value = true
             try {
-                val results = searchOnlineMusic("${track.title} ${track.artist}")
-                changeCoverSearchResults.value = results.filter { !it.customCoverPath.isNullOrEmpty() }.take(3)
+                val coverResults = mutableListOf<TrackEntity>()
+                val cleanTitle = track.title
+                    .replace(Regex("\\(Official.*?\\)", RegexOption.IGNORE_CASE), "")
+                    .replace(Regex("\\(trim\\)", RegexOption.IGNORE_CASE), "")
+                    .replace(Regex("\\.opus|\\.m4a|\\.mp3", RegexOption.IGNORE_CASE), "")
+                    .replace(Regex("\\bFC\\b", RegexOption.IGNORE_CASE), "")
+                    .replace(Regex("\\b\\-1\\b", RegexOption.IGNORE_CASE), "")
+                    .replace(Regex("\\b4k\\b", RegexOption.IGNORE_CASE), "")
+                    .replace(Regex("\\[.*?]"), "")
+                    .replace(Regex("\\|.*"), "")
+                    .replace(Regex("composed by.*", RegexOption.IGNORE_CASE), "")
+                    .trim()
+                val artist = if (track.artist != "Unknown Artist" && track.artist != "Artista Desconocido") track.artist else ""
+
+                // 1. Try iTunes API first (fast, reliable, high quality covers)
+                try {
+                    val query = "$cleanTitle $artist".replace(Regex("\\s+"), " ").trim()
+                    val encodedQuery = java.net.URLEncoder.encode(query, "UTF-8")
+                    val itunesApi = "https://itunes.apple.com/search?term=$encodedQuery&entity=song&limit=5"
+                    
+                    val connection = java.net.URL(itunesApi).openConnection() as java.net.HttpURLConnection
+                    connection.setRequestProperty("User-Agent", "Mozilla/5.0")
+                    connection.connectTimeout = 3000
+                    connection.readTimeout = 3000
+                    
+                    val response = connection.inputStream.bufferedReader().readText()
+                    // Parse artworkUrl100 entries
+                    var searchFrom = 0
+                    while (coverResults.size < 5) {
+                        val artIdx = response.indexOf("\"artworkUrl100\":\"", searchFrom)
+                        if (artIdx == -1) break
+                        val start = artIdx + 17
+                        val end = response.indexOf("\"", start)
+                        val lowResUrl = response.substring(start, end)
+                        val hiResUrl = lowResUrl.replace("100x100bb", "600x600bb")
+                        
+                        // Also grab trackName for display
+                        val nameIdx = response.lastIndexOf("\"trackName\":\"", artIdx)
+                        val trackName = if (nameIdx != -1) {
+                            val ns = nameIdx + 13
+                            val ne = response.indexOf("\"", ns)
+                            response.substring(ns, ne)
+                        } else "iTunes Result"
+                        
+                        coverResults.add(TrackEntity(
+                            id = hiResUrl.hashCode().toLong(),
+                            title = trackName,
+                            artist = artist.ifEmpty { "iTunes" },
+                            album = "iTunes",
+                            duration = 0L,
+                            dataPath = "",
+                            folderPath = "",
+                            customCoverPath = hiResUrl
+                        ))
+                        searchFrom = end + 1
+                    }
+                    connection.disconnect()
+                } catch (_: Exception) {}
+                
+                // 2. Try YouTube search (full query, then title-only fallback)
+                if (coverResults.size < 3) {
+                    try {
+                        val fullQuery = if (artist.isNotEmpty()) "$cleanTitle $artist" else cleanTitle
+                        val fullResults = searchOnlineMusic(fullQuery)
+                            .filter { !it.customCoverPath.isNullOrEmpty() }
+                        coverResults.addAll(fullResults.take(3))
+                    } catch (_: Exception) {}
+                }
+                
+                if (coverResults.size < 3) {
+                    try {
+                        val titleOnly = searchOnlineMusic(cleanTitle)
+                            .filter { !it.customCoverPath.isNullOrEmpty() }
+                        coverResults.addAll(titleOnly.take(3))
+                    } catch (_: Exception) {}
+                }
+                
+                // 3. Fallback for complex names: split by hyphens and take the last prominent chunk
+                if (coverResults.size == 0 && cleanTitle.contains("-")) {
+                    try {
+                        val chunks = cleanTitle.split("-").map { it.trim() }.filter { it.length > 2 }
+                        if (chunks.size >= 2) {
+                            val targetChunk = chunks.last()
+                            val fallbackYt = searchOnlineMusic(targetChunk).filter { !it.customCoverPath.isNullOrEmpty() }
+                            coverResults.addAll(fallbackYt.take(3))
+                        }
+                    } catch (_: Exception) {}
+                }
+
+                
+                changeCoverSearchResults.value = coverResults.distinctBy { it.customCoverPath }.take(6)
             } catch (e: Exception) {
                 changeCoverSearchResults.value = emptyList()
             } finally {
@@ -223,9 +317,9 @@ class LibraryViewModel(
                     }.take(10)
                 }
 
-                val artistResults: List<TrackEntity> = try { filterNew(onlineRepository.searchOnlineMusic(artistQuery)) } catch (e: Exception) { emptyList() }
-                val similarResults: List<TrackEntity> = try { filterNew(onlineRepository.searchOnlineMusic(similarQuery)) } catch (e: Exception) { emptyList() }
-                val trendingResults: List<TrackEntity> = try { filterNew(onlineRepository.searchOnlineMusic(trendingQuery)) } catch (e: Exception) { emptyList() }
+                val artistResults: List<TrackEntity> = try { filterNew(searchOnlineMusic(artistQuery)) } catch (e: Exception) { emptyList() }
+                val similarResults: List<TrackEntity> = try { filterNew(searchOnlineMusic(similarQuery)) } catch (e: Exception) { emptyList() }
+                val trendingResults: List<TrackEntity> = try { filterNew(searchOnlineMusic(trendingQuery)) } catch (e: Exception) { emptyList() }
                 
                 val newMap: Map<String, List<TrackEntity>> = mapOf(
                     (if (artistName != null) platformHelper.getLocalizedString("because_you_listened", artistName) else platformHelper.getLocalizedString("top_artists")) to artistResults,
@@ -289,7 +383,17 @@ class LibraryViewModel(
     }
 
     override suspend fun searchOnlineMusic(query: String): List<TrackEntity> {
-        return onlineRepository.searchOnlineMusic(query)
+        val trimmedQuery = query.trim()
+        searchCacheLock.withLock {
+            if (searchCache.containsKey(trimmedQuery)) {
+                return searchCache[trimmedQuery]!!
+            }
+        }
+        val results = onlineRepository.searchOnlineMusic(trimmedQuery)
+        searchCacheLock.withLock {
+            searchCache[trimmedQuery] = results
+        }
+        return results
     }
 
     override suspend fun resolveStreamUrl(videoId: String): String? {
@@ -406,7 +510,7 @@ class LibraryViewModel(
                     if (coverUrl == null) {
                         val minutes = track.duration / 60000
                         val query = "${track.title} ${track.artist} $minutes min"
-                        val results = onlineRepository.searchOnlineMusic(query)
+                        val results = searchOnlineMusic(query)
                         coverUrl = results.firstOrNull { !it.customCoverPath.isNullOrEmpty() }?.customCoverPath
                     }
                     

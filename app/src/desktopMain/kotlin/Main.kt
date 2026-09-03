@@ -12,6 +12,8 @@ import com.example.beatpulse.visualizer.RealDesktopVisualizerManager
 import androidx.compose.ui.window.Tray
 import androidx.compose.ui.window.rememberTrayState
 import androidx.compose.ui.res.painterResource
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import com.example.beatpulse.player.AppPlayer
 import com.example.beatpulse.data.DesktopLibraryPlatformHelper
 import com.example.beatpulse.data.DesktopLibraryScanner
@@ -107,7 +109,7 @@ fun main() = application {
                             playerViewModel.togglePlayPause()
                             true
                         }
-                        androidx.compose.ui.input.key.Key.S -> {
+                        androidx.compose.ui.input.key.Key.S, androidx.compose.ui.input.key.Key.X, androidx.compose.ui.input.key.Key.C -> {
                             playerViewModel.triggerStreamConfigDialog()
                             true
                         }
@@ -144,6 +146,17 @@ fun main() = application {
                 }
             }
         }
+        
+        val isMicModeActive by playerViewModel.isMicModeActive.collectAsState()
+        val selectedAudioDevice by playerViewModel.selectedAudioDevice.collectAsState()
+        
+        androidx.compose.runtime.LaunchedEffect(isMicModeActive, selectedAudioDevice) {
+            visualizerManager.stopMicMode()
+            if (isMicModeActive) {
+                visualizerManager.startMicMode(selectedAudioDevice ?: "")
+            }
+        }
+
         com.example.beatpulse.theme.BeatPulseTheme { com.example.beatpulse.ui.AppScreen(
             prefs = prefs,
             libraryViewModel = libraryViewModel,

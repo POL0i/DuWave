@@ -35,12 +35,15 @@ class DesktopPlayerViewModel : IPlayerViewModel {
     override val isWifiStreamActive: StateFlow<Boolean> = MutableStateFlow(false)
     override val searchFailed: StateFlow<Boolean> = MutableStateFlow(false)
     override val streamAvatarUri: StateFlow<String?> = MutableStateFlow(null)
+    override fun updateStreamAvatar(uri: String?) {}
     override val streamConfigAspectRatio: StateFlow<String> = MutableStateFlow("16:9")
-    override val streamConfigEffectsVisible: StateFlow<Boolean> = MutableStateFlow(false)
-    override val streamConfigUiVisible: StateFlow<Boolean> = MutableStateFlow(false)
     
     override val coverVisibilityMode = MutableStateFlow("NORMAL")
     override val chromaKeyColor = MutableStateFlow("Green")
+    override val streamConfigUiVisible = MutableStateFlow(false)
+    override fun setStreamConfigUiVisible(visible: Boolean) { streamConfigUiVisible.value = visible }
+    override val streamConfigEffectsVisible = MutableStateFlow(false)
+    override fun toggleStreamConfigEffects() { streamConfigEffectsVisible.value = !streamConfigEffectsVisible.value }
     override val coverDragEnabled = MutableStateFlow(false)
     override val cleanUiMode = MutableStateFlow(false)
     override val dynamicColorsPlus = MutableStateFlow(false)
@@ -101,4 +104,11 @@ class DesktopPlayerViewModel : IPlayerViewModel {
 
     override val settingsMenuRequested = kotlinx.coroutines.flow.MutableSharedFlow<Unit>()
     override fun triggerSettingsMenu() {}
+
+    override val showFps: StateFlow<Boolean> = MutableStateFlow(false)
+    override val isBuffering: StateFlow<Boolean> = MutableStateFlow(false)
+
+    override val availableAudioDevices: StateFlow<List<String>> = MutableStateFlow(emptyList())
+    override val selectedAudioDevice: StateFlow<String?> = MutableStateFlow(null)
+    override fun selectAudioDevice(name: String?) {}
 }

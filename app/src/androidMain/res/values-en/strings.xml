@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">DuWave</string>
+    <string name="swipe_to_choose">Swipe the mini-player sideways to switch sections!</string>
     <string name="perm_mic_denied">Rhythmic animations are disabled because there is no microphone permission.</string>
     <string name="perm_storage_denied">Storage permission is required to find your music.</string>
     <string name="add_to_playlist">Add to Playlist</string>
