@@ -250,7 +250,7 @@ fun DesignSettingsDialog(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                items(chunkedStyles[page]) { item ->
+                                items(chunkedStyles[page], key = { it.first }) { item ->
                                     val idx = item.first
                                     val name = item.second
                                     val isSelected = currentBgStyle == idx
@@ -268,7 +268,8 @@ fun DesignSettingsDialog(
                                         },
                                         paletteColors = paletteColors,
                                         dynamicTextColor = dynamicTextColor,
-                                        prefs = prefs
+                                        prefs = prefs,
+                                        modifier = Modifier.animateItem()
                                     )
                                 }
                             }
@@ -333,7 +334,8 @@ fun StyleGridItem(
     onToggleFavorite: () -> Unit,
     paletteColors: PaletteColors,
     dynamicTextColor: Color,
-    prefs: AppPreferences
+    prefs: AppPreferences,
+    modifier: Modifier = Modifier
 ) {
     val starScale by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isFavorite) 1.2f else 1.0f,
@@ -346,7 +348,7 @@ fun StyleGridItem(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable { prefs.backgroundStyle = idx }
             .padding(4.dp)

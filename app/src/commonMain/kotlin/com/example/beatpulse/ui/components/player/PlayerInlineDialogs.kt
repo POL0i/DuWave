@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.window.Dialog
@@ -697,17 +699,20 @@ fun PlayerSettingsSheet(
     val dynamicColorsInterval by playerViewModel.dynamicColorsInterval.collectAsState()
     val coverScale by playerViewModel.coverScale.collectAsState()
 
+    var isAdjusting by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val currentContainerAlpha by androidx.compose.animation.core.animateFloatAsState(if (isAdjusting) 0.3f else 0.95f, label = "containerAlpha")
+    val currentScrimAlpha by androidx.compose.animation.core.animateFloatAsState(if (isAdjusting) 0.0f else 0.2f, label = "scrimAlpha")
+
     androidx.compose.material3.ModalBottomSheet(
         onDismissRequest = { onDismissRequest() },
-        containerColor = colorDominant.copy(alpha = 0.95f),
-        scrimColor = Color.Black.copy(alpha = 0.2f)
+        containerColor = colorDominant.copy(alpha = currentContainerAlpha),
+        scrimColor = Color.Black.copy(alpha = currentScrimAlpha)
     ) {
-        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth().animateContentSize(), contentAlignment = Alignment.Center) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 800.dp)
-                    .fillMaxHeight(0.85f)
                     .padding(horizontal = 24.dp)
                     .padding(bottom = 32.dp)
                     .verticalScroll(rememberScrollState())
@@ -731,8 +736,9 @@ fun PlayerSettingsSheet(
                         }
                     }
                 ) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Básicas") })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Avanzadas") })
+                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Básicos") })
+                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Avanzados") })
+                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Visuales") })
                 }
                 Spacer(modifier = Modifier.height(24.dp))
 
@@ -787,58 +793,57 @@ fun PlayerSettingsSheet(
                         val pages = sortedStyles.chunked(8)
                         val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pages.size })
                         
-                        androidx.compose.foundation.pager.HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier.fillMaxWidth().height(220.dp)
-                        ) { pageIdx ->
-                            val pageStyles = pages[pageIdx]
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                val chunkedRows = pageStyles.chunked(4)
-                                for (rowStyles in chunkedRows) {
-                                    Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
-                                        for (style in rowStyles) {
-                                            val isSelected = currentStyle == style
-                                            val isFavorite = style.name in favoriteVisualizerStyles
-                                            
-                                            val starScale by androidx.compose.animation.core.animateFloatAsState(
-                                                targetValue = if (isFavorite) 1.2f else 1.0f,
-                                                animationSpec = androidx.compose.animation.core.spring(
-                                                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                                                    stiffness = androidx.compose.animation.core.Spring.StiffnessLow
-                                                ),
-                                                label = "starScale"
-                                            )
-    
-                                            Column(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .padding(horizontal = 4.dp),
-                                                horizontalAlignment = Alignment.CenterHorizontally
+                            androidx.compose.foundation.pager.HorizontalPager(
+                                state = pagerState,
+                                modifier = Modifier.fillMaxWidth().height(220.dp)
+                            ) { pageIdx ->
+                                val pageStyles = pages[pageIdx]
+                                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
+                                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(4),
+                                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    userScrollEnabled = false
+                                ) {
+                                    items(pageStyles, key = { it.name }) { style ->
+                                        val isSelected = currentStyle == style
+                                        val isFavorite = style.name in favoriteVisualizerStyles
+                                        
+                                        val starScale by androidx.compose.animation.core.animateFloatAsState(
+                                            targetValue = if (isFavorite) 1.2f else 1.0f,
+                                            animationSpec = androidx.compose.animation.core.spring(
+                                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                                            ),
+                                            label = "starScale"
+                                        )
+
+                                        Column(
+                                            modifier = Modifier.animateItem().padding(horizontal = 4.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            androidx.compose.foundation.layout.Box(
+                                                modifier = Modifier.fillMaxWidth().height(70.dp)
                                             ) {
+                                                // The clipped container for the preview
                                                 androidx.compose.foundation.layout.Box(
                                                     modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .height(70.dp)
+                                                        .fillMaxSize()
+                                                        .padding(end = 6.dp, top = 6.dp) // Leave room for the star
+                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .border(
+                                                            width = if (isSelected) 2.dp else 1.dp,
+                                                            color = if (isSelected) colorVibrant else Color.Gray.copy(alpha = 0.5f),
+                                                            shape = RoundedCornerShape(8.dp)
+                                                        )
+                                                        .background(if (isSelected) colorVibrant.copy(alpha=0.15f) else Color.Transparent)
+                                                        .clickable { onStyleChange(style, styleNames[style] ?: style.name) }
                                                 ) {
-                                                    // The clipped container for the preview
-                                                    androidx.compose.foundation.layout.Box(
-                                                        modifier = Modifier
-                                                            .fillMaxSize()
-                                                            .padding(end = 6.dp, top = 6.dp) // Leave room for the star
-                                                            .clip(RoundedCornerShape(8.dp))
-                                                            .border(
-                                                                width = if (isSelected) 2.dp else 1.dp,
-                                                                color = if (isSelected) colorVibrant else Color.Gray.copy(alpha = 0.5f),
-                                                                shape = RoundedCornerShape(8.dp)
-                                                            )
-                                                            .background(if (isSelected) colorVibrant.copy(alpha=0.15f) else Color.Transparent)
-                                                            .clickable { onStyleChange(style, styleNames[style] ?: style.name) }
-                                                    ) {
-                                                        // Draw the wave preview in center
-                                                        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                            WavePreview(style = style, color = if (isSelected) colorVibrant else Color.Gray)
-                                                        }
+                                                    // Draw the wave preview in center
+                                                    androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                        WavePreview(style = style, color = if (isSelected) colorVibrant else Color.Gray)
                                                     }
+                                                }
                                                     
                                                     // The animated star placed outside the clip bounds
                                                     Icon(
@@ -870,16 +875,8 @@ fun PlayerSettingsSheet(
                                                 )
                                             }
                                         }
-                                        // Fill remaining space if less than 4 items
-                                        if (rowStyles.size < 4) {
-                                            for (i in 0 until (4 - rowStyles.size)) {
-                                                Spacer(modifier = Modifier.weight(1f).padding(horizontal = 4.dp))
-                                            }
-                                        }
                                     }
                                 }
-                            }
-                        }
                         Spacer(modifier = Modifier.height(12.dp))
                         // Pager indicators
                         Row(
@@ -916,26 +913,8 @@ fun PlayerSettingsSheet(
                         }
                     }
 
-                } else {
-                    // TAB 2: Avanzadas
-                    Text("Fluidez / Phantom (Damping)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                    Slider(
-                        value = damping,
-                        onValueChange = { visualizerManager.damping.value = it },
-                        valueRange = 0.05f..2.0f,
-                        colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text("Sensibilidad (% Reactividad)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                    Slider(
-                        value = reactivity,
-                        onValueChange = { visualizerManager.reactivity.value = it },
-                        valueRange = 0.1f..1.5f,
-                        colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-
+                } else if (selectedTab == 1) {
+                    // TAB 2: Avanzados
                     var isAdvancedMode by remember { androidx.compose.runtime.mutableStateOf(false) }
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { 
                         isAdvancedMode = !isAdvancedMode
@@ -948,59 +927,79 @@ fun PlayerSettingsSheet(
                         )
                     }
                     
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
                     if (isAdvancedMode) {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorDominant, androidx.compose.foundation.shape.CircleShape))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Bajos: %.1f".format(bassMult), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+                            CircularKnob(
+                                value = bassMult,
+                                onValueChange = { visualizerManager.bassMultiplier.value = it },
+                                onAdjustingChange = { isAdjusting = it },
+                                valueRange = 0.5f..3.0f,
+                                label = "Bajos",
+                                color = colorDominant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            CircularKnob(
+                                value = midMult,
+                                onValueChange = { visualizerManager.midMultiplier.value = it },
+                                onAdjustingChange = { isAdjusting = it },
+                                valueRange = 0.5f..3.0f,
+                                label = "Medios",
+                                color = colorVibrant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            CircularKnob(
+                                value = trebleMult,
+                                onValueChange = { visualizerManager.trebleMultiplier.value = it },
+                                onAdjustingChange = { isAdjusting = it },
+                                valueRange = 0.5f..3.0f,
+                                label = "Agudos",
+                                color = colorMuted,
+                                modifier = Modifier.weight(1f)
+                            )
                         }
-                        Slider(
-                            value = bassMult,
-                            onValueChange = { visualizerManager.bassMultiplier.value = it },
-                            valueRange = 0.5f..3.0f,
-                            colors = SliderDefaults.colors(thumbColor = colorDominant, activeTrackColor = colorDominant)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorVibrant, androidx.compose.foundation.shape.CircleShape))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Medios: %.1f".format(midMult), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                        }
-                        Slider(
-                            value = midMult,
-                            onValueChange = { visualizerManager.midMultiplier.value = it },
-                            valueRange = 0.5f..3.0f,
-                            colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            androidx.compose.foundation.layout.Box(modifier = Modifier.size(12.dp).background(colorMuted, androidx.compose.foundation.shape.CircleShape))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Agudos: %.1f".format(trebleMult), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                        }
-                        Slider(
-                            value = trebleMult,
-                            onValueChange = { visualizerManager.trebleMultiplier.value = it },
-                            valueRange = 0.5f..3.0f,
-                            colors = SliderDefaults.colors(thumbColor = colorMuted, activeTrackColor = colorMuted)
-                        )
                     } else {
-                        Spacer(modifier = Modifier.height(16.dp))
                         Text("General: %.1f".format(sensitivity), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                        Slider(
+                        ThickGradientSlider(
                             value = sensitivity,
                             onValueChange = { visualizerManager.sensitivity.value = it },
+                            onAdjustingChange = { isAdjusting = it },
                             valueRange = 0.5f..3.0f,
-                            colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorDominant)
+                            colors = listOf(colorMuted, colorDominant, colorVibrant),
+                            modifier = Modifier.fillMaxWidth().height(32.dp)
                         )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
                     HorizontalDivider(color = Color.DarkGray)
                     Spacer(modifier = Modifier.height(16.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Fluidez", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                            Slider(
+                                value = damping,
+                                onValueChange = { visualizerManager.damping.value = it },
+                                valueRange = 0.05f..2.0f,
+                                colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
+                            )
+                        }
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Reactividad", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                            Slider(
+                                value = reactivity,
+                                onValueChange = { visualizerManager.reactivity.value = it },
+                                valueRange = 0.1f..1.5f,
+                                colors = SliderDefaults.colors(thumbColor = colorDominant, activeTrackColor = colorDominant)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                } else if (selectedTab == 2) {
+                    // TAB 3: Visuales
                     Text("Opciones Avanzadas de Portada", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -1147,6 +1146,139 @@ fun PlayerSettingsSheet(
                     Spacer(modifier = Modifier.height(24.dp))
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun CircularKnob(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    label: String,
+    color: Color,
+    onAdjustingChange: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = modifier) {
+        val pct = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+        
+        androidx.compose.foundation.Canvas(
+            modifier = Modifier
+                .size(64.dp)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { onAdjustingChange(true) },
+                        onDragEnd = { onAdjustingChange(false) },
+                        onDragCancel = { onAdjustingChange(false) },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                            val touchPos = change.position
+                            var angle = kotlin.math.atan2(touchPos.y - center.y, touchPos.x - center.x) * 180f / kotlin.math.PI.toFloat()
+                            if (angle < 0) angle += 360f
+                            
+                            var mappedAngle = angle - 135f
+                            if (mappedAngle < 0) mappedAngle += 360f
+                            
+                            var newPct = mappedAngle / 270f
+                            if (newPct > 1f) {
+                                newPct = if (mappedAngle < 315f) 1f else 0f
+                            }
+                            
+                            val newVal = valueRange.start + newPct * (valueRange.endInclusive - valueRange.start)
+                            onValueChange(newVal.coerceIn(valueRange))
+                        }
+                    )
+                }
+        ) {
+            val r = size.width / 2f
+            val center = androidx.compose.ui.geometry.Offset(r, r)
+            
+            // Background circle
+            drawCircle(
+                color = color.copy(alpha = 0.2f),
+                radius = r,
+                center = center
+            )
+            
+            // Track arc
+            val angle = 270f * pct
+            drawArc(
+                color = color,
+                startAngle = 135f,
+                sweepAngle = angle,
+                useCenter = false,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+            )
+            
+            // Knob Dot
+            val dotAngle = 135f + angle
+            val dotRad = (dotAngle * kotlin.math.PI / 180).toFloat()
+            val dotR = r - 12.dp.toPx()
+            val dotX = center.x + kotlin.math.cos(dotRad) * dotR
+            val dotY = center.y + kotlin.math.sin(dotRad) * dotR
+            drawCircle(
+                color = Color.White,
+                radius = 6.dp.toPx(),
+                center = androidx.compose.ui.geometry.Offset(dotX, dotY)
+            )
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(label, color = Color.White, style = MaterialTheme.typography.labelSmall)
+        Text(String.format("%.1f", value), color = color, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun ThickGradientSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    colors: List<Color>,
+    onAdjustingChange: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    val pct = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+    
+    androidx.compose.foundation.Canvas(
+        modifier = modifier
+            .pointerInput(Unit) {
+                detectDragGestures(
+                    onDragStart = { onAdjustingChange(true) },
+                    onDragEnd = { onAdjustingChange(false) },
+                    onDragCancel = { onAdjustingChange(false) },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        val newPct = (change.position.x / size.width).coerceIn(0f, 1f)
+                        val newVal = valueRange.start + newPct * (valueRange.endInclusive - valueRange.start)
+                        onValueChange(newVal)
+                    }
+                )
+            }
+    ) {
+        val w = size.width
+        val h = size.height
+        val corner = androidx.compose.ui.geometry.CornerRadius(h/2, h/2)
+        
+        // Background
+        drawRoundRect(
+            color = Color.DarkGray.copy(alpha = 0.5f),
+            size = size,
+            cornerRadius = corner
+        )
+        
+        // Gradient fill
+        if (pct > 0) {
+            drawRoundRect(
+                brush = androidx.compose.ui.graphics.Brush.horizontalGradient(
+                    colors = colors,
+                    startX = 0f,
+                    endX = w
+                ),
+                size = androidx.compose.ui.geometry.Size(w * pct, h),
+                cornerRadius = corner
+            )
         }
     }
 }
