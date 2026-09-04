@@ -593,7 +593,7 @@ fun PlayerSupportDialog(
     
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("Apoyo y Sugerencias", color = animatedColor) },
+        title = { Text(getLocalizedString("support_suggestions"), color = animatedColor) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Card(
@@ -623,7 +623,7 @@ fun PlayerSupportDialog(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "Apóyanos en Patreon y obtén nuevos estilos visuales y nuevos estilos visuales para ondas.",
+                    text = getLocalizedString("support_patreon"),
                     color = colorVibrant,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.bodyMedium,
@@ -641,7 +641,7 @@ fun PlayerSupportDialog(
                         codeError = false
                         showSuccess = false
                     },
-                    label = { Text("Código de Patreon", color = dynamicTextColor.copy(alpha = 0.7f)) },
+                    label = { Text(getLocalizedString("patreon_code"), color = dynamicTextColor.copy(alpha = 0.7f)) },
                     isError = codeError,
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
@@ -668,7 +668,7 @@ fun PlayerSupportDialog(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
             ) {
-                Text(if (showSuccess) "¡Desbloqueado!" else "Canjear código", color = Color.White)
+                Text(if (showSuccess) "¡Desbloqueado!" else getLocalizedString("redeem_code"), color = Color.White)
             }
         },
         dismissButton = {
@@ -771,7 +771,7 @@ fun PlayerSettingsSheet(
                     val isShuffleEnabled by playerViewModel.shuffleModeEnabled.collectAsState()
                     val currentMode by playerViewModel.repeatMode.collectAsState()
                     
-                    Text("Opciones de Reproducción", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Text(getLocalizedString("playback_options"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                         // Aleatorio as an icon button instead of switch
                         androidx.compose.material3.IconButton(onClick = { playerViewModel.shuffleModeEnabled.value = !isShuffleEnabled }) {
@@ -930,7 +930,7 @@ fun PlayerSettingsSheet(
                         TextButton(onClick = { visualizerManager.visualizerArchetype.value = 0 }) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.Waves, contentDescription = null, tint = if (visualizerArchetype == 0) colorVibrant else Color.Gray)
-                                Text("3 Ondas superpuestas", color = if (visualizerArchetype == 0) colorVibrant else Color.Gray, fontSize = 12.sp)
+                                Text(getLocalizedString("three_overlapping_waves"), color = if (visualizerArchetype == 0) colorVibrant else Color.Gray, fontSize = 12.sp)
                             }
                         }
                         TextButton(onClick = { visualizerManager.visualizerArchetype.value = 1 }) {
@@ -1068,7 +1068,7 @@ fun PlayerSettingsSheet(
                                     tint = if (dynamicColorsPlus) colorVibrant else Color.Gray
                                 )
                             }
-                            Text("Dinámico+", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                            Text(getLocalizedString("dynamic_plus"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                     

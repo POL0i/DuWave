@@ -252,7 +252,7 @@
     <string name="visuals">Visuais</string>
     <string name="visual_waves">Ondas Visuais</string>
     <string name="archetypes">Arquétipos</string>
-    <string name="three_overlapping_waves">Três Ondas Sobrepostas</string>
+    <string name="three_overlapping_waves">3 Ondas sobrepostas</string>
     <string name="one_combined_wave">Uma Onda Combinada</string>
     <string name="general_sensitivity">Sensibilidade Geral</string>
     <string name="fluidity">Fluidez</string>
@@ -294,4 +294,16 @@
     <string name="preset_custom">Personalizado</string>
     <string name="preset_normal">Normal</string>
     <string name="preset_classic">Clássico</string>
+    <string name="double_tap_edges">Toque duas vezes nas bordas para mudar de música</string>
+    <string name="double_tap_here_skip">Toque duas vezes aqui para avançar ou retroceder 10s</string>
+    <string name="rotate_cover_to_seek">Gire a capa para avançar ou retroceder</string>
+    <string name="playback_options">Opções de Reprodução</string>
+    <string name="dynamic_plus">Dinâmico+</string>
+    <string name="support_suggestions">Apoio e Sugestões</string>
+    <string name="suggest_idea">Sugerir Ideia</string>
+    <string name="send_feedback">Envie comentários ou sugestões para novos recursos.</string>
+    <string name="support_patreon">Apoie-nos no Patreon e obtenha novos estilos visuais e novos estilos visuais para ondas.</string>
+    <string name="patreon_code">Código do Patreon</string>
+    <string name="redeem_code">Resgatar Código</string>
+    <string name="patreon_wall">Mural Patreon</string>
 </resources>

@@ -1214,7 +1214,7 @@ private fun PlayerTrackInfoHeader(
                 }
                 Row(modifier = Modifier.align(Alignment.CenterStart)) {
                     IconButton(onClick = onShowSupport, modifier = Modifier.size(36.dp).clip(CircleShape).background(paletteColors.dominant.copy(alpha = 0.5f))) {
-                        Icon(imageVector = Icons.Default.Favorite, contentDescription = "Apoyo y Sugerencias", tint = colorVibrant, modifier = Modifier.size(20.dp))
+                        Icon(imageVector = Icons.Default.Favorite, contentDescription = getLocalizedString("support_suggestions"), tint = colorVibrant, modifier = Modifier.size(20.dp))
                     }
                 }
                 Row(modifier = Modifier.align(Alignment.CenterEnd)) {

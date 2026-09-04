@@ -160,7 +160,7 @@ fun DesignSettingsDialog(
                 
                 val isPatreonUnlocked by prefs.isPatreonUnlockedFlow.collectAsState()
                 if (isPatreonUnlocked) {
-                    styles.add(9 to "Muro Patreon")
+                    styles.add(9 to getLocalizedString("patreon_wall"))
                     styles.add(10 to "Fuente Oscura")
                     styles.add(11 to "Terraria")
                     styles.add(12 to "Zen Clear")

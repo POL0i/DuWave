@@ -90,16 +90,16 @@ fun GestureTutorialOverlay(showNextPrev: Boolean, showSeek10s: Boolean, showViny
             val pulse = if (dotOffset % 0.5f < 0.25f) 1f else 0f
             Box(modifier = Modifier.align(Alignment.CenterStart).offset(x = 16.dp).graphicsLayer { alpha = pulse }) { Box(modifier = Modifier.size(24.dp).background(Color.White.copy(alpha = 0.6f), CircleShape)) }
             Box(modifier = Modifier.align(Alignment.CenterEnd).offset(x = (-16).dp).graphicsLayer { alpha = pulse }) { Box(modifier = Modifier.size(24.dp).background(Color.White.copy(alpha = 0.6f), CircleShape)) }
-            Text("Toca dos veces los bordes para cambiar de canción", color = Color.White, modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(8.dp))
+            Text(getLocalizedString("double_tap_edges"), color = Color.White, modifier = Modifier.align(Alignment.TopCenter).padding(top = 100.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(8.dp))
         }
         if (showSeek10s && !showNextPrev) {
             Box(modifier = Modifier.align(Alignment.Center).offset(x = -50.dp).graphicsLayer { alpha = 1f - dotOffset }) { Box(modifier = Modifier.size(20.dp).background(Color.White, CircleShape)) }
             Box(modifier = Modifier.align(Alignment.Center).offset(x = 50.dp).graphicsLayer { alpha = 1f - dotOffset }) { Box(modifier = Modifier.size(20.dp).background(Color.White, CircleShape)) }
-            Text("Toca dos veces aquí para adelantar o retrasar 10s", color = Color.White, modifier = Modifier.align(Alignment.Center).offset(y = (-100).dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(8.dp))
+            Text(getLocalizedString("double_tap_here_skip"), color = Color.White, modifier = Modifier.align(Alignment.Center).offset(y = (-100).dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(8.dp))
         }
         if (showVinylSeek && !showSeek10s) {
             Icon(imageVector = Icons.Default.Menu, contentDescription = null, tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.align(Alignment.Center).size(80.dp).graphicsLayer { rotationZ = dotOffset * 360f })
-            Text("Gira la portada para adelantar o retrasar", color = Color.White, modifier = Modifier.align(Alignment.Center).offset(y = 120.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(8.dp))
+            Text(getLocalizedString("rotate_cover_to_seek"), color = Color.White, modifier = Modifier.align(Alignment.Center).offset(y = 120.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(8.dp))
         }
         if (showPlaylistSwipe) {
             Box(modifier = Modifier.align(Alignment.Center).offset(y = 80.dp + (-dotOffset * 60).dp).graphicsLayer { alpha = 1f - dotOffset }) { Box(modifier = Modifier.size(24.dp).background(Color.White, CircleShape)) }
