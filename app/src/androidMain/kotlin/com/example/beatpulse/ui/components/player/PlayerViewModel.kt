@@ -200,8 +200,10 @@ class PlayerViewModel(
             // Pause playback when entering Mic Mode
             _playerState.value?.pause()
             streamAvatarUri.value?.let { uri -> viewModelScope.launch { extractColorsFromUri(uri) } }
+            visualizerManager.startMicMode(context)
         } else {
             _currentTrack.value?.let { track -> viewModelScope.launch { extractColors(track) } }
+            visualizerManager.stopMicMode()
         }
     }
     // -------------------------------

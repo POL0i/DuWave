@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import com.example.beatpulse.utils.getLocalizedString
 import androidx.compose.ui.unit.dp
 import com.example.beatpulse.data.AppPreferences
 import com.example.beatpulse.theme.PaletteColors
@@ -128,8 +129,8 @@ fun DesignSettingsDialog(
                         false
                     } else false
                 }
-                .fillMaxWidth(0.9f)
-                .widthIn(max = 360.dp)
+                .fillMaxWidth(0.95f)
+                .widthIn(max = 420.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -176,7 +177,7 @@ fun DesignSettingsDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(380.dp) // Más largo, ensures all 7 shapes fit without clipping
+                        .height(480.dp) // Más largo, ensures all shapes and styles fit well
                         .onKeyEvent { event ->
                             if (event.type == KeyEventType.KeyDown && event.isAltPressed) {
                                 if (event.key == Key.DirectionRight) {
@@ -234,7 +235,7 @@ fun DesignSettingsDialog(
                     // Right Column: Visual Styles
                     Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
                         Text(
-                            getLocalizedString("visual_style").takeIf { it.isNotBlank() && it != "visual_style" } ?: "Estilo Visual",
+                            getLocalizedString("visual_style").takeIf { it.isNotBlank() && it != "visual_style" } ?: getLocalizedString("visual_style"),
                             color = dynamicTextColor,
                             style = MaterialTheme.typography.titleMedium
                         )
@@ -308,13 +309,14 @@ fun DesignSettingsDialog(
                             // Close Button
                             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                                 Text(
-                                    text = getLocalizedString("close").takeIf { it != "close" } ?: "Cerrar",
-                                    color = paletteColors.vibrant,
+                                    text = getLocalizedString("close").takeIf { it != "close" } ?: getLocalizedString("close"),
+                                    color = Color.White,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(paletteColors.vibrant)
                                         .clickable { onDismiss() }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                        .padding(horizontal = 24.dp, vertical = 12.dp)
                                 )
                             }
                         }

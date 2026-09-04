@@ -25,6 +25,15 @@ expect fun SystemImagePicker(
 )
 
 @androidx.compose.runtime.Composable
+expect fun SystemMicPermissionHandler(
+    requestTrigger: Boolean,
+    onResult: (Boolean) -> Unit
+)
+
+@androidx.compose.runtime.Composable
+expect fun SystemStatusBarVisibility(visible: Boolean)
+
+@androidx.compose.runtime.Composable
 expect fun SystemBackHandler(onBack: () -> Unit)
 
 @androidx.compose.runtime.Composable

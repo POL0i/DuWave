@@ -71,6 +71,13 @@ object ThumbnailCache {
                             return@withContext response.body?.bytes()
                         }
                     } catch (e: Exception) { e.printStackTrace() }
+                } else if (coverPath.startsWith("content://")) {
+                    try {
+                        val stream = context.contentResolver.openInputStream(android.net.Uri.parse(coverPath))
+                        val bytes = stream?.readBytes()
+                        stream?.close()
+                        if (bytes != null) return@withContext bytes
+                    } catch (e: Exception) { e.printStackTrace() }
                 } else {
                     val file = java.io.File(coverPath)
                     if (file.exists()) {
@@ -302,7 +309,22 @@ actual fun rememberStreamAvatar(uri: String?): ImageBitmap? {
                     }
                 }
                 
-                if (uri.startsWith("http://") || uri.startsWith("https://")) {
+                if (uri.startsWith("content://")) {
+                    try {
+                        val stream = context.contentResolver.openInputStream(android.net.Uri.parse(uri))
+                        val bytes = stream?.readBytes()
+                        stream?.close()
+                        if (bytes != null) {
+                            val bm = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            if (bm != null) {
+                                java.io.FileOutputStream(avatarFile).use {
+                                    bm.compress(Bitmap.CompressFormat.JPEG, 90, it)
+                                }
+                                bitmap = bm.asImageBitmap()
+                            }
+                        }
+                    } catch (e: Exception) { e.printStackTrace() }
+                } else if (uri.startsWith("http://") || uri.startsWith("https://")) {
                     val client = okhttp3.OkHttpClient()
                     val request = okhttp3.Request.Builder().url(uri).build()
                     val response = client.newCall(request).execute()

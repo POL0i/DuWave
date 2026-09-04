@@ -16,6 +16,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.filled.Feedback
 
 import androidx.compose.animation.AnimatedVisibility
+import com.example.beatpulse.utils.getLocalizedString
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateColor
@@ -412,6 +413,31 @@ private fun PlayerScreenContent(
         onDispose { }
     }
 
+    if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) {
+        com.example.beatpulse.utils.SystemStatusBarVisibility(false)
+    }
+
+    var settingsButtonVisible by remember { mutableStateOf(true) }
+    var settingsButtonBlink by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        // Blink for 3 seconds
+        repeat(3) {
+            settingsButtonBlink = true
+            delay(500)
+            settingsButtonBlink = false
+            delay(500)
+        }
+        // Fade out
+        settingsButtonVisible = false
+    }
+
+    val settingsAlpha by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (settingsButtonVisible) { if (settingsButtonBlink) 0.3f else 1f } else 0f,
+        animationSpec = tween(durationMillis = if (settingsButtonVisible) 300 else 2000),
+        label = "settingsAlpha"
+    )
+
     val rotationAngle by infiniteTransition.animateFloat(
         initialValue = 0f, targetValue = 360f,
         animationSpec = infiniteRepeatable(animation = tween(8000, easing = LinearEasing), repeatMode = RepeatMode.Restart),
@@ -442,6 +468,7 @@ private fun PlayerScreenContent(
     val isLandscape = false
     val scrollState = rememberScrollState()
     var showMicPermissionDialog by remember { mutableStateOf(false) }
+    var requestMicPermission by remember { mutableStateOf(false) }
     
     var showNextPrevTutorial by remember { mutableStateOf(!prefs.hasUsedNextPrevGesture) }
     var showSeek10sTutorial by remember { mutableStateOf(!prefs.hasUsedSeek10sGesture) }
@@ -527,7 +554,11 @@ private fun PlayerScreenContent(
             onShowSupport = { showSupportDialog = true },
             onAddToPlaylist = { currentTrack?.let { onAddToPlaylist(it) } },
             onToggleMicMode = {
-                playerViewModel.toggleMicMode()
+                if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) {
+                    showMicPermissionDialog = true
+                } else {
+                    playerViewModel.toggleMicMode()
+                }
             },
             onShowStreamConfig = { 
                 showStreamConfigDialog = true
@@ -675,7 +706,7 @@ private fun PlayerScreenContent(
         visible = isMicModeCleanUI && isMicModeActive,
         enter = fadeIn(),
         exit = fadeOut(),
-        modifier = Modifier.align(Alignment.TopEnd).padding(24.dp)
+        modifier = Modifier.align(Alignment.TopEnd).padding(top = 70.dp, end = 24.dp)
     ) {
         IconButton(
             onClick = {
@@ -693,20 +724,35 @@ private fun PlayerScreenContent(
         }
     }
 
+    // Floating Settings Button
+    Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+        IconButton(
+            onClick = { showSettingsMenu = true },
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = 24.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = "Ajustes de reproducción",
+                tint = colorVibrant.copy(alpha = settingsAlpha),
+                modifier = Modifier.size(28.dp)
+            )
+        }
+    }
+
     val styleNames = mapOf(
-        VisualizerStyle.WAVE to "Ondas",
-        VisualizerStyle.SLIME to "Slime",
-        VisualizerStyle.BARS to "Barras",
-        VisualizerStyle.DOTS to "Puntos",
-        VisualizerStyle.PARTICLES to "Partículas",
-        VisualizerStyle.RINGS to "Anillos",
-        VisualizerStyle.AURA to "Aura",
-        VisualizerStyle.BANDS to "Bandas",
-        VisualizerStyle.TERRAIN to "Terreno 3D",
-        VisualizerStyle.STAR to "Estrella",
-        VisualizerStyle.OSCILLOSCOPE to "Osciloscopio",
-        VisualizerStyle.TRAP_NATION to "Trap Nation",
-        VisualizerStyle.SIDE_PERSPECTIVE_BANDS to "Bandas con Perspectiva"
+        VisualizerStyle.WAVE to getLocalizedString("waves"),
+        VisualizerStyle.SLIME to getLocalizedString("slime"),
+        VisualizerStyle.BARS to getLocalizedString("bars"),
+        VisualizerStyle.DOTS to getLocalizedString("dots"),
+        VisualizerStyle.PARTICLES to getLocalizedString("particles"),
+        VisualizerStyle.RINGS to getLocalizedString("rings"),
+        VisualizerStyle.AURA to getLocalizedString("aura"),
+        VisualizerStyle.BANDS to getLocalizedString("bands"),
+        VisualizerStyle.TERRAIN to getLocalizedString("terrain_3d"),
+        VisualizerStyle.STAR to getLocalizedString("star"),
+        VisualizerStyle.OSCILLOSCOPE to getLocalizedString("oscilloscope"),
+        VisualizerStyle.TRAP_NATION to getLocalizedString("trap_nation"),
+        VisualizerStyle.SIDE_PERSPECTIVE_BANDS to getLocalizedString("perspective_bands")
     )
 
     PlayerSettingsSheet(
@@ -719,19 +765,29 @@ private fun PlayerScreenContent(
         styleNames = styleNames
     )
 
+    com.example.beatpulse.utils.SystemMicPermissionHandler(
+        requestTrigger = requestMicPermission,
+        onResult = { granted ->
+            requestMicPermission = false
+            if (granted) {
+                playerViewModel.toggleMicMode()
+            }
+        }
+    )
+
     if (showMicPermissionDialog) {
         AlertDialog(
             onDismissRequest = { showMicPermissionDialog = false },
-            title = { Text("Modo Grabación", color = colorVibrant) },
-            text = { Text("DuWave requiere permiso para grabar audio y así sincronizar los visualizadores. No guardaremos ningún audio.", color = Color.White) },
+            title = { Text(getLocalizedString("mic_test_title"), color = colorVibrant) },
+            text = { Text(getLocalizedString("mic_test_desc"), color = Color.White) },
             confirmButton = {
                 TextButton(onClick = {
                     showMicPermissionDialog = false
-                    playerViewModel.toggleMicMode()
+                    requestMicPermission = true
                 }) { Text("Confirmar", color = colorVibrant) }
             },
             dismissButton = {
-                TextButton(onClick = { showMicPermissionDialog = false }) { Text("Cancelar", color = Color.Gray) }
+                TextButton(onClick = { showMicPermissionDialog = false }) { Text(getLocalizedString("cancel"), color = Color.Gray) }
             },
             containerColor = colorDominant.copy(alpha = 0.95f)
         )

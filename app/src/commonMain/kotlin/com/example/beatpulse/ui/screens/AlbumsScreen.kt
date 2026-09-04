@@ -596,7 +596,7 @@ fun AddTracksScreen(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
             ) {
-                Text(if (selectedTracks.values.any { it }) "Añadir" else "Cancelar")
+                Text(if (selectedTracks.values.any { it }) "Añadir" else getLocalizedString("cancel"))
             }
         }
 

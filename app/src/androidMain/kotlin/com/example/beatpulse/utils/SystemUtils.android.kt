@@ -71,6 +71,58 @@ actual fun SystemImagePicker(
 }
 
 @androidx.compose.runtime.Composable
+actual fun SystemMicPermissionHandler(
+    requestTrigger: Boolean,
+    onResult: (Boolean) -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        onResult(isGranted)
+    }
+
+    androidx.compose.runtime.LaunchedEffect(requestTrigger) {
+        if (requestTrigger) {
+            val permissionCheckResult = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.RECORD_AUDIO
+            )
+            if (permissionCheckResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                onResult(true)
+            } else {
+                launcher.launch(android.Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+actual fun SystemStatusBarVisibility(visible: Boolean) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val activity = context as? android.app.Activity
+    androidx.compose.runtime.DisposableEffect(visible) {
+        if (activity != null) {
+            val window = activity.window
+            val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+            if (visible) {
+                controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            } else {
+                controller.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+                controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            }
+        }
+        onDispose {
+            if (activity != null) {
+                val window = activity.window
+                val controller = androidx.core.view.WindowCompat.getInsetsController(window, window.decorView)
+                controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+            }
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
 actual fun getLocalizedString(key: String): String {
     val context = androidx.compose.ui.platform.LocalContext.current
     val resId = context.resources.getIdentifier(key, "string", context.packageName)

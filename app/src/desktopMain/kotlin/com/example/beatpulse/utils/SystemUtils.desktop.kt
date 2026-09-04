@@ -61,6 +61,24 @@ actual fun SystemImagePicker(
     )
 }
 
+@androidx.compose.runtime.Composable
+actual fun SystemMicPermissionHandler(
+    requestTrigger: Boolean,
+    onResult: (Boolean) -> Unit
+) {
+    androidx.compose.runtime.LaunchedEffect(requestTrigger) {
+        if (requestTrigger) {
+            onResult(true)
+        }
+    }
+}
+
+@androidx.compose.runtime.Composable
+actual fun SystemStatusBarVisibility(visible: Boolean) {
+    // No-op on desktop
+}
+
+
 private val desktopStrings = mapOf(
     "tab_all" to "Todos",
     "tab_browser" to "Navegador",
@@ -88,14 +106,14 @@ private val desktopStrings = mapOf(
     "no_playlists_short" to "No tienes playlists creadas.",
     "no_playlists_created" to "No tienes playlists creadas. Crea una desde la pestaña de Álbumes.",
     "added_to_playlist" to "Añadida a %s",
-    "close" to "Cerrar",
+                "close" to "Fechar",
     "welcome_title" to "¡Bienvenido a DuWave!",
     "welcome_body" to "👋 Gestos Principales:\n\n• Usa la lupa en Biblioteca para buscar y el botón de recargar para buscar música nueva.\n\n• Toca aquí para comenzar a escuchar.",
     "create_playlist" to "Crear Playlist",
     "new_playlist" to "Nueva Playlist",
     "playlist_name" to "Nombre de la Playlist",
-    "save" to "Guardar",
-    "cancel" to "Cancelar",
+                "save" to "Salvar",
+                "cancel" to "Cancelar",
     "delete" to "Eliminar",
     "add_songs" to "Añadir Canciones",
     "track_deleted" to "Canción eliminada",
@@ -127,16 +145,16 @@ private val desktopStrings = mapOf(
     "visualizer_bg" to "Fondo Dinámico",
     "visualizer_sensitivity" to "Sensibilidad Visual",
     "visualizer_mode" to "Modo de Ondas",
-    "equalizer" to "Ecualizador",
+                "equalizer" to "Equalizador",
     "your_statistics" to "Tus Estadísticas",
     "start_listening_stats" to "Empieza a escuchar música para ver tus estadísticas aquí.",
     "shuffle_playback" to "Reproducción Aleatoria",
     "repeat_method" to "Método de Repetición",
     "speed_and_pitch" to "Velocidad y tono",
-    "title" to "Título",
-    "artist" to "Artista",
+                "title" to "Título",
+                "artist" to "Artista",
     "album" to "Álbum",
-    "edit_tag" to "Editar etiqueta",
+                "edit_tag" to "Editar Tag",
     "sleep_timer" to "Temporizador",
     "exact_timer" to "Temporizador Exacto",
     "turn_off" to "Apagar",
@@ -154,7 +172,7 @@ private val desktopStrings = mapOf(
     "suggest_improvements" to "Sugerir mejoras",
     "reload_covers" to "Recargar Portadas",
     "change_cover_title" to "Cambiar Portada",
-    "choose_cover" to "Elegir Portada",
+                "choose_cover" to "Escolher Capa",
     "trim_audio" to "Recortar audio",
     "save_trim" to "Guardar Recorte",
     "play_trimmed" to "Reproducir Recorte",
@@ -188,7 +206,7 @@ private val desktopStrings = mapOf(
     "support_ideas_title" to "¿Quieres aportar ideas?",
     "support_patreon_title" to "Apoya el proyecto",
     "audio_effects" to "Efectos de Audio",
-    "playback_settings" to "Ajustes de reproducción",
+                "playback_settings" to "Configurações de Reprodução",
     "because_you_listened" to "Porque escuchaste %s",
     "top_artists" to "Artistas Populares",
     "based_on" to "Basado en %s",

@@ -25,6 +25,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.RepeatOne
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
@@ -53,6 +56,7 @@ import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import com.example.beatpulse.utils.getLocalizedString
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -79,7 +83,7 @@ fun PlayerTimerDialog(
     
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("Temporizador", color = colorVibrant) },
+        title = { Text(getLocalizedString("timer"), color = colorVibrant) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(modifier = Modifier.size(200.dp).padding(16.dp), contentAlignment = Alignment.Center) {
@@ -122,7 +126,7 @@ fun PlayerTimerDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismissRequest) { Text("Aceptar", color = colorVibrant) }
+            TextButton(onClick = onDismissRequest) { Text(getLocalizedString("ok"), color = colorVibrant) }
         },
         containerColor = colorDominant.copy(alpha = 0.95f)
     )
@@ -149,7 +153,7 @@ fun PlayerEqDialog(
     
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("Ecualizador", color = colorVibrant, fontWeight = FontWeight.Bold) },
+        title = { Text(getLocalizedString("equalizer"), color = colorVibrant, fontWeight = FontWeight.Bold) },
         text = {
             Column(modifier = Modifier
                 .fillMaxWidth()
@@ -193,7 +197,7 @@ fun PlayerEqDialog(
                                 onClick = { expanded = true },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                val currentName = if (currentPreset.toInt() == -1) "Personalizado" else presets.find { it.first == currentPreset }?.second ?: "Normal"
+                                val currentName = if (currentPreset.toInt() == -1) getLocalizedString("preset_custom") else presets.find { it.first == currentPreset }?.second ?: getLocalizedString("normal")
                                 Text(currentName, color = Color.White)
                             }
                             DropdownMenu(
@@ -202,7 +206,7 @@ fun PlayerEqDialog(
                                 modifier = Modifier.background(Color.DarkGray)
                             ) {
                                 DropdownMenuItem(
-                                    text = { Text("Personalizado", color = Color.White) },
+                                    text = { Text(getLocalizedString("preset_custom"), color = Color.White) },
                                     onClick = { expanded = false }
                                 )
                                 presets.forEach { preset ->
@@ -249,7 +253,7 @@ fun PlayerEqDialog(
                 }
             }
         },
-        confirmButton = { TextButton(onClick = onDismissRequest) { Text("Cerrar", color = colorVibrant) } },
+        confirmButton = { TextButton(onClick = onDismissRequest) { Text(getLocalizedString("close"), color = colorVibrant) } },
         containerColor = colorDominant.copy(alpha = 0.95f)
     )
 }
@@ -272,20 +276,20 @@ fun PlayerEditorDialog(
     
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("Editar Etiqueta", color = colorVibrant) },
+        title = { Text(getLocalizedString("edit_tag"), color = colorVibrant) },
         text = {
             Column {
                 OutlinedTextField(
                     value = editTitle,
                     onValueChange = { editTitle = it },
-                    label = { Text("Título", color = Color.Gray) },
+                    label = { Text(getLocalizedString("title"), color = Color.Gray) },
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = colorVibrant, cursorColor = colorVibrant)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = editArtist,
                     onValueChange = { editArtist = it },
-                    label = { Text("Artista", color = Color.Gray) },
+                    label = { Text(getLocalizedString("artist"), color = Color.Gray) },
                     colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = colorVibrant, cursorColor = colorVibrant)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -305,7 +309,7 @@ fun PlayerEditorDialog(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
                 ) {
-                    Text("Elegir Portada")
+                    Text(getLocalizedString("choose_cover"))
                 }
                 if (editCoverPath != null) {
                     Text("Portada personalizada seleccionada", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
@@ -316,10 +320,10 @@ fun PlayerEditorDialog(
             TextButton(onClick = {
                 onUpdateTrackMetadata(currentTrack.id, editTitle, editArtist, editAlbum, editCoverPath)
                 onDismissRequest()
-            }) { Text("Guardar", color = colorVibrant) }
+            }) { Text(getLocalizedString("save"), color = colorVibrant) }
         },
         dismissButton = {
-            TextButton(onClick = onDismissRequest) { Text("Cancelar", color = Color.Gray) }
+            TextButton(onClick = onDismissRequest) { Text(getLocalizedString("cancel"), color = Color.Gray) }
         },
         containerColor = colorDominant.copy(alpha = 0.95f)
     )
@@ -360,7 +364,7 @@ fun PlayerStreamConfigDialog(
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("Ajustes de Reproducción", color = colorVibrant) },
+        title = { Text(getLocalizedString("playback_settings"), color = colorVibrant) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.verticalScroll(rememberScrollState())) {
                 
@@ -376,7 +380,7 @@ fun PlayerStreamConfigDialog(
                                 tint = if (cleanUiMode) colorVibrant else Color.Gray
                             )
                         }
-                        Text("UI Limpia", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        Text(getLocalizedString("clean_ui"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                     }
                     
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
@@ -390,7 +394,7 @@ fun PlayerStreamConfigDialog(
                                 tint = if (coverDragEnabled) colorVibrant else Color.Gray
                             )
                         }
-                        Text("Mover", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        Text(getLocalizedString("move"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                     }
                     
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
@@ -400,11 +404,11 @@ fun PlayerStreamConfigDialog(
                         ) {
                             Icon(
                                 imageVector = if (streamConfigEffectsVisible) Icons.Filled.AutoAwesome else Icons.Filled.Block,
-                                contentDescription = "Efectos",
+                                contentDescription = getLocalizedString("effects"),
                                 tint = if (streamConfigEffectsVisible) colorVibrant else Color.Gray
                             )
                         }
-                        Text("Efectos", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        Text(getLocalizedString("effects"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 
@@ -417,9 +421,9 @@ fun PlayerStreamConfigDialog(
                             checked = coverVisibilityMode == "NORMAL",
                             onCheckedChange = { playerViewModel.setCoverVisibilityMode("NORMAL") }
                         ) {
-                            Icon(Icons.Filled.Image, contentDescription = "Normal", tint = if (coverVisibilityMode == "NORMAL") colorVibrant else Color.Gray)
+                            Icon(Icons.Filled.Image, contentDescription = getLocalizedString("normal"), tint = if (coverVisibilityMode == "NORMAL") colorVibrant else Color.Gray)
                         }
-                        Text("Normal", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        Text(getLocalizedString("normal"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                     }
                     
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
@@ -437,9 +441,9 @@ fun PlayerStreamConfigDialog(
                             checked = coverVisibilityMode == "HIDDEN",
                             onCheckedChange = { playerViewModel.setCoverVisibilityMode("HIDDEN") }
                         ) {
-                            Icon(Icons.Filled.Clear, contentDescription = "Oculta", tint = if (coverVisibilityMode == "HIDDEN") colorVibrant else Color.Gray)
+                            Icon(Icons.Filled.Clear, contentDescription = getLocalizedString("hidden"), tint = if (coverVisibilityMode == "HIDDEN") colorVibrant else Color.Gray)
                         }
-                        Text("Oculta", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                        Text(getLocalizedString("hidden"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 
@@ -551,7 +555,7 @@ fun PlayerStreamConfigDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("Cerrar", color = colorVibrant)
+                Text(getLocalizedString("close"), color = colorVibrant)
             }
         },
         containerColor = colorDominant
@@ -580,6 +584,8 @@ fun PlayerSupportDialog(
         ),
         label = ""
     )
+    
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     
     var patreonCode by remember { mutableStateOf("") }
     var codeError by remember { mutableStateOf(false) }
@@ -614,6 +620,18 @@ fun PlayerSupportDialog(
                     }
                 }
                 
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "Apóyanos en Patreon y obtén nuevos estilos visuales y nuevos estilos visuales para ondas.",
+                    color = colorVibrant,
+                    fontWeight = FontWeight.Bold,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.clickable {
+                        uriHandler.openUri("https://www.patreon.com/c/aldearius/membership")
+                    }.padding(vertical = 4.dp)
+                )
+                
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 OutlinedTextField(
@@ -634,34 +652,35 @@ fun PlayerSupportDialog(
                     ),
                     modifier = Modifier.fillMaxWidth()
                 )
-                
-                Button(
-                    onClick = {
-                        val expected = listOf(68, 85, 87, 65, 86, 69, 50, 48, 50, 54)
-                        val isValid = patreonCode.length == expected.size && patreonCode.map { it.code } == expected
-                        if (isValid) {
-                            prefs.isPatreonUnlocked = true
-                            showSuccess = true
-                        } else {
-                            codeError = true
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = colorVibrant),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(if (showSuccess) "¡Desbloqueado!" else "Canjear código", color = Color.White)
-                }
             }
         },
-        confirmButton = {},
+        confirmButton = {
+            Button(
+                onClick = {
+                    val expected = listOf(68, 85, 87, 65, 86, 69, 50, 48, 50, 54)
+                    val isValid = patreonCode.length == expected.size && patreonCode.map { it.code } == expected
+                    if (isValid) {
+                        prefs.isPatreonUnlocked = true
+                        showSuccess = true
+                    } else {
+                        codeError = true
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
+            ) {
+                Text(if (showSuccess) "¡Desbloqueado!" else "Canjear código", color = Color.White)
+            }
+        },
         dismissButton = {
             TextButton(onClick = onDismissRequest) {
-                Text("Cancelar", color = dynamicTextColor.copy(alpha = 0.7f))
+                Text(getLocalizedString("cancel"), color = dynamicTextColor.copy(alpha = 0.7f))
             }
         },
         containerColor = paletteColors.dominant
     )
 }
+
+var lastSelectedSettingsTab by androidx.compose.runtime.mutableStateOf(0)
 
 @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
@@ -690,6 +709,7 @@ fun PlayerSettingsSheet(
     val midMult by visualizerManager.midMultiplier.collectAsState()
     val trebleMult by visualizerManager.trebleMultiplier.collectAsState()
     val sensitivity by visualizerManager.sensitivity.collectAsState()
+    val isAdvancedMode by visualizerManager.isAdvancedMode.collectAsState()
     
     val coverVisibilityMode by playerViewModel.coverVisibilityMode.collectAsState()
     val chromaKeyColor by playerViewModel.chromaKeyColor.collectAsState()
@@ -717,68 +737,72 @@ fun PlayerSettingsSheet(
                     .padding(bottom = 32.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                var selectedTab by remember { mutableStateOf(0) }
-                
-                Text("Opciones de Reproductor", color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                // No pager state needed, using lastSelectedSettingsTab directly
+                Text(getLocalizedString("player_options"), color = colorVibrant, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 TabRow(
-                    selectedTabIndex = selectedTab,
+                    selectedTabIndex = lastSelectedSettingsTab,
                     containerColor = Color.Transparent,
                     contentColor = colorVibrant,
                     divider = {},
                     indicator = { tabPositions -> 
-                        if (selectedTab < tabPositions.size) {
+                        if (lastSelectedSettingsTab < tabPositions.size) {
                             androidx.compose.material3.TabRowDefaults.SecondaryIndicator(
-                                modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                modifier = Modifier.tabIndicatorOffset(tabPositions[lastSelectedSettingsTab]),
                                 color = colorVibrant
                             )
                         }
                     }
                 ) {
-                    Tab(selected = selectedTab == 0, onClick = { selectedTab = 0 }, text = { Text("Básicos") })
-                    Tab(selected = selectedTab == 1, onClick = { selectedTab = 1 }, text = { Text("Avanzados") })
-                    Tab(selected = selectedTab == 2, onClick = { selectedTab = 2 }, text = { Text("Visuales") })
+                    Tab(selected = lastSelectedSettingsTab == 0, onClick = { lastSelectedSettingsTab = 0 }, text = { Text(getLocalizedString("basic_options")) })
+                    Tab(selected = lastSelectedSettingsTab == 1, onClick = { lastSelectedSettingsTab = 1 }, text = { Text(getLocalizedString("advanced_options")) })
+                    Tab(selected = lastSelectedSettingsTab == 2, onClick = { lastSelectedSettingsTab = 2 }, text = { Text(getLocalizedString("visuals")) })
                 }
                 Spacer(modifier = Modifier.height(24.dp))
 
-                if (selectedTab == 0) {
+                androidx.compose.animation.AnimatedContent(
+                    targetState = lastSelectedSettingsTab,
+                    label = "TabTransition"
+                ) { page ->
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        if (page == 0) {
                     // TAB 1: Básicas
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(0.7f)) {
-                            val isShuffleEnabled by playerViewModel.shuffleModeEnabled.collectAsState()
-                            androidx.compose.material3.Switch(
-                                checked = isShuffleEnabled,
-                                onCheckedChange = { playerViewModel.shuffleModeEnabled.value = it },
-                                colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorVibrant.copy(alpha=0.5f))
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Icon(imageVector = Icons.Default.Shuffle, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Aleatorio", color = Color.White)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
+                    val isShuffleEnabled by playerViewModel.shuffleModeEnabled.collectAsState()
+                    val currentMode by playerViewModel.repeatMode.collectAsState()
                     
-                    Text("Modo de Bucle", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        val currentMode by playerViewModel.repeatMode.collectAsState()
-                        TextButton(onClick = { playerViewModel.repeatMode.value = 0 }) {
-                            Text("Apagado", color = if (!abRepeatModeEnabled && currentMode == 0) colorVibrant else Color.Gray)
+                    Text("Opciones de Reproducción", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                        // Aleatorio as an icon button instead of switch
+                        androidx.compose.material3.IconButton(onClick = { playerViewModel.shuffleModeEnabled.value = !isShuffleEnabled }) {
+                            Icon(Icons.Default.Shuffle, contentDescription = "Aleatorio", tint = if (isShuffleEnabled) colorVibrant else Color.Gray)
                         }
-                        TextButton(onClick = { playerViewModel.repeatMode.value = 2 }) {
-                            Text("Lista", color = if (!abRepeatModeEnabled && currentMode == 2) colorVibrant else Color.Gray)
-                        }
-                        TextButton(onClick = { playerViewModel.repeatMode.value = 1 }) {
-                            Text("Una", color = if (!abRepeatModeEnabled && currentMode == 1) colorVibrant else Color.Gray)
-                        }
-                        TextButton(onClick = { /* AB handled elsewhere */ }) {
-                            Text("A-B", color = if (abRepeatModeEnabled) colorVibrant else Color.Gray)
+                        
+                        // Loop modes as icon buttons
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            // Apagado
+                            androidx.compose.material3.IconButton(onClick = { playerViewModel.setRepeatMode(0) }) {
+                                Icon(Icons.Default.Close, contentDescription = "Apagado", tint = if (!abRepeatModeEnabled && currentMode == 0) colorVibrant else Color.Gray)
+                            }
+                            // Lista
+                            androidx.compose.material3.IconButton(onClick = { playerViewModel.setRepeatMode(2) }) {
+                                Icon(Icons.Default.Repeat, contentDescription = "Lista", tint = if (!abRepeatModeEnabled && currentMode == 2) colorVibrant else Color.Gray)
+                            }
+                            // Una
+                            androidx.compose.material3.IconButton(onClick = { playerViewModel.setRepeatMode(1) }) {
+                                Icon(Icons.Default.RepeatOne, contentDescription = "Una", tint = if (!abRepeatModeEnabled && currentMode == 1) colorVibrant else Color.Gray)
+                            }
+                            // A-B
+                            androidx.compose.material3.TextButton(onClick = { 
+                                (playerViewModel.abRepeatModeEnabled as? kotlinx.coroutines.flow.MutableStateFlow)?.value = !abRepeatModeEnabled 
+                            }) {
+                                Text("A-B", color = if (abRepeatModeEnabled) colorVibrant else Color.Gray, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("Estilo Visual", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Text(getLocalizedString("visual_style"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                     val infiniteTransition = rememberInfiniteTransition()
                     val phase by infiniteTransition.animateFloat(
                         initialValue = 0f, targetValue = 2f * kotlin.math.PI.toFloat(),
@@ -895,6 +919,10 @@ fun PlayerSettingsSheet(
                             }
                         }
                     }
+
+
+                } else if (page == 1) {
+                    // TAB 2: Avanzados
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Text("Ondas Visuales (Archetype)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
@@ -912,23 +940,21 @@ fun PlayerSettingsSheet(
                             }
                         }
                     }
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                } else if (selectedTab == 1) {
-                    // TAB 2: Avanzados
-                    var isAdvancedMode by remember { androidx.compose.runtime.mutableStateOf(false) }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { 
-                        isAdvancedMode = !isAdvancedMode
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable {
+                        visualizerManager.isAdvancedMode.value = !isAdvancedMode
                     }) {
-                        Text(if (isAdvancedMode) "Sensibilidad por frecuencias (Avanzado)" else "Sensibilidad General", color = Color.Gray, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                        Text(if (isAdvancedMode) "Sensibilidad por frecuencias (Avanzado)" else getLocalizedString("general_sensitivity"), color = Color.Gray, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
                         androidx.compose.material3.Switch(
                             checked = isAdvancedMode,
-                            onCheckedChange = { isAdvancedMode = it },
+                            onCheckedChange = { visualizerManager.isAdvancedMode.value = it },
                             colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorVibrant.copy(alpha=0.5f))
                         )
                     }
-                    
+
                     Spacer(modifier = Modifier.height(16.dp))
-                    
+
                     if (isAdvancedMode) {
                         Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
                             CircularKnob(
@@ -936,7 +962,7 @@ fun PlayerSettingsSheet(
                                 onValueChange = { visualizerManager.bassMultiplier.value = it },
                                 onAdjustingChange = { isAdjusting = it },
                                 valueRange = 0.5f..3.0f,
-                                label = "Bajos",
+                                label = getLocalizedString("bass"),
                                 color = colorDominant,
                                 modifier = Modifier.weight(1f)
                             )
@@ -960,7 +986,6 @@ fun PlayerSettingsSheet(
                             )
                         }
                     } else {
-                        Text("General: %.1f".format(sensitivity), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                         ThickGradientSlider(
                             value = sensitivity,
                             onValueChange = { visualizerManager.sensitivity.value = it },
@@ -977,7 +1002,7 @@ fun PlayerSettingsSheet(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Fluidez", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                            Text(getLocalizedString("fluidity"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                             Slider(
                                 value = damping,
                                 onValueChange = { visualizerManager.damping.value = it },
@@ -986,7 +1011,7 @@ fun PlayerSettingsSheet(
                             )
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Reactividad", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                            Text(getLocalizedString("reactivity"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                             Slider(
                                 value = reactivity,
                                 onValueChange = { visualizerManager.reactivity.value = it },
@@ -995,10 +1020,10 @@ fun PlayerSettingsSheet(
                             )
                         }
                     }
-
+                    
                     Spacer(modifier = Modifier.height(24.dp))
 
-                } else if (selectedTab == 2) {
+                } else if (page == 2) {
                     // TAB 3: Visuales
                     Text("Opciones Avanzadas de Portada", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                     Spacer(modifier = Modifier.height(16.dp))
@@ -1015,7 +1040,7 @@ fun PlayerSettingsSheet(
                                     tint = if (cleanUiMode) colorVibrant else Color.Gray
                                 )
                             }
-                            Text("UI Limpia", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                            Text(getLocalizedString("clean_ui"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
@@ -1029,7 +1054,7 @@ fun PlayerSettingsSheet(
                                     tint = if (coverDragEnabled) colorVibrant else Color.Gray
                                 )
                             }
-                            Text("Mover", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                            Text(getLocalizedString("move"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
@@ -1070,9 +1095,9 @@ fun PlayerSettingsSheet(
                                 checked = coverVisibilityMode == "NORMAL",
                                 onCheckedChange = { playerViewModel.setCoverVisibilityMode("NORMAL") }
                             ) {
-                                Icon(Icons.Filled.Image, contentDescription = "Normal", tint = if (coverVisibilityMode == "NORMAL") colorVibrant else Color.Gray)
+                                Icon(Icons.Filled.Image, contentDescription = getLocalizedString("normal"), tint = if (coverVisibilityMode == "NORMAL") colorVibrant else Color.Gray)
                             }
-                            Text("Normal", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                            Text(getLocalizedString("normal"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
@@ -1090,9 +1115,9 @@ fun PlayerSettingsSheet(
                                 checked = coverVisibilityMode == "HIDDEN",
                                 onCheckedChange = { playerViewModel.setCoverVisibilityMode("HIDDEN") }
                             ) {
-                                Icon(Icons.Filled.Clear, contentDescription = "Oculta", tint = if (coverVisibilityMode == "HIDDEN") colorVibrant else Color.Gray)
+                                Icon(Icons.Filled.Clear, contentDescription = getLocalizedString("hidden"), tint = if (coverVisibilityMode == "HIDDEN") colorVibrant else Color.Gray)
                             }
-                            Text("Oculta", color = Color.White, style = MaterialTheme.typography.bodySmall)
+                            Text(getLocalizedString("hidden"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                     
@@ -1114,37 +1139,40 @@ fun PlayerSettingsSheet(
                     
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Text("Tamaño de la Portada: ${String.format("%.2fx", coverScale)}", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
-                        Slider(
-                            value = coverScale,
-                            onValueChange = { playerViewModel.setCoverScale(it) },
-                            valueRange = 0.5f..2.5f,
-                            colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
                     val showFps by playerViewModel.showFps.collectAsState()
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Mostrar Contador de FPS", color = Color.White)
-                        Switch(
-                            checked = showFps,
-                            onCheckedChange = {
-                                prefs.showFps = it
-                                (playerViewModel.showFps as? MutableStateFlow)?.value = it
-                            },
-                            colors = SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorDominant)
-                        )
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(0.5f)) {
+                            Text(getLocalizedString("size"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                            Slider(
+                                value = coverScale,
+                                onValueChange = { playerViewModel.setCoverScale(it) },
+                                valueRange = 0.5f..2.5f,
+                                colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
+                            )
+                        }
+                        
+                        Row(
+                            modifier = Modifier.weight(0.5f).padding(start = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Text("FPS", color = Color.White, style = MaterialTheme.typography.labelMedium)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            androidx.compose.material3.Switch(
+                                checked = showFps,
+                                onCheckedChange = {
+                                    prefs.showFps = it
+                                    (playerViewModel.showFps as? MutableStateFlow)?.value = it
+                                },
+                                colors = androidx.compose.material3.SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorDominant)
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
                 }
+                }
+                } // End AnimatedContent
             }
         }
     }
@@ -1334,7 +1362,7 @@ fun AvatarPreviewDialog(
                 Spacer(modifier = Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                     TextButton(onClick = onDismiss) {
-                        Text("Cancelar", color = Color.White)
+                        Text(getLocalizedString("cancel"), color = Color.White)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
@@ -1342,7 +1370,7 @@ fun AvatarPreviewDialog(
                         enabled = bitmap != null,
                         colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
                     ) {
-                        Text("Aplicar", color = Color.White)
+                        Text(getLocalizedString("apply"), color = Color.White)
                     }
                 }
             }

@@ -666,7 +666,7 @@ fun LibraryScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { trackPendingConfirmation = null }) {
-                        Text("Cancelar", color = colorVibrant)
+                        Text(getLocalizedString("cancel"), color = colorVibrant)
                     }
                 },
                 containerColor = paletteColors.dominant

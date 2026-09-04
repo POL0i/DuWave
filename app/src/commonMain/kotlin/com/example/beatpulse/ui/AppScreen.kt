@@ -14,6 +14,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -379,9 +380,9 @@ fun AppScreen(
                 Text(text = getLocalizedString("welcome_body"), color = Color.White, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
                 Spacer(modifier = Modifier.height(32.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Button(onClick = { (prefs as AppPreferences).appLanguage = "es"; SystemUtils.recreateApp() }, colors = ButtonDefaults.buttonColors(containerColor = if ((prefs as AppPreferences).appLanguage == "es") paletteColors.vibrant else Color.DarkGray)) { Text("🇲🇽 ES") }
-                    Button(onClick = { (prefs as AppPreferences).appLanguage = "en"; SystemUtils.recreateApp() }, colors = ButtonDefaults.buttonColors(containerColor = if ((prefs as AppPreferences).appLanguage == "en") paletteColors.vibrant else Color.DarkGray)) { Text("🇬🇧 EN") }
-                    Button(onClick = { (prefs as AppPreferences).appLanguage = "pt"; SystemUtils.recreateApp() }, colors = ButtonDefaults.buttonColors(containerColor = if ((prefs as AppPreferences).appLanguage == "pt") paletteColors.vibrant else Color.DarkGray)) { Text("🇧🇷 PT") }
+                    Button(onClick = { (prefs as AppPreferences).appLanguage = "es" }, colors = ButtonDefaults.buttonColors(containerColor = if ((prefs as AppPreferences).appLanguage == "es") paletteColors.vibrant else Color.DarkGray)) { Text("🇲🇽 ES") }
+                    Button(onClick = { (prefs as AppPreferences).appLanguage = "en" }, colors = ButtonDefaults.buttonColors(containerColor = if ((prefs as AppPreferences).appLanguage == "en") paletteColors.vibrant else Color.DarkGray)) { Text("🇬🇧 EN") }
+                    Button(onClick = { (prefs as AppPreferences).appLanguage = "pt" }, colors = ButtonDefaults.buttonColors(containerColor = if ((prefs as AppPreferences).appLanguage == "pt") paletteColors.vibrant else Color.DarkGray)) { Text("🇧🇷 PT") }
                 }
             }
         }
@@ -394,13 +395,22 @@ fun AppScreen(
             animationSpec = infiniteRepeatable(animation = tween(1500, easing = LinearEasing), repeatMode = RepeatMode.Restart)
         )
         Box(
-            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha=0.6f)).clickable { showSwipeHint = false },
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.BottomCenter
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(bottom = 160.dp).padding(horizontal = 24.dp)) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .padding(bottom = 160.dp)
+                    .padding(horizontal = 24.dp)
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
+                    .background(Color.Black.copy(alpha = 0.8f))
+                    .clickable { showSwipeHint = false }
+                    .padding(16.dp)
+            ) {
                 Box(modifier = Modifier.offset(x = offsetX.dp).size(24.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape))
                 Spacer(modifier = Modifier.height(16.dp))
-                Text(getLocalizedString("swipe_to_choose"), color = Color.White, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
+                Text(getLocalizedString("swipe_to_choose"), color = Color.White, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
             }
         }
     }

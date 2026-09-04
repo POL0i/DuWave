@@ -238,7 +238,6 @@ fun UnifiedLibraryScreen(
                                                         if (prefs.appLanguage == code) return@clickable
                                                         prefs.appLanguage = code
                                                         showLanguageDialog = false
-                                                        com.example.beatpulse.utils.SystemUtils.recreateApp()
                                                     }
                                                     .padding(16.dp),
                                                 fontSize = 18.sp,
@@ -717,7 +716,7 @@ fun UnifiedLibraryScreen(
                         },
                         dismissButton = {
                             TextButton(onClick = { trackPendingConfirmation = null }) {
-                                Text("Cancelar", color = paletteColors.vibrant)
+                                Text(getLocalizedString("cancel"), color = paletteColors.vibrant)
                             }
                         },
                         containerColor = paletteColors.dominant

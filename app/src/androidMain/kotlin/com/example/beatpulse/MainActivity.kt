@@ -205,14 +205,20 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.ui.platform.LocalConfiguration provides updatedConfig
             ) {
                 BeatPulseTheme(isPixelArt = bgStyle == 8) {
-                    com.example.beatpulse.ui.AppScreen(
-                        visualizerManager = visualizerManager,
-                        equalizerManager = equalizerManager,
-                        prefs = prefs,
-                        libraryViewModel = libraryViewModel,
-                        playerViewModel = playerViewModel,
-                        statsViewModel = statsViewModel
-                    )
+                    androidx.compose.animation.Crossfade(
+                        targetState = localeCode,
+                        animationSpec = androidx.compose.animation.core.tween(durationMillis = 600),
+                        label = "language_crossfade"
+                    ) { _ ->
+                        com.example.beatpulse.ui.AppScreen(
+                            visualizerManager = visualizerManager,
+                            equalizerManager = equalizerManager,
+                            prefs = prefs,
+                            libraryViewModel = libraryViewModel,
+                            playerViewModel = playerViewModel,
+                            statsViewModel = statsViewModel
+                        )
+                    }
                 }
             }
         }
