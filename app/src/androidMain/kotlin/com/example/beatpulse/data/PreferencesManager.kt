@@ -307,4 +307,28 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
     override var showRemainingTime: Boolean
         get() = prefs.getBoolean("showRemainingTime", false)
         set(value) = prefs.edit().putBoolean("showRemainingTime", value).apply()
+
+    private val _favoriteBackgroundStylesFlow = MutableStateFlow(
+        prefs.getStringSet("favoriteBackgroundStyles", emptySet())?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet()
+    )
+    override val favoriteBackgroundStylesFlow: StateFlow<Set<Int>> = _favoriteBackgroundStylesFlow
+
+    override var favoriteBackgroundStyles: Set<Int>
+        get() = _favoriteBackgroundStylesFlow.value
+        set(value) {
+            prefs.edit().putStringSet("favoriteBackgroundStyles", value.map { it.toString() }.toSet()).apply()
+            _favoriteBackgroundStylesFlow.value = value
+        }
+
+    private val _favoriteVisualizerStylesFlow = MutableStateFlow(
+        prefs.getStringSet("favoriteVisualizerStyles", emptySet()) ?: emptySet()
+    )
+    override val favoriteVisualizerStylesFlow: StateFlow<Set<String>> = _favoriteVisualizerStylesFlow
+
+    override var favoriteVisualizerStyles: Set<String>
+        get() = _favoriteVisualizerStylesFlow.value
+        set(value) {
+            prefs.edit().putStringSet("favoriteVisualizerStyles", value).apply()
+            _favoriteVisualizerStylesFlow.value = value
+        }
 }

@@ -44,11 +44,30 @@ actual object SystemUtils {
         // por simplicidad y porque el scope actual es Desktop, retornamos null.
         return null
     }
+
+    actual val isMobilePlatform: Boolean = true
 }
 
 @androidx.compose.runtime.Composable
 actual fun SystemBackHandler(onBack: () -> Unit) {
     androidx.activity.compose.BackHandler(onBack = onBack)
+}
+
+@androidx.compose.runtime.Composable
+actual fun SystemImagePicker(
+    onFileSelected: (String?) -> Unit,
+    colorDominant: androidx.compose.ui.graphics.Color,
+    colorVibrant: androidx.compose.ui.graphics.Color
+) {
+    val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri: android.net.Uri? ->
+        onFileSelected(uri?.toString())
+    }
+    
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        launcher.launch("image/*")
+    }
 }
 
 @androidx.compose.runtime.Composable

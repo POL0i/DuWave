@@ -88,4 +88,16 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
         set(value) { _isPatreonUnlockedFlow.value = value }
     override var showFps: Boolean = false
     override var showRemainingTime: Boolean = false
+
+    private val _favoriteBackgroundStylesFlow = MutableStateFlow<Set<Int>>(emptySet())
+    override val favoriteBackgroundStylesFlow: StateFlow<Set<Int>> = _favoriteBackgroundStylesFlow
+    override var favoriteBackgroundStyles: Set<Int>
+        get() = _favoriteBackgroundStylesFlow.value
+        set(value) { _favoriteBackgroundStylesFlow.value = value }
+
+    private val _favoriteVisualizerStylesFlow = MutableStateFlow<Set<String>>(emptySet())
+    override val favoriteVisualizerStylesFlow: StateFlow<Set<String>> = _favoriteVisualizerStylesFlow
+    override var favoriteVisualizerStyles: Set<String>
+        get() = _favoriteVisualizerStylesFlow.value
+        set(value) { _favoriteVisualizerStylesFlow.value = value }
 }

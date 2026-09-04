@@ -21,6 +21,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
@@ -338,7 +339,7 @@ fun UnifiedLibraryScreen(
                     contentColor = paletteColors.vibrant,
                     edgePadding = 8.dp,
                     indicator = { tabPositions ->
-                        TabRowDefaults.Indicator(
+                        TabRowDefaults.SecondaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage % 4]),
                             color = paletteColors.vibrant,
                             height = 3.dp
@@ -484,7 +485,7 @@ fun UnifiedLibraryScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { selectedViewData = null }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = dynamicTextColor)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = dynamicTextColor)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -501,7 +502,7 @@ fun UnifiedLibraryScreen(
                     if (currentViewData.playlistId == null) {
                         Box {
                              IconButton(onClick = { isSortMenuExpanded = true }) {
-                                 Icon(Icons.Default.Sort, contentDescription = "Sort", tint = paletteColors.vibrant)
+                                 Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort", tint = paletteColors.vibrant)
                              }
                              androidx.compose.material3.MaterialTheme(
                                  colorScheme = androidx.compose.material3.MaterialTheme.colorScheme.copy(
@@ -838,7 +839,7 @@ fun ListsSubPage(
             PlaylistFolderItem(
                 title = pl.name,
                 count = trackCount,
-                icon = Icons.Default.QueueMusic,
+                icon = Icons.AutoMirrored.Filled.QueueMusic,
                 tint = paletteColors.vibrant,
                 textColor = dynamicTextColor,
                 onClick = { onPlaylistSelected(PlaylistViewData(pl.name, emptyList(), pl.playlistId)) }

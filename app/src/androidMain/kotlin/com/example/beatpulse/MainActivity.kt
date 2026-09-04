@@ -82,6 +82,10 @@ object NavigationKeys {
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        var instance: MainActivity? = null
+    }
+
     private val visualizerManager: AudioVisualizerManager by inject()
     private val prefs: com.example.beatpulse.data.PreferencesManager by inject()
     private val musicRepository: MusicRepository by inject()
@@ -150,6 +154,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        instance = this
         enableEdgeToEdge()
         
         // VisualizerState is handled in commonMain now
@@ -230,6 +235,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         unregisterReceiver(downloadReceiver)
+        if (instance == this) instance = null
     }
 
     private fun checkPermissionsAndSetup() {
@@ -240,9 +246,11 @@ class MainActivity : ComponentActivity() {
         }
 
         val missingPermissions = mutableListOf<String>()
-        // RECORD_AUDIO is no longer requested at startup. It will be requested on-demand in Mic Mode.
         if (ContextCompat.checkSelfPermission(this, storagePermission) != PackageManager.PERMISSION_GRANTED) {
             missingPermissions.add(storagePermission)
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            missingPermissions.add(Manifest.permission.RECORD_AUDIO)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {

@@ -275,4 +275,28 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
     override var showRemainingTime: Boolean
         get() = getBoolean("showRemainingTime", false)
         set(value) = setBoolean("showRemainingTime", value)
+
+    private val _favoriteBackgroundStylesFlow = MutableStateFlow(
+        getString("favoriteBackgroundStyles", "").split(",").mapNotNull { it.toIntOrNull() }.toSet()
+    )
+    override val favoriteBackgroundStylesFlow: StateFlow<Set<Int>> = _favoriteBackgroundStylesFlow
+
+    override var favoriteBackgroundStyles: Set<Int>
+        get() = _favoriteBackgroundStylesFlow.value
+        set(value) {
+            _favoriteBackgroundStylesFlow.value = value
+            setString("favoriteBackgroundStyles", value.joinToString(","))
+        }
+
+    private val _favoriteVisualizerStylesFlow = MutableStateFlow(
+        getString("favoriteVisualizerStyles", "").split(",").filter { it.isNotBlank() }.toSet()
+    )
+    override val favoriteVisualizerStylesFlow: StateFlow<Set<String>> = _favoriteVisualizerStylesFlow
+
+    override var favoriteVisualizerStyles: Set<String>
+        get() = _favoriteVisualizerStylesFlow.value
+        set(value) {
+            _favoriteVisualizerStylesFlow.value = value
+            setString("favoriteVisualizerStyles", value.joinToString(","))
+        }
 }

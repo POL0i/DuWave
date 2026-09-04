@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -232,7 +233,7 @@ fun AlbumsScreen(
                             PlaylistFolderItem(
                                 title = pl.name,
                                 count = trackCount,
-                                icon = Icons.Default.QueueMusic,
+                                icon = Icons.AutoMirrored.Filled.QueueMusic,
                                 tint = paletteColors.vibrant,
                                 textColor = dynamicTextColor,
                                 onClick = { selectedPlaylist = PlaylistViewData(pl.name, emptyList(), pl.playlistId) }
@@ -314,7 +315,7 @@ fun AlbumsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { selectedPlaylist = null }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = dynamicTextColor)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = dynamicTextColor)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(

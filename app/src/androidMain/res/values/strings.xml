@@ -239,4 +239,15 @@
     <string name="playback_error">Error al reproducir: Archivo no encontrado o dañado.</string>
     <string name="online_service_down">El servicio no está disponible de momento, por favor, espera una nueva actualización.</string>
     <string name="swipe_to_choose">¡Desliza el minirreproductor a los lados para cambiar de sección!</string>
+    <string name="shazam_api_unavailable">La API de reconocimiento musical no funciona actualmente. Espere a una próxima actualización.</string>
+    <string name="shazam_mic_denied">Se necesita permiso de micrófono para reconocer la canción.</string>
+    <string name="shazam_indie_warning">Funciona mejor con música comercial (Spotify, Apple). Los remixes o canciones de YouTube/Juegos podrían no ser reconocidos.</string>
+    <string name="shazam_no_match">No se encontró ninguna coincidencia.</string>
+    <string name="shazam_unknown_error">Error desconocido al escuchar.</string>
+    <string name="shazam_listening_title">Escuchando...</string>
+    <string name="shazam_listening_desc">Acerca el micrófono a la música. Déjelo sonar por unos segundos...</string>
+    <string name="shazam_found_title">¡Canción encontrada!</string>
+    <string name="shazam_search_button">Buscar Canción</string>
+    <string name="shazam_error_title">No se pudo reconocer</string>
+    <string name="shazam_retry_button">Reintentar</string>
 </resources>

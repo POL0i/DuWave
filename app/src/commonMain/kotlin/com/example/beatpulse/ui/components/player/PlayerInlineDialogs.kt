@@ -8,6 +8,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -39,6 +43,9 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Colorize
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
@@ -325,6 +332,22 @@ fun PlayerStreamConfigDialog(
     playerViewModel: IPlayerViewModel
 ) {
     if (!showStreamConfigDialog) return
+    var showAvatarPreview by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var selectedAvatarPath by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    
+    if (showAvatarPreview && selectedAvatarPath != null) {
+        AvatarPreviewDialog(
+            path = selectedAvatarPath!!,
+            onDismiss = { showAvatarPreview = false; selectedAvatarPath = null },
+            onApply = { path ->
+                playerViewModel.updateStreamAvatar(path)
+                showAvatarPreview = false
+                selectedAvatarPath = null
+            },
+            colorVibrant = colorVibrant,
+            colorDominant = colorDominant
+        )
+    }
     val streamConfigEffectsVisible by playerViewModel.streamConfigEffectsVisible.collectAsState()
     val streamConfigAspectRatio by playerViewModel.streamConfigAspectRatio.collectAsState()
     val cleanUiMode by playerViewModel.cleanUiMode.collectAsState()
@@ -433,13 +456,26 @@ fun PlayerStreamConfigDialog(
                     }
                 }
                 
+                var showSystemPicker by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                
+                if (showSystemPicker) {
+                    com.example.beatpulse.utils.SystemImagePicker(
+                        onFileSelected = { path ->
+                            showSystemPicker = false
+                            if (path != null) {
+                                selectedAvatarPath = path
+                                showAvatarPreview = true
+                            }
+                        },
+                        colorDominant = colorDominant,
+                        colorVibrant = colorVibrant
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(8.dp))
                 Button(
                     onClick = { 
-                        val path = com.example.beatpulse.utils.SystemUtils.pickImageFile()
-                        if (path != null) {
-                            playerViewModel.updateStreamAvatar(path)
-                        }
+                        showSystemPicker = true
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = colorDominant.copy(alpha=0.5f)),
                     border = androidx.compose.foundation.BorderStroke(1.dp, colorVibrant),
@@ -645,6 +681,7 @@ fun PlayerSettingsSheet(
     val thumbnailShapeIdx by prefs.thumbnailShapeFlow.collectAsState()
     val abRepeatModeEnabled by playerViewModel.abRepeatModeEnabled.collectAsState()
     val visualizerArchetype by visualizerManager.visualizerArchetype.collectAsState()
+    val favoriteVisualizerStyles by prefs.favoriteVisualizerStylesFlow.collectAsState()
     val reactivity by visualizerManager.reactivity.collectAsState()
     val damping by visualizerManager.damping.collectAsState()
     val bassMult by visualizerManager.bassMultiplier.collectAsState()
@@ -687,7 +724,7 @@ fun PlayerSettingsSheet(
                     divider = {},
                     indicator = { tabPositions -> 
                         if (selectedTab < tabPositions.size) {
-                            androidx.compose.material3.TabRowDefaults.Indicator(
+                            androidx.compose.material3.TabRowDefaults.SecondaryIndicator(
                                 modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
                                 color = colorVibrant
                             )
@@ -743,48 +780,121 @@ fun PlayerSettingsSheet(
                     )
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        val styles = VisualizerStyle.values()
-                        val chunked = styles.toList().chunked(4)
-                        for (rowStyles in chunked) {
-                            Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
-                                for (style in rowStyles) {
-                                    val isSelected = currentStyle == style
-                                    
-                                    androidx.compose.material3.Surface(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .clickable { onStyleChange(style, styleNames[style] ?: style.name) }
-                                            .padding(horizontal = 4.dp),
-                                        shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp),
-                                        color = if (isSelected) colorVibrant.copy(alpha=0.2f) else Color.Transparent,
-                                        border = if (isSelected) androidx.compose.foundation.BorderStroke(1.dp, colorVibrant) else androidx.compose.foundation.BorderStroke(1.dp, Color.Gray.copy(alpha=0.5f))
-                                    ) {
-                                        Column(
-                                            modifier = Modifier.padding(12.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            androidx.compose.foundation.Canvas(modifier = Modifier.size(36.dp)) {
-                                                val w = size.width
-                                                val h = size.height
-                                                val color = if (isSelected) colorVibrant else Color.Gray
-                                                val isCircle = thumbnailShapeIdx == 0
-                                                val basePath = androidx.compose.ui.graphics.Path().apply {
-                                                    val r = w * 0.22f
-                                                    if (isCircle) {
-                                                        addOval(androidx.compose.ui.geometry.Rect(w/2 - r, h/2 - r, w/2 + r, h/2 + r))
-                                                    } else {
-                                                        val cr = if (thumbnailShapeIdx == 2) 4f else if (thumbnailShapeIdx == 3) 8f else 0f
-                                                        addRoundRect(androidx.compose.ui.geometry.RoundRect(w/2 - r, h/2 - r, w/2 + r, h/2 + r, androidx.compose.ui.geometry.CornerRadius(cr, cr)))
+                        val sortedStyles = remember(favoriteVisualizerStyles) {
+                            VisualizerStyle.values().sortedByDescending { it.name in favoriteVisualizerStyles }
+                        }
+                        
+                        val pages = sortedStyles.chunked(8)
+                        val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pages.size })
+                        
+                        androidx.compose.foundation.pager.HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxWidth().height(220.dp)
+                        ) { pageIdx ->
+                            val pageStyles = pages[pageIdx]
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                val chunkedRows = pageStyles.chunked(4)
+                                for (rowStyles in chunkedRows) {
+                                    Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+                                        for (style in rowStyles) {
+                                            val isSelected = currentStyle == style
+                                            val isFavorite = style.name in favoriteVisualizerStyles
+                                            
+                                            val starScale by androidx.compose.animation.core.animateFloatAsState(
+                                                targetValue = if (isFavorite) 1.2f else 1.0f,
+                                                animationSpec = androidx.compose.animation.core.spring(
+                                                    dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                                    stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                                                ),
+                                                label = "starScale"
+                                            )
+    
+                                            Column(
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .padding(horizontal = 4.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                androidx.compose.foundation.layout.Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .height(70.dp)
+                                                ) {
+                                                    // The clipped container for the preview
+                                                    androidx.compose.foundation.layout.Box(
+                                                        modifier = Modifier
+                                                            .fillMaxSize()
+                                                            .padding(end = 6.dp, top = 6.dp) // Leave room for the star
+                                                            .clip(RoundedCornerShape(8.dp))
+                                                            .border(
+                                                                width = if (isSelected) 2.dp else 1.dp,
+                                                                color = if (isSelected) colorVibrant else Color.Gray.copy(alpha = 0.5f),
+                                                                shape = RoundedCornerShape(8.dp)
+                                                            )
+                                                            .background(if (isSelected) colorVibrant.copy(alpha=0.15f) else Color.Transparent)
+                                                            .clickable { onStyleChange(style, styleNames[style] ?: style.name) }
+                                                    ) {
+                                                        // Draw the wave preview in center
+                                                        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                            WavePreview(style = style, color = if (isSelected) colorVibrant else Color.Gray)
+                                                        }
                                                     }
+                                                    
+                                                    // The animated star placed outside the clip bounds
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Star,
+                                                        contentDescription = "Favorite",
+                                                        tint = if (isFavorite) colorVibrant else Color.Gray.copy(alpha = 0.3f),
+                                                        modifier = Modifier
+                                                            .align(Alignment.TopEnd)
+                                                            .offset(x = 6.dp, y = (-6).dp)
+                                                            .graphicsLayer {
+                                                                scaleX = starScale
+                                                                scaleY = starScale
+                                                            }
+                                                            .size(24.dp)
+                                                            .clickable { 
+                                                                val newSet = favoriteVisualizerStyles.toMutableSet()
+                                                                if (isFavorite) newSet.remove(style.name) else newSet.add(style.name)
+                                                                prefs.favoriteVisualizerStyles = newSet
+                                                            }
+                                                    )
                                                 }
-                                                drawPath(basePath, color = Color(0xFF222222))
-                                                drawPath(basePath, color.copy(alpha = 0.5f), style = androidx.compose.ui.graphics.drawscope.Stroke(1.5f))
+                                                Spacer(modifier = Modifier.height(6.dp))
+                                                Text(
+                                                    text = styleNames[style] ?: style.name,
+                                                    color = if (isSelected) colorVibrant else Color.Gray,
+                                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal),
+                                                    maxLines = 1,
+                                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                                )
                                             }
-                                            Spacer(modifier = Modifier.height(12.dp))
-                                            Text(styleNames[style] ?: style.name, color = if (isSelected) colorVibrant else Color.Gray, style = MaterialTheme.typography.labelSmall, maxLines = 1)
+                                        }
+                                        // Fill remaining space if less than 4 items
+                                        if (rowStyles.size < 4) {
+                                            for (i in 0 until (4 - rowStyles.size)) {
+                                                Spacer(modifier = Modifier.weight(1f).padding(horizontal = 4.dp))
+                                            }
                                         }
                                     }
                                 }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        // Pager indicators
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            repeat(pages.size) { iteration ->
+                                val color = if (pagerState.currentPage == iteration) colorVibrant else Color.Gray.copy(alpha = 0.5f)
+                                androidx.compose.foundation.layout.Box(
+                                    modifier = Modifier
+                                        .padding(4.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(color)
+                                        .size(6.dp)
+                                )
                             }
                         }
                     }
@@ -1035,6 +1145,202 @@ fun PlayerSettingsSheet(
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AvatarPreviewDialog(
+    path: String,
+    onDismiss: () -> Unit,
+    onApply: (String) -> Unit,
+    colorVibrant: Color,
+    colorDominant: Color
+) {
+    val bitmap = com.example.beatpulse.ui.components.rememberStreamAvatar(path)
+    val palette = androidx.compose.runtime.remember(bitmap) {
+        bitmap?.let { com.example.beatpulse.utils.extractPaletteFast(it) }
+    }
+    
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = colorDominant),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.padding(16.dp).fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Previsualización de Portada", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
+                        contentDescription = "Preview",
+                        modifier = Modifier.size(200.dp).clip(RoundedCornerShape(8.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    if (palette != null) {
+                        Text("Paleta Generada:", color = Color.LightGray, style = MaterialTheme.typography.labelMedium)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            val colorsToShow = listOf(palette.dominant, palette.vibrant, palette.muted)
+                            colorsToShow.forEach { c ->
+                                Box(modifier = Modifier.size(32.dp).clip(CircleShape).background(c))
+                            }
+                        }
+                    }
+                } else {
+                    Box(modifier = Modifier.size(200.dp).background(Color.DarkGray, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                        Text("Cargando o Error", color = Color.White)
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(24.dp))
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = onDismiss) {
+                        Text("Cancelar", color = Color.White)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = { onApply(path) },
+                        enabled = bitmap != null,
+                        colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
+                    ) {
+                        Text("Aplicar", color = Color.White)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun WavePreview(style: VisualizerStyle, color: Color) {
+    androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+        val w = size.width
+        val h = size.height
+        val path = androidx.compose.ui.graphics.Path()
+        val paintColor = color.copy(alpha = 0.8f)
+
+        when (style) {
+            VisualizerStyle.WAVE -> {
+                path.moveTo(0f, h / 2f)
+                path.quadraticBezierTo(w * 0.25f, 0f, w * 0.5f, h / 2f)
+                path.quadraticBezierTo(w * 0.75f, h, w, h / 2f)
+                drawPath(path, paintColor, style = androidx.compose.ui.graphics.drawscope.Stroke(2f))
+            }
+            VisualizerStyle.BARS, VisualizerStyle.BANDS -> {
+                val barW = w / 7f
+                val spacing = barW * 0.5f
+                val heights = listOf(0.4f, 0.7f, 0.5f, 0.9f, 0.6f)
+                var x = (w - (barW * 5 + spacing * 4)) / 2f
+                for (ratio in heights) {
+                    val barH = h * ratio
+                    drawRoundRect(
+                        color = paintColor,
+                        topLeft = androidx.compose.ui.geometry.Offset(x, h - barH),
+                        size = androidx.compose.ui.geometry.Size(barW, barH),
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(2f, 2f)
+                    )
+                    x += barW + spacing
+                }
+            }
+            VisualizerStyle.RINGS -> {
+                drawCircle(color = paintColor, radius = h * 0.35f, center = center, style = androidx.compose.ui.graphics.drawscope.Stroke(2f))
+                drawCircle(color = paintColor.copy(alpha = 0.4f), radius = h * 0.15f, center = center)
+            }
+            VisualizerStyle.DOTS, VisualizerStyle.PARTICLES -> {
+                val dotR = w * 0.08f
+                drawCircle(color = paintColor, radius = dotR, center = androidx.compose.ui.geometry.Offset(w * 0.2f, h * 0.7f))
+                drawCircle(color = paintColor, radius = dotR * 1.5f, center = androidx.compose.ui.geometry.Offset(w * 0.5f, h * 0.3f))
+                drawCircle(color = paintColor, radius = dotR * 0.8f, center = androidx.compose.ui.geometry.Offset(w * 0.8f, h * 0.6f))
+                drawCircle(color = paintColor.copy(alpha=0.5f), radius = dotR * 1.2f, center = androidx.compose.ui.geometry.Offset(w * 0.35f, h * 0.5f))
+            }
+            VisualizerStyle.SLIME -> {
+                path.moveTo(0f, h * 0.8f)
+                path.quadraticBezierTo(w * 0.2f, h * 0.4f, w * 0.5f, h * 0.7f)
+                path.quadraticBezierTo(w * 0.8f, h * 1.0f, w, h * 0.5f)
+                path.lineTo(w, h)
+                path.lineTo(0f, h)
+                path.close()
+                drawPath(path, paintColor)
+            }
+            VisualizerStyle.AURA -> {
+                drawCircle(
+                    brush = androidx.compose.ui.graphics.Brush.radialGradient(
+                        colors = listOf(paintColor, Color.Transparent),
+                        center = center,
+                        radius = h * 0.6f
+                    ),
+                    radius = h * 0.6f,
+                    center = center
+                )
+            }
+            VisualizerStyle.TERRAIN -> {
+                path.moveTo(0f, h)
+                path.lineTo(w * 0.2f, h * 0.5f)
+                path.lineTo(w * 0.5f, h * 0.8f)
+                path.lineTo(w * 0.8f, h * 0.3f)
+                path.lineTo(w, h * 0.9f)
+                path.lineTo(w, h)
+                path.close()
+                drawPath(path, paintColor, style = androidx.compose.ui.graphics.drawscope.Stroke(2f))
+            }
+            VisualizerStyle.STAR -> {
+                path.moveTo(w * 0.5f, 0f)
+                path.lineTo(w * 0.65f, h * 0.35f)
+                path.lineTo(w, h * 0.4f)
+                path.lineTo(w * 0.75f, h * 0.65f)
+                path.lineTo(w * 0.85f, h)
+                path.lineTo(w * 0.5f, h * 0.8f)
+                path.lineTo(w * 0.15f, h)
+                path.lineTo(w * 0.25f, h * 0.65f)
+                path.lineTo(0f, h * 0.4f)
+                path.lineTo(w * 0.35f, h * 0.35f)
+                path.close()
+                drawPath(path, paintColor, style = androidx.compose.ui.graphics.drawscope.Stroke(2f))
+            }
+            VisualizerStyle.OSCILLOSCOPE -> {
+                path.moveTo(0f, h / 2f)
+                var cx = 0f
+                while(cx < w) {
+                    val y = h/2f + kotlin.math.sin(cx / 4f) * (h/3f)
+                    path.lineTo(cx, y)
+                    cx += 4f
+                }
+                drawPath(path, paintColor, style = androidx.compose.ui.graphics.drawscope.Stroke(1.5f))
+            }
+            VisualizerStyle.TRAP_NATION -> {
+                drawCircle(color = paintColor, radius = h * 0.25f, center = center, style = androidx.compose.ui.graphics.drawscope.Stroke(3f))
+                val outerRadius = h * 0.35f
+                for (i in 0..7) {
+                    val angle = (i * 45) * (kotlin.math.PI / 180)
+                    val sx = center.x + kotlin.math.cos(angle).toFloat() * (h * 0.25f)
+                    val sy = center.y + kotlin.math.sin(angle).toFloat() * (h * 0.25f)
+                    val ex = center.x + kotlin.math.cos(angle).toFloat() * outerRadius
+                    val ey = center.y + kotlin.math.sin(angle).toFloat() * outerRadius
+                    drawLine(color = paintColor, start = androidx.compose.ui.geometry.Offset(sx, sy), end = androidx.compose.ui.geometry.Offset(ex, ey), strokeWidth = 4f)
+                }
+            }
+            VisualizerStyle.SIDE_PERSPECTIVE_BANDS -> {
+                val barW = w / 4f
+                val spacing = barW * 0.2f
+                val heights = listOf(0.8f, 0.6f, 0.4f)
+                var x = (w - (barW * 3 + spacing * 2)) / 2f
+                for ((i, ratio) in heights.withIndex()) {
+                    val barH = h * ratio
+                    val skew = (2 - i) * 2f
+                    path.moveTo(x - skew, h)
+                    path.lineTo(x, h - barH)
+                    path.lineTo(x + barW, h - barH)
+                    path.lineTo(x + barW - skew, h)
+                    path.close()
+                    drawPath(path, paintColor)
+                    x += barW + spacing
                 }
             }
         }

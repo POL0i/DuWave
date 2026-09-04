@@ -65,12 +65,17 @@ actual fun rememberStreamAvatar(uri: String?): ImageBitmap? {
         LaunchedEffect(uri) {
             try {
                 withContext(Dispatchers.IO) {
-                    val bytes = URL(uri).readBytes()
+                    val bytes = if (uri.startsWith("http") || uri.startsWith("file://")) {
+                        URL(uri).readBytes()
+                    } else {
+                        File(uri).readBytes()
+                    }
                     val imageBitmap = Image.makeFromEncoded(bytes).toComposeImageBitmap()
                     thumbnailCache[uri] = imageBitmap
                     bitmap = imageBitmap
                 }
             } catch (e: Exception) {
+                e.printStackTrace()
                 noArtSet.add(uri)
             }
         }

@@ -8,7 +8,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlaylistAdd
+import androidx.compose.material.icons.automirrored.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.CastConnected
 import androidx.compose.ui.draw.alpha
@@ -239,7 +239,6 @@ private fun PlayerScreenContent(
 ) {
         val currentTrack = state.currentTrack
     val currentQueue = state.currentQueue
-    val paletteColors = state.paletteColors
     val bottomPadding = state.bottomPadding
     val prefs = state.prefs
     val sleepTimerSeconds = state.sleepTimerSeconds
@@ -304,6 +303,18 @@ private fun PlayerScreenContent(
     } else {
         currentTrack?.let { com.example.beatpulse.ui.components.rememberFullAlbumArt(it) }
     }
+    
+    var localPalette by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<com.example.beatpulse.theme.PaletteColors?>(null) }
+    androidx.compose.runtime.LaunchedEffect(albumArtBitmap) {
+        if (albumArtBitmap != null) {
+            localPalette = com.example.beatpulse.utils.extractPaletteFast(albumArtBitmap)
+        } else {
+            localPalette = null
+        }
+    }
+    
+    val paletteColors = localPalette ?: state.paletteColors
+    
     val streamConfigUiVisible by playerViewModel.streamConfigUiVisible.collectAsState()
     val isWifiStreamActive by playerViewModel.isWifiStreamActive.collectAsState()
     val wifiStreamFps by playerViewModel.wifiStreamFps.collectAsState()
@@ -822,8 +833,10 @@ fun PlayerTerrainBackground(
         val midOpacity = (0.4f + midMult * 0.3f + reactivity * 0.2f).coerceIn(0f, 1f)
         val highOpacity = (0.5f + trebleMult * 0.2f + reactivity * 0.2f).coerceIn(0f, 1f)
         
-        val numZ = 24
-        val numX = 40
+        val isMobile = com.example.beatpulse.utils.SystemUtils.isMobilePlatform
+        // EXTREME OPTIMIZATION: Grid restored to 14x20 to keep peaks visible, but we remove the fill entirely on mobile for max FPS
+        val numZ = if (isMobile) 14 else 24
+        val numX = if (isMobile) 20 else 40
         
         if (terrainState.history.size != numZ * numX) {
             terrainState.history = FloatArray(numZ * numX)
@@ -907,16 +920,17 @@ fun PlayerTerrainBackground(
         }
 
            fun drawTerrainLayer(color: androidx.compose.ui.graphics.Color, isTop: Boolean, opacityMult: Float, pulseMult: Float) {
-            val ampMult = if (isTop) 2.5f else 5.0f // Top mountains are smaller
+            val ampMult = if (isTop) 2.5f else 5.0f
 
             fun project(x: Float, y: Float, z: Float): androidx.compose.ui.geometry.Offset {
-                val scale = h * 0.9f / z
+                val scale = h * 1.4f / z // Perspectiva incrementada (antes 0.9f)
                 val px = w / 2f + x * scale
-                val horizonOffset = h * 0.12f // Separate horizon to not overlap cover art
-                val cameraY = 1.2f // Elevate camera so the floor spreads out into a proper grid
+                val horizonOffset = h * 0.12f // Separación del horizonte
+                val cameraY = 1.0f // Cámara un poco más baja para acentuar profundidad
                 
-                // Pulse the Y height dynamically with the music!
-                val pulsedY = y * pulseMult
+                // Pulse the Y height dynamically with the music! 
+                // Increased global bounce multiplier (1.5x) for more reaction
+                val pulsedY = y * pulseMult * 1.5f
                 
                 // Floor (+Y goes down on screen). Ceiling (-Y goes up).
                 val screenY = if (isTop) {
@@ -927,7 +941,7 @@ fun PlayerTerrainBackground(
                     baseScreenY + cameraY * scale - pulsedY * ampMult * scale
                 }
                 return androidx.compose.ui.geometry.Offset(px, screenY)
-            }       
+            }
 
             val strokeColor = color.copy(alpha = opacityMult)
             
@@ -958,6 +972,10 @@ fun PlayerTerrainBackground(
                 val b = highColor.blue * hW + midColor.blue * mW + bassColor.blue * bW
                 return androidx.compose.ui.graphics.Color(r, g, b, 1f)
             }
+            
+            // ULTRA OPTIMIZATION: Combine entire wireframe into a single Path and draw ONCE with a solid color.
+            // Eliminates 14+ JNI drawPath calls per frame and removes heavy Skia gradient shaders entirely.
+            terrainSharedLinePath.reset()
 
             // Draw back-to-front for proper painter's algorithm occlusion.
             for (zi in 0 until numZ - 1) {
@@ -974,86 +992,112 @@ fun PlayerTerrainBackground(
                 
                 if (fadeBack <= 0.01f && fadeFront <= 0.01f) continue
 
-                // 1. Draw filled quads
-                for (xi in 0 until numX - 1) {
-                    val elBL = terrainState.history[zi * numX + xi] * growBack
-                    val elBR = terrainState.history[zi * numX + xi + 1] * growBack
-                    val elFL = terrainState.history[(zi + 1) * numX + xi] * growFront
-                    val elFR = terrainState.history[(zi + 1) * numX + xi + 1] * growFront
-                    
-                    val xL = (xi.toFloat() / (numX - 1)) * 6f - 3f
-                    val xR = ((xi + 1).toFloat() / (numX - 1)) * 6f - 3f
+                // 1. Draw filled geometry
+                if (isMobile) {
+                    // ULTRA OPTIMIZATION FOR MOBILE: 
+                    // To guarantee 60 FPS on weak hardware, we skip drawing the filled quad entirely
+                    // and just draw the wireframe neon lines (holographic grid effect).
+                } else {
+                    for (xi in 0 until numX - 1) {
+                        val elBL = terrainState.history[zi * numX + xi] * growBack
+                        val elBR = terrainState.history[zi * numX + xi + 1] * growBack
+                        val elFL = terrainState.history[(zi + 1) * numX + xi] * growFront
+                        val elFR = terrainState.history[(zi + 1) * numX + xi + 1] * growFront
+                        
+                        val xL = (xi.toFloat() / (numX - 1)) * 4f - 2f
+                        val xR = ((xi + 1).toFloat() / (numX - 1)) * 4f - 2f
 
-                    val ptBL = project(xL, elBL, zBack)
-                    val ptBR = project(xR, elBR, zBack)
-                    val ptFL = project(xL, elFL, zFront)
-                    val ptFR = project(xR, elFR, zFront)
+                        val ptBL = project(xL, elBL, zBack)
+                        val ptBR = project(xR, elBR, zBack)
+                        val ptFL = project(xL, elFL, zFront)
+                        val ptFR = project(xR, elFR, zFront)
 
-                    val quadPath = androidx.compose.ui.graphics.Path().apply {
-                        moveTo(ptBL.x, ptBL.y)
-                        lineTo(ptBR.x, ptBR.y)
-                        lineTo(ptFR.x, ptFR.y)
-                        lineTo(ptFL.x, ptFL.y)
-                        close()
+                        terrainSharedQuadPath.reset()
+                        terrainSharedQuadPath.moveTo(ptBL.x, ptBL.y)
+                        terrainSharedQuadPath.lineTo(ptBR.x, ptBR.y)
+                        terrainSharedQuadPath.lineTo(ptFR.x, ptFR.y)
+                        terrainSharedQuadPath.lineTo(ptFL.x, ptFL.y)
+                        terrainSharedQuadPath.close()
+
+                        // Vary color based on elevation for 3D depth effect
+                        val avgY = (elBL + elBR + elFL + elFR) / 4f
+                        val intensity = (avgY / 2.5f).coerceIn(0f, 1f)
+                        
+                        val avgNeon = getNeonColor(xi)
+                        
+                        // Blend quad color with neon based on elevation
+                        val baseFill = androidx.compose.ui.graphics.lerp(
+                            paletteColors.darkMuted,
+                            avgNeon,
+                            intensity * 0.4f
+                        )
+                        // Blend quad color with background based on fadeBack (creates horizon fog effect)
+                        val quadFill = androidx.compose.ui.graphics.lerp(
+                            paletteColors.dominant,
+                            baseFill,
+                            fadeBack
+                        ).copy(alpha = 1.0f)
+
+                        drawPath(terrainSharedQuadPath, color = quadFill, style = androidx.compose.ui.graphics.drawscope.Fill)
                     }
-
-                    // Vary color based on elevation for 3D depth effect
-                    val avgY = (elBL + elBR + elFL + elFR) / 4f
-                    val intensity = (avgY / 2.5f).coerceIn(0f, 1f)
-                    
-                    val avgNeon = getNeonColor(xi)
-                    
-                    // Blend quad color with neon based on elevation
-                    val baseFill = androidx.compose.ui.graphics.lerp(
-                        paletteColors.darkMuted,
-                        avgNeon,
-                        intensity * 0.4f
-                    )
-                    // Blend quad color with background based on fadeBack (creates horizon fog effect)
-                    val quadFill = androidx.compose.ui.graphics.lerp(
-                        paletteColors.dominant,
-                        baseFill,
-                        fadeBack
-                    ).copy(alpha = 1.0f)
-
-                    drawPath(quadPath, color = quadFill, style = androidx.compose.ui.graphics.drawscope.Fill)
                 }
 
-                // 2. Draw wireframe for this row
-                val linePath = androidx.compose.ui.graphics.Path()
+                // 2. Add to master wireframe path
+                // Draw all horizontal lines first
                 var first = true
                 for (xi in 0 until numX) {
-                    val elB = terrainState.history[zi * numX + xi] * growBack
-                    val elF = terrainState.history[(zi + 1) * numX + xi] * growFront
-                    
-                    val x = (xi.toFloat() / (numX - 1)) * 6f - 3f
-
+                    // Multiplicamos la elevación x1.5 para picos más pronunciados y visibles
+                    val elB = terrainState.history[zi * numX + xi] * growBack * 1.5f
+                    // Comprimimos el ancho total de 6 a 4 unidades (-2 a 2)
+                    val x = (xi.toFloat() / (numX - 1)) * 4f - 2f
                     val ptB = project(x, elB, zBack)
-                    val ptF = project(x, elF, zFront)
-
-                    // Horizontal line along the back
                     if (first) {
-                        linePath.moveTo(ptB.x, ptB.y)
+                        terrainSharedLinePath.moveTo(ptB.x, ptB.y)
                         first = false
                     } else {
-                        linePath.lineTo(ptB.x, ptB.y)
+                        terrainSharedLinePath.lineTo(ptB.x, ptB.y)
                     }
-
-                    // Vertical line from back to front
-                    linePath.moveTo(ptB.x, ptB.y)
-                    linePath.lineTo(ptF.x, ptF.y)
-                    linePath.moveTo(ptF.x, ptF.y) // Move cursor to front so next lineTo doesn't connect diagonal
                 }
-                
-                val gradientColors = List(numX) { getNeonColor(it).copy(alpha = opacityMult * fadeBack) }
-                val lineBrush = androidx.compose.ui.graphics.Brush.horizontalGradient(
-                    colors = gradientColors,
-                    startX = 0f,
-                    endX = w
-                )
-                
-                drawPath(linePath, brush = lineBrush, style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+
+                // Draw all vertical lines
+                for (xi in 0 until numX) {
+                    val elB = terrainState.history[zi * numX + xi] * growBack * 1.5f
+                    val elF = terrainState.history[(zi + 1) * numX + xi] * growFront * 1.5f
+                    val x = (xi.toFloat() / (numX - 1)) * 4f - 2f
+                    val ptB = project(x, elB, zBack)
+                    val ptF = project(x, elF, zFront)
+                    terrainSharedLinePath.moveTo(ptB.x, ptB.y)
+                    terrainSharedLinePath.lineTo(ptF.x, ptF.y)
+                }
             }
+            
+            // Draw the very front horizontal line
+            val lastZ = numZ - 1
+            val zFront = lastZ.toFloat() - scrollZ
+            var firstFront = true
+            for (xi in 0 until numX) {
+                val elF = terrainState.history[lastZ * numX + xi] * 1.5f // Fully grown, taller
+                val x = (xi.toFloat() / (numX - 1)) * 4f - 2f
+                val ptF = project(x, elF, zFront)
+                if (firstFront) {
+                    terrainSharedLinePath.moveTo(ptF.x, ptF.y)
+                    firstFront = false
+                } else {
+                    terrainSharedLinePath.lineTo(ptF.x, ptF.y)
+                }
+            }
+            
+            // Draw the master wireframe with a single blazing-fast native call.
+            // Used a thicker stroke (4f on mobile) and solid bright color to make the lines pop as requested.
+            drawPath(
+                terrainSharedLinePath,
+                color = color,
+                alpha = (opacityMult * 1.5f).coerceIn(0.5f, 1f), // Siempre visible, nunca muy oscuro
+                style = androidx.compose.ui.graphics.drawscope.Stroke(
+                    width = if (isMobile) 4f else 2f, 
+                    join = androidx.compose.ui.graphics.StrokeJoin.Round
+                )
+            )
         }
 
         if (visualizerArchetype == 1) {
@@ -1064,8 +1108,9 @@ fun PlayerTerrainBackground(
             drawTerrainLayer(neonColor, isTop = true, opacityMult = midOpacity, pulseMult = midPulse)
             drawTerrainLayer(neonColor, isTop = false, opacityMult = bassOpacity, pulseMult = bassPulse)
         } else {
-            drawTerrainLayer(paletteColors.dominant, false, bassOpacity, 1f)
-            drawTerrainLayer(paletteColors.muted, true, highOpacity, 1f)
+            // Siempre forzar colores vibrantes para la malla de modo ahorro de recursos
+            drawTerrainLayer(paletteColors.vibrant, false, bassOpacity, 1f)
+            drawTerrainLayer(paletteColors.vibrant, true, highOpacity, 1f)
         }
     }
 }
@@ -1123,7 +1168,7 @@ private fun PlayerTrackInfoHeader(
                     ) { state ->
                         when (state) {
                             0 -> IconButton(onClick = onAddToPlaylist, modifier = Modifier.padding(end = 8.dp).size(36.dp).clip(CircleShape).background(paletteColors.dominant.copy(alpha = 0.5f))) {
-                                Icon(imageVector = Icons.Default.PlaylistAdd, contentDescription = "Añadir a Playlist", tint = colorVibrant, modifier = Modifier.size(20.dp))
+                                Icon(imageVector = Icons.AutoMirrored.Filled.PlaylistAdd, contentDescription = "Añadir a Playlist", tint = colorVibrant, modifier = Modifier.size(20.dp))
                             }
                             1 -> IconButton(onClick = onToggleMicMode, modifier = Modifier.padding(end = 8.dp).size(36.dp).clip(CircleShape).background(paletteColors.dominant.copy(alpha = 0.5f))) {
                                 Icon(imageVector = Icons.Default.Mic, contentDescription = "Modo Streamer", tint = colorVibrant, modifier = Modifier.size(20.dp))
@@ -1224,54 +1269,60 @@ private fun ColumnScope.PlayerVisualizerArea(
         modifier = Modifier
             .then(areaModifier)
             .fillMaxWidth()
-            .pointerInput(abRepeatModeEnabled) {
-                detectDragGestures(
-                    onDragStart = { currentDragAction = DragAction.NONE; lastAngle = null; accumulatedAngle = 0f; dragSeekTimeMs = currentPosition },
-                    onDragEnd = {
-                        if (currentDragAction == DragAction.DJ_SEEK) { dragSeekTimeMs?.let { playerViewModel.seekTo(it) } }
-                        coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }
-                        currentDragAction = DragAction.NONE; lastAngle = null; dragSeekTimeMs = null
-                    },
-                    onDragCancel = { currentDragAction = DragAction.NONE; coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }; lastAngle = null; dragSeekTimeMs = null }
-                ) { change, dragAmount ->
-                    change.consume()
-                    val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
-                    val touchPos = change.position
-                    if (currentDragAction == DragAction.NONE) {
-                        if (dragAmount.y < -15f && abs(dragAmount.x) < 20f && touchPos.y > center.y) { currentDragAction = DragAction.OPEN_QUEUE; onShowQueue(); if (showPlaylistSwipeTutorial) onDismissPlaylistSwipeTutorial() }
-                        else if (abs(dragAmount.x) > 5f || abs(dragAmount.y) > 5f) { currentDragAction = DragAction.DJ_SEEK; val dx = touchPos.x - center.x; val dy = touchPos.y - center.y; lastAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f }
-                    }
-                    if (currentDragAction == DragAction.DJ_SEEK) {
-                        val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
-                        val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
-                        val prevAngle = lastAngle
-                        if (prevAngle != null) {
-                            var deltaAngle = currentAngle - prevAngle; if (deltaAngle > 180f) deltaAngle -= 360f; if (deltaAngle < -180f) deltaAngle += 360f
-                            accumulatedAngle += deltaAngle
-                            if (abs(accumulatedAngle) >= 10f) { /* audioManager click */ accumulatedAngle = 0f }
-                            val seekMs = (deltaAngle / 360f) * 120000f
-                            val current = dragSeekTimeMs ?: currentPosition; val maxDuration = if (duration > 0) duration else Long.MAX_VALUE; dragSeekTimeMs = (current + seekMs.toLong()).coerceIn(0L, maxDuration); if (showVinylSeekTutorial) onDismissVinylSeekTutorial() 
-                            coroutineScope.launch { coverRotationAnim.snapTo(coverRotationAnim.value + deltaAngle) }
-                            if (Math.random() < 0.5) { val vx = (Math.random().toFloat() - 0.5f) * 15f; val vy = (Math.random().toFloat() - 0.5f) * 15f; sparks.add(Spark(playheadPos.x, playheadPos.y, vx, vy, 1f, if (Math.random() < 0.5) paletteColors.vibrant else paletteColors.dominant)) }
+            .then(
+                if (coverDragEnabled) Modifier
+                else Modifier.pointerInput(abRepeatModeEnabled) {
+                    detectDragGestures(
+                        onDragStart = { currentDragAction = DragAction.NONE; lastAngle = null; accumulatedAngle = 0f; dragSeekTimeMs = currentPosition },
+                        onDragEnd = {
+                            if (currentDragAction == DragAction.DJ_SEEK) { dragSeekTimeMs?.let { playerViewModel.seekTo(it) } }
+                            coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }
+                            currentDragAction = DragAction.NONE; lastAngle = null; dragSeekTimeMs = null
+                        },
+                        onDragCancel = { currentDragAction = DragAction.NONE; coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }; lastAngle = null; dragSeekTimeMs = null }
+                    ) { change, dragAmount ->
+                        change.consume()
+                        val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
+                        val touchPos = change.position
+                        if (currentDragAction == DragAction.NONE) {
+                            if (dragAmount.y < -15f && abs(dragAmount.x) < 20f && touchPos.y > center.y) { currentDragAction = DragAction.OPEN_QUEUE; onShowQueue(); if (showPlaylistSwipeTutorial) onDismissPlaylistSwipeTutorial() }
+                            else if (abs(dragAmount.x) > 5f || abs(dragAmount.y) > 5f) { currentDragAction = DragAction.DJ_SEEK; val dx = touchPos.x - center.x; val dy = touchPos.y - center.y; lastAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f }
                         }
-                        lastAngle = currentAngle
+                        if (currentDragAction == DragAction.DJ_SEEK) {
+                            val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
+                            val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
+                            val prevAngle = lastAngle
+                            if (prevAngle != null) {
+                                var deltaAngle = currentAngle - prevAngle; if (deltaAngle > 180f) deltaAngle -= 360f; if (deltaAngle < -180f) deltaAngle += 360f
+                                accumulatedAngle += deltaAngle
+                                if (abs(accumulatedAngle) >= 10f) { /* audioManager click */ accumulatedAngle = 0f }
+                                val seekMs = (deltaAngle / 360f) * 120000f
+                                val current = dragSeekTimeMs ?: currentPosition; val maxDuration = if (duration > 0) duration else Long.MAX_VALUE; dragSeekTimeMs = (current + seekMs.toLong()).coerceIn(0L, maxDuration); if (showVinylSeekTutorial) onDismissVinylSeekTutorial() 
+                                coroutineScope.launch { coverRotationAnim.snapTo(coverRotationAnim.value + deltaAngle) }
+                                if (Math.random() < 0.5) { val vx = (Math.random().toFloat() - 0.5f) * 15f; val vy = (Math.random().toFloat() - 0.5f) * 15f; sparks.add(Spark(playheadPos.x, playheadPos.y, vx, vy, 1f, if (Math.random() < 0.5) paletteColors.vibrant else paletteColors.dominant)) }
+                            }
+                            lastAngle = currentAngle
+                        }
                     }
                 }
-            }
-            .pointerInput(abRepeatModeEnabled) {
-                detectTapGestures(
-                    onDoubleTap = { offset ->
-                        if (showNextPrevTutorial) onDismissNextPrevTutorial()
-                        if (offset.x < size.width / 2) { playerViewModel.seekToPrevious(); coroutineScope.launch { onFeedbackPrevTrack(true); delay(400); onFeedbackPrevTrack(false) } }
-                        else { playerViewModel.seekToNext(); coroutineScope.launch { onFeedbackNextTrack(true); delay(400); onFeedbackNextTrack(false) } }
-                    },
-                    onPress = {
-                        val job = coroutineScope.launch { delay(300); playerViewModel.setSpeed(2f) }
-                        tryAwaitRelease(); job.cancel()
-                        playerViewModel.setSpeed(1f)
-                    }
-                )
-            },
+            )
+            .then(
+                if (coverDragEnabled) Modifier
+                else Modifier.pointerInput(abRepeatModeEnabled) {
+                    detectTapGestures(
+                        onDoubleTap = { offset ->
+                            if (showNextPrevTutorial) onDismissNextPrevTutorial()
+                            if (offset.x < size.width / 2) { playerViewModel.seekToPrevious(); coroutineScope.launch { onFeedbackPrevTrack(true); delay(400); onFeedbackPrevTrack(false) } }
+                            else { playerViewModel.seekToNext(); coroutineScope.launch { onFeedbackNextTrack(true); delay(400); onFeedbackNextTrack(false) } }
+                        },
+                        onPress = {
+                            val job = coroutineScope.launch { delay(300); playerViewModel.setSpeed(2f) }
+                            tryAwaitRelease(); job.cancel()
+                            playerViewModel.setSpeed(1f)
+                        }
+                    )
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         // OSCILLOSCOPE BACKGROUND (Behind cover)
@@ -1323,7 +1374,13 @@ private fun ColumnScope.PlayerVisualizerArea(
             
             Box(
                 modifier = Modifier
+                    .offset { androidx.compose.ui.unit.IntOffset(coverOffsetX.toInt(), coverOffsetY.toInt()) }
                     .size(160.dp)
+                    .graphicsLayer {
+                        scaleX = animatedScaleAnim.value * coverScale
+                        scaleY = animatedScaleAnim.value * coverScale
+                        if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value
+                    }
                     .then(
                         if (coverDragEnabled) {
                             Modifier.pointerInput(Unit) {
@@ -1339,31 +1396,27 @@ private fun ColumnScope.PlayerVisualizerArea(
                             }
                         } else Modifier
                     )
-                    .graphicsLayer {
-                        translationX = coverOffsetX
-                        translationY = coverOffsetY
-                        scaleX = animatedScaleAnim.value * coverScale
-                        scaleY = animatedScaleAnim.value * coverScale
-                        if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value
-                    }
-                    .clip(shape)
-                    .background(colorDominant.copy(alpha = 0.5f))
-                    .pointerInput(Unit) {
-                        detectTapGestures(
-                            onTap = { playerViewModel.togglePlayPause() },
-                            onDoubleTap = { offset ->
-                                if (showSeek10sTutorial) onDismissSeek10sTutorial()
-                                if (offset.x < size.width / 2) {
-                                playerViewModel.seekTo((currentPosition - 10000).coerceAtLeast(0))
-                                coroutineScope.launch { onFeedbackSeekLeft(true); delay(400); onFeedbackSeekLeft(false) }
-                            } else {
-                                playerViewModel.seekTo((currentPosition + 10000).coerceAtMost(duration))
-                                coroutineScope.launch { onFeedbackSeekRight(true); delay(400); onFeedbackSeekRight(false) }
-                            }
+                    .then(
+                        if (coverDragEnabled) Modifier
+                        else Modifier.pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { playerViewModel.togglePlayPause() },
+                                onDoubleTap = { offset ->
+                                    if (showSeek10sTutorial) onDismissSeek10sTutorial()
+                                    if (offset.x < size.width / 2) {
+                                        playerViewModel.seekTo((currentPosition - 10000).coerceAtLeast(0))
+                                        coroutineScope.launch { onFeedbackSeekLeft(true); delay(400); onFeedbackSeekLeft(false) }
+                                    } else {
+                                        playerViewModel.seekTo((currentPosition + 10000).coerceAtMost(duration))
+                                        coroutineScope.launch { onFeedbackSeekRight(true); delay(400); onFeedbackSeekRight(false) }
+                                    }
+                                }
+                            )
                         }
                     )
-                }
-                .onGloballyPositioned { coordinates ->
+                    .clip(shape)
+                    .background(colorDominant.copy(alpha = 0.5f))
+                    .onGloballyPositioned { coordinates ->
                     val yOffset = coordinates.positionInRoot().y
                     val height = coordinates.size.height
                     val centerY = yOffset + (height / 2f)
@@ -1481,7 +1534,7 @@ fun PlayerOscilloscope(
         val currentXRot = kotlin.math.sin(timeDelta * 0.5f) * 0.4f
         val currentYRot = kotlin.math.cos(timeDelta * 0.7f) * 0.4f
         val currentZRot = ringAngle + timeDelta * 2.0f
-        val numPoints = 120
+        val numPoints = if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) 60 else 120
         
         for (ring in 0 until numRings) {
             val ringT = ring.toFloat() / numRings
@@ -1560,7 +1613,7 @@ fun PlayerOscilloscope(
         val currentXRot = kotlin.math.sin(timeDelta * 0.5f) * 0.4f
         val currentYRot = kotlin.math.cos(timeDelta * 0.7f) * 0.4f
         val currentZRot = ringAngle + timeDelta * 1.5f
-        val numPoints = 250 // Increased for smoother knot
+        val numPoints = if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) 90 else 250 // Reduced for mobile
         
         var prevX = 0f
         var prevY = 0f
@@ -1646,6 +1699,10 @@ private val sidePerspectiveXLArr = FloatArray(256)
 private val sidePerspectiveYLArr = FloatArray(256)
 private val sidePerspectiveXRArr = FloatArray(256)
 private val sidePerspectiveYRArr = FloatArray(256)
+
+// Pre-allocated paths for Terrain 3D to avoid massive object allocation (100k+/sec)
+private val terrainSharedQuadPath = androidx.compose.ui.graphics.Path()
+private val terrainSharedLinePath = androidx.compose.ui.graphics.Path()
 private val sidePerspectivePathLeft = androidx.compose.ui.graphics.Path()
 private val sidePerspectivePathRight = androidx.compose.ui.graphics.Path()
 private val sidePerspectivePathFill = androidx.compose.ui.graphics.Path()

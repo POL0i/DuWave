@@ -97,6 +97,12 @@ class PlayerViewModel(
     override val shuffleModeEnabled: MutableStateFlow<Boolean> = MutableStateFlow(false)
     override val playbackSpeed: MutableStateFlow<Float> = MutableStateFlow(1.0f)
 
+    override fun setRepeatMode(mode: Int) {
+        repeatMode.value = mode
+        PreferencesManager.getInstance(context).repeatMode = mode
+        _playerState.value?.repeatMode = mode
+    }
+
     private val _playbackPitch = MutableStateFlow(1.0f)
     override val playbackPitch: StateFlow<Float> = _playbackPitch
 
@@ -171,7 +177,13 @@ class PlayerViewModel(
         val wifiStreamCustomHeight = MutableStateFlow(1080)
     }
 
-    fun updateStreamAvatar(uri: String?) {
+    override val availableAudioDevices = MutableStateFlow<List<String>>(emptyList())
+    override val selectedAudioDevice = MutableStateFlow<String?>(null)
+    override fun selectAudioDevice(name: String?) {
+        selectedAudioDevice.value = name
+    }
+
+    override fun updateStreamAvatar(uri: String?) {
         PreferencesManager.getInstance(context).streamAvatarUri = uri
         streamAvatarUri.value = uri
         if (isMicModeActive.value && uri != null) {

@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -22,7 +23,7 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Cloud
@@ -53,15 +54,63 @@ import androidx.compose.material.icons.filled.MoreVert
 import com.example.beatpulse.ui.components.rememberAlbumArt
 import com.example.beatpulse.ui.components.rememberAlbumArt
 import com.example.beatpulse.ui.components.rememberTrackPalette
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
+import kotlin.math.abs
 import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.foundation.isSystemInDarkTheme
 
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import com.example.beatpulse.recognition.MusicRecognizer
+import com.example.beatpulse.recognition.RecognizedTrack
+
+@Composable
+fun MicVisualizer(progress: Float, amplitude: Float, color: Color) {
+    val barCount = 12
+    val animatedAmplitudes = remember { List(barCount) { Animatable(0.1f) } }
+
+    LaunchedEffect(amplitude) {
+        animatedAmplitudes.forEachIndexed { index, animatable ->
+            launch {
+                val distanceFromCenter = abs(index - barCount / 2f)
+                val scale = (1f - (distanceFromCenter / (barCount / 2f))).coerceAtLeast(0.3f)
+                val targetValue = if (amplitude > 10f) {
+                    val normalizedAmp = (amplitude / 1200f).coerceIn(0f, 1f)
+                    val baseScale = 0.5f + Math.random().toFloat() * 1.5f
+                    (normalizedAmp * scale * baseScale).coerceIn(0.15f, 1f)
+                } else {
+                    0.1f
+                }
+                animatable.animateTo(
+                    targetValue = targetValue,
+                    animationSpec = tween(durationMillis = 100)
+                )
+            }
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().height(60.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        animatedAmplitudes.forEachIndexed { index, animatable ->
+            val isFilled = (index.toFloat() / barCount) <= progress
+            val barColor = if (isFilled) color else Color.Gray.copy(alpha = 0.3f)
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 4.dp)
+                    .width(8.dp)
+                    .fillMaxHeight(animatable.value)
+                    .background(color = barColor, shape = RoundedCornerShape(4.dp))
+            )
+        }
+    }
+}
 
 @Composable
 fun LibraryScreen(
@@ -98,6 +147,19 @@ fun LibraryScreen(
     var trackPendingDownload by remember { mutableStateOf<TrackEntity?>(null) }
     var trackToDelete by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingTrim by remember { mutableStateOf<TrackEntity?>(null) }
+
+    var isListeningForMusic by remember { mutableStateOf(false) }
+    var listeningProgress by remember { mutableFloatStateOf(0f) }
+    var listeningAmplitude by remember { mutableFloatStateOf(0f) }
+    val musicRecognizer = remember { MusicRecognizer() }
+    var recognitionResult by remember { mutableStateOf<RecognizedTrack?>(null) }
+    var recognitionError by remember { mutableStateOf<String?>(null) }
+
+    val shazamApiUnavailableStr = getLocalizedString("shazam_api_unavailable")
+    val shazamMicDeniedStr = getLocalizedString("shazam_mic_denied")
+    val shazamIndieWarningStr = getLocalizedString("shazam_indie_warning")
+    val shazamNoMatchStr = getLocalizedString("shazam_no_match")
+    val shazamUnknownErrorStr = getLocalizedString("shazam_unknown_error")
 
     val trackDeletedStr = getLocalizedString("track_deleted")
     val deleteLauncher = com.example.beatpulse.ui.utils.rememberTrackDeleteHandler(onDeleted = {
@@ -184,7 +246,7 @@ fun LibraryScreen(
                 contentColor = colorVibrant,
                 indicator = { tabPositions ->
                     if (selectedTabIndex < tabPositions.size) {
-                        TabRowDefaults.Indicator(
+                        TabRowDefaults.SecondaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),
                             color = colorVibrant,
                             height = 3.dp
@@ -431,7 +493,7 @@ fun LibraryScreen(
         ) {
              Box {
                  IconButton(onClick = { isSortMenuExpanded = true }) {
-                     Icon(Icons.Default.Sort, contentDescription = "Sort", tint = colorVibrant)
+                     Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort", tint = colorVibrant)
                  }
                  androidx.compose.material3.MaterialTheme(
                      colorScheme = androidx.compose.material3.MaterialTheme.colorScheme.copy(
@@ -490,6 +552,52 @@ fun LibraryScreen(
                              unfocusedBorderColor = Color.Transparent
                          )
                      )
+                     if (isSearchingOnline) {
+                         fun startRecognition() {
+                             scope.launch {
+                                 recognitionResult = null
+                                 recognitionError = null
+                                 isListeningForMusic = true
+                                 listeningProgress = 0f
+                                 
+                                 val isAvailable = musicRecognizer.checkAvailability()
+                                 if (!isAvailable) {
+                                     isListeningForMusic = false
+                                     recognitionError = shazamApiUnavailableStr
+                                     return@launch
+                                 }
+                                 
+                                 val result = musicRecognizer.recognizeMusic { progress, amplitude ->
+                                     listeningProgress = progress
+                                     listeningAmplitude = amplitude
+                                 }
+                                 isListeningForMusic = false
+                                 
+                                 result.fold(
+                                     onSuccess = { track ->
+                                         recognitionResult = track
+                                     },
+                                     onFailure = { error ->
+                                         recognitionError = when {
+                                             error.message?.contains("micrófono", ignoreCase = true) == true ||
+                                             error.message?.contains("permission", ignoreCase = true) == true ||
+                                             error.message?.contains("denegado", ignoreCase = true) == true ->
+                                                 shazamMicDeniedStr
+                                             error.message?.contains("No match", ignoreCase = true) == true ->
+                                                 shazamNoMatchStr
+                                             else -> error.message ?: shazamUnknownErrorStr
+                                         }
+                                     }
+                                 )
+                             }
+                         }
+                         
+                         IconButton(onClick = {
+                             startRecognition()
+                         }) {
+                             Icon(Icons.Default.Mic, contentDescription = "Reconocer Canción", tint = colorVibrant)
+                         }
+                     }
                      IconButton(onClick = onRescan) {
                          Icon(Icons.Default.Refresh, contentDescription = "Rescan", tint = colorVibrant)
                      }
@@ -609,6 +717,120 @@ fun LibraryScreen(
                     viewModel.updateTrackCover(track, newPath)
                     trackToChangeCover = null
                 }
+            )
+        }
+
+        // Listening dialog
+        if (isListeningForMusic) {
+            AlertDialog(
+                onDismissRequest = { /* Modal, espera a que termine */ },
+                title = { Text(getLocalizedString("shazam_listening_title"), color = dynamicTextColor) },
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(64.dp), tint = colorVibrant)
+                        Spacer(Modifier.height(16.dp))
+                        Text(getLocalizedString("shazam_listening_desc"), color = dynamicTextColor, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        Spacer(Modifier.height(16.dp))
+                        MicVisualizer(progress = listeningProgress, amplitude = listeningAmplitude, color = colorVibrant)
+                    }
+                },
+                confirmButton = { },
+                containerColor = paletteColors.dominant
+            )
+        }
+
+        // Recognition success dialog
+        recognitionResult?.let { track ->
+            AlertDialog(
+                onDismissRequest = { recognitionResult = null },
+                title = { Text(getLocalizedString("shazam_found_title"), color = dynamicTextColor) },
+                icon = { Icon(Icons.Default.Mic, contentDescription = null, tint = colorVibrant) },
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text(track.title, color = dynamicTextColor, fontWeight = FontWeight.Bold, fontSize = 18.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        Spacer(Modifier.height(4.dp))
+                        Text(track.artist, color = dynamicTextColor.copy(alpha = 0.7f), fontSize = 14.sp)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        viewModel.searchQuery.value = "${track.title} ${track.artist} audio"
+                        recognitionResult = null
+                    }) {
+                        Text(getLocalizedString("shazam_search_button"), color = colorVibrant)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { recognitionResult = null }) {
+                        Text(getLocalizedString("cancel"), color = dynamicTextColor.copy(alpha = 0.7f))
+                    }
+                },
+                containerColor = paletteColors.dominant
+            )
+        }
+
+        // Recognition error dialog
+        recognitionError?.let { errorMsg ->
+            AlertDialog(
+                onDismissRequest = { recognitionError = null },
+                title = { Text(getLocalizedString("shazam_error_title"), color = dynamicTextColor) },
+                icon = { Icon(Icons.Default.Mic, contentDescription = null, tint = Color.Red.copy(alpha = 0.7f)) },
+                text = {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                        Text(errorMsg, color = dynamicTextColor, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        Spacer(Modifier.height(8.dp))
+                        if (errorMsg == shazamNoMatchStr) {
+                            Text(shazamIndieWarningStr, color = dynamicTextColor.copy(alpha = 0.7f), fontSize = 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        recognitionError = null
+                        // Retry: trigger recognition again
+                        scope.launch {
+                            recognitionResult = null
+                            recognitionError = null
+                            isListeningForMusic = true
+                            listeningProgress = 0f
+                            val isAvailable = musicRecognizer.checkAvailability()
+                            if (!isAvailable) {
+                                isListeningForMusic = false
+                                recognitionError = shazamApiUnavailableStr
+                                return@launch
+                            }
+                            val result = musicRecognizer.recognizeMusic { progress, amplitude ->
+                                listeningProgress = progress
+                                listeningAmplitude = amplitude
+                            }
+                            isListeningForMusic = false
+                            result.fold(
+                                onSuccess = { track ->
+                                    recognitionResult = track
+                                },
+                                onFailure = { error ->
+                                    recognitionError = when {
+                                        error.message?.contains("micrófono", ignoreCase = true) == true ||
+                                        error.message?.contains("permission", ignoreCase = true) == true ||
+                                        error.message?.contains("denegado", ignoreCase = true) == true ->
+                                            shazamMicDeniedStr
+                                        error.message?.contains("No match", ignoreCase = true) == true ->
+                                            shazamNoMatchStr
+                                        else -> error.message ?: shazamUnknownErrorStr
+                                    }
+                                }
+                            )
+                        }
+                    }) {
+                        Text(getLocalizedString("shazam_retry_button"), color = colorVibrant)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { recognitionError = null }) {
+                        Text(getLocalizedString("cancel"), color = dynamicTextColor.copy(alpha = 0.7f))
+                    }
+                },
+                containerColor = paletteColors.dominant
             )
         }
     }

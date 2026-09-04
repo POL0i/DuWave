@@ -25,6 +25,10 @@ interface IPreferencesManager {
     var isPatreonUnlocked: Boolean
     val isPatreonUnlockedFlow: StateFlow<Boolean>
     var showFps: Boolean
+    val favoriteBackgroundStylesFlow: StateFlow<Set<Int>>
+    var favoriteBackgroundStyles: Set<Int>
+    val favoriteVisualizerStylesFlow: StateFlow<Set<String>>
+    var favoriteVisualizerStyles: Set<String>
 }
 
 interface IAudioVisualizerManager {
@@ -89,6 +93,8 @@ interface IPlayerViewModel {
     val effectsPreset: StateFlow<String>
     val currentPosition: StateFlow<Long>
     val duration: StateFlow<Long>
+
+    fun setRepeatMode(mode: Int)
 
     fun seekTo(position: Long)
     fun seekToNext()

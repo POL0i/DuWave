@@ -29,19 +29,36 @@ actual object SystemUtils {
     }
 
     actual fun pickImageFile(): String? {
-        val chooser = javax.swing.JFileChooser()
-        chooser.fileSelectionMode = javax.swing.JFileChooser.FILES_ONLY
-        chooser.fileFilter = javax.swing.filechooser.FileNameExtensionFilter("Imágenes", "jpg", "jpeg", "png")
-        if (chooser.showOpenDialog(null) == javax.swing.JFileChooser.APPROVE_OPTION) {
-            return chooser.selectedFile.absolutePath
+        val fileDialog = java.awt.FileDialog(java.awt.Frame(), "Seleccionar imagen", java.awt.FileDialog.LOAD)
+        fileDialog.isVisible = true
+        val file = fileDialog.file
+        val dir = fileDialog.directory
+        return if (file != null && dir != null) {
+            dir + file
+        } else {
+            null
         }
-        return null
     }
+
+    actual val isMobilePlatform: Boolean = false
 }
 
 @androidx.compose.runtime.Composable
 actual fun SystemBackHandler(onBack: () -> Unit) {
     // En Desktop no hay un botón físico de atrás global por defecto, pero podríamos capturar ESC
+}
+
+@androidx.compose.runtime.Composable
+actual fun SystemImagePicker(
+    onFileSelected: (String?) -> Unit,
+    colorDominant: androidx.compose.ui.graphics.Color,
+    colorVibrant: androidx.compose.ui.graphics.Color
+) {
+    com.example.beatpulse.ui.components.ComposeImagePicker(
+        onFileSelected = onFileSelected,
+        colorDominant = colorDominant,
+        colorVibrant = colorVibrant
+    )
 }
 
 private val desktopStrings = mapOf(

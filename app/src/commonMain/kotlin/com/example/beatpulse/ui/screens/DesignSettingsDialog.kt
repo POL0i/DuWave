@@ -28,9 +28,12 @@ import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.material.icons.filled.Crop
 import androidx.compose.material.icons.filled.CropSquare
 import androidx.compose.material.icons.filled.RoundedCorner
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -48,6 +51,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.shape.GenericShape
 
 private val DummyVisualizerManager = object : IAudioVisualizerManager {
     override val bassAmplitudes: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0))
@@ -64,6 +68,34 @@ private val DummyVisualizerManager = object : IAudioVisualizerManager {
     override val trebleMultiplier: MutableStateFlow<Float> = MutableStateFlow(1f)
     override val visualizerArchetype: MutableStateFlow<Int> = MutableStateFlow(0)
     override val fftMode: MutableStateFlow<String> = MutableStateFlow("")
+}
+
+val DiamondShape = GenericShape { size, _ ->
+    moveTo(size.width / 2f, 0f)
+    lineTo(size.width, size.height / 2f)
+    lineTo(size.width / 2f, size.height)
+    lineTo(0f, size.height / 2f)
+    close()
+}
+
+val HexagonShape = GenericShape { size, _ ->
+    moveTo(size.width / 2f, 0f)
+    lineTo(size.width, size.height * 0.25f)
+    lineTo(size.width, size.height * 0.75f)
+    lineTo(size.width / 2f, size.height)
+    lineTo(0f, size.height * 0.75f)
+    lineTo(0f, size.height * 0.25f)
+    close()
+}
+
+val CathedralShape = GenericShape { size, _ ->
+    moveTo(size.width / 2f, 0f)
+    quadraticTo(size.width, 0f, size.width, size.height * 0.4f)
+    lineTo(size.width, size.height)
+    lineTo(0f, size.height)
+    lineTo(0f, size.height * 0.4f)
+    quadraticTo(0f, 0f, size.width / 2f, 0f)
+    close()
 }
 
 @Composable
@@ -132,9 +164,13 @@ fun DesignSettingsDialog(
                     styles.add(11 to "Terraria")
                     styles.add(12 to "Zen Clear")
                     styles.add(13 to "Mareas de Arena")
+                    styles.add(15 to ((getLocalizedString("style_retro_crt").takeIf { it != "style_retro_crt" } ?: "Retro CRT") + "\nby Kabuto"))
+                    styles.add(16 to "Procedural CRT")
                 }
                 
-                val chunkedStyles = styles.chunked(4)
+                val favoriteStyles by prefs.favoriteBackgroundStylesFlow.collectAsState()
+                val sortedStyles = styles.sortedByDescending { it.first in favoriteStyles }
+                val chunkedStyles = sortedStyles.chunked(4)
                 val pagerState = rememberPagerState(pageCount = { chunkedStyles.size })
                 
                 Row(
@@ -166,10 +202,7 @@ fun DesignSettingsDialog(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        val shapeIndices = mutableListOf(0, 1, 2, 3)
-                        if (isPatreonUnlocked) {
-                            shapeIndices.addAll(listOf(4, 5, 6))
-                        }
+                        val shapeIndices = listOf(0, 1, 2, 3, 4, 5, 6)
                         
                         shapeIndices.forEach { idx ->
                             val isSelected = currentShapeIdx == idx
@@ -177,9 +210,9 @@ fun DesignSettingsDialog(
                                 1 -> androidx.compose.ui.graphics.RectangleShape
                                 2 -> RoundedCornerShape(4.dp)
                                 3 -> RoundedCornerShape(8.dp)
-                                4 -> CutCornerShape(topStart = 16.dp, bottomEnd = 16.dp)
-                                5 -> RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
-                                6 -> CutCornerShape(8.dp)
+                                4 -> CathedralShape
+                                5 -> DiamondShape
+                                6 -> HexagonShape
                                 else -> CircleShape
                             }
                             
@@ -221,11 +254,18 @@ fun DesignSettingsDialog(
                                     val idx = item.first
                                     val name = item.second
                                     val isSelected = currentBgStyle == idx
+                                    val isFavorite = idx in favoriteStyles
                                     
                                     StyleGridItem(
                                         idx = idx,
                                         name = name,
                                         isSelected = isSelected,
+                                        isFavorite = isFavorite,
+                                        onToggleFavorite = {
+                                            val newFavorites = favoriteStyles.toMutableSet()
+                                            if (isFavorite) newFavorites.remove(idx) else newFavorites.add(idx)
+                                            prefs.favoriteBackgroundStyles = newFavorites
+                                        },
                                         paletteColors = paletteColors,
                                         dynamicTextColor = dynamicTextColor,
                                         prefs = prefs
@@ -239,14 +279,16 @@ fun DesignSettingsDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(top = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Left spacer to push dots to center relative to the available space
-                            Spacer(modifier = Modifier.weight(1f))
+                            // Empty box for left spacing to match the close button width
+                            Box(modifier = Modifier.weight(1f))
                             
                             // Dots
-                            Row(horizontalArrangement = Arrangement.Center) {
+                            Row(
+                                modifier = Modifier.weight(2f),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
                                 repeat(chunkedStyles.size) { iteration ->
                                     val color = if (pagerState.currentPage == iteration) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.3f)
                                     Box(
@@ -287,10 +329,21 @@ fun StyleGridItem(
     idx: Int,
     name: String,
     isSelected: Boolean,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
     paletteColors: PaletteColors,
     dynamicTextColor: Color,
     prefs: AppPreferences
 ) {
+    val starScale by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isFavorite) 1.2f else 1.0f,
+        animationSpec = androidx.compose.animation.core.spring(
+            dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+            stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+        ),
+        label = "starScale"
+    )
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -301,41 +354,66 @@ fun StyleGridItem(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(115.dp) // Estirado para rellenar el espacio vacío
-                .clip(RoundedCornerShape(12.dp))
-                .border(
-                    width = if (isSelected) 3.dp else 1.dp,
-                    color = if (isSelected) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(12.dp)
-                )
+                .height(85.dp)
         ) {
-            // Real preview using the component
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (idx) {
-                    1 -> CyberpunkBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    2 -> AnimeBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    3 -> LuminousBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    4 -> Y2KBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    5 -> DarkAmbientBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    6 -> GothicFantasyBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    7 -> CathedralFantasyBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    8 -> TaleLegendBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    9 -> RetroWallBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    10 -> FountainBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    11 -> TerrariaWaterBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    12 -> ZenClearBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    13 -> SandsFlowBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    14 -> com.example.beatpulse.ui.components.backgrounds.LullabyEyesBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
-                    else -> Box(modifier = Modifier.fillMaxSize().background(paletteColors.dominant))
+            // The clipped container for the preview
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(end = 6.dp, top = 6.dp) // Leave room for the star to bleed out
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(
+                        width = if (isSelected) 3.dp else 1.dp,
+                        color = if (isSelected) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+            ) {
+                // Real preview using the component
+                Box(modifier = Modifier.fillMaxSize()) {
+                    when (idx) {
+                        1 -> CyberpunkBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        2 -> AnimeBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        3 -> LuminousBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        4 -> Y2KBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        5 -> DarkAmbientBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        6 -> GothicFantasyBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        7 -> CathedralFantasyBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        8 -> TaleLegendBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        9 -> RetroWallBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        10 -> FountainBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        11 -> TerrariaWaterBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        12 -> ZenClearBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        13 -> SandsFlowBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        14 -> com.example.beatpulse.ui.components.backgrounds.LullabyEyesBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        15 -> com.example.beatpulse.ui.components.backgrounds.RetroCRTBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = 0.5f, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = false) {}
+                        16 -> com.example.beatpulse.ui.components.backgrounds.ProceduralCRTCdc3rxBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = 0.5f, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = false) {}
+                        else -> Box(modifier = Modifier.fillMaxSize().background(paletteColors.dominant))
+                    }
                 }
             }
+            
+            // The animated star placed outside the clip bounds
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = "Favorite",
+                tint = if (isFavorite) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.3f),
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 6.dp, y = (-6).dp)
+                    .graphicsLayer {
+                        scaleX = starScale
+                        scaleY = starScale
+                    }
+                    .size(24.dp)
+                    .clickable { onToggleFavorite() }
+            )
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = name,
             style = MaterialTheme.typography.bodySmall.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal),
             color = if (isSelected) paletteColors.vibrant else dynamicTextColor,
-            maxLines = 1,
+            maxLines = 2,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
     }

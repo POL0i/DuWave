@@ -38,71 +38,43 @@ import com.example.beatpulse.theme.PaletteColors
 import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
 import com.example.beatpulse.ui.LocalCoverOffset
 
+// Radial tunnel shader — anonymous author (GLSL Sandbox)
 private const val LUMINOUS_SHADER_SRC = """
     uniform float2 iResolution;
     uniform float iTime;
     uniform float iEnergy;
     uniform half4 colorVibrant;
     uniform half4 colorLightVibrant;
-    uniform float iOffsetX;
-    uniform float iOffsetY;
-    
-    // Hash function for random values
-    float hash12(float2 p) {
-        float3 p3  = fract(float3(p.xyx) * .1031);
-        p3 += dot(p3, p3.yzx + 33.33);
-        return fract((p3.x + p3.y) * p3.z);
-    }
+    uniform float iCenterX;
+    uniform float iCenterY;
     
     half4 main(float2 fragCoord) {
-                float2 uv = (fragCoord.xy + float2(iOffsetX * iResolution.y, iOffsetY * iResolution.y)) / iResolution.xy;
-        float2 uv_screen = (fragCoord.xy - 0.5 * iResolution.xy) / iResolution.y;
-        float r_screen = length(uv_screen);
-        float2 p = uv * 2.0 - 1.0;
-        p.x *= iResolution.x / iResolution.y;
+        float2 centerPx = float2(iCenterX, iCenterY);
+        float2 uv = (fragCoord.xy - centerPx) / (0.5 * iResolution.y);
         
-        float2 p_screen = uv_screen * 2.0 - 1.0;
-        p_screen.x *= iResolution.x / iResolution.y;
+        // Gentle drift
+        uv += float2(cos(iTime * 0.25), sin(iTime * 0.5)) * 0.4;
         
-        half3 col = half3(0.0, 0.0, 0.0);
+        float u = sqrt(dot(uv, uv));
+        float v = atan(uv.y, uv.x);
         
-        float time = iTime * 0.15 + iEnergy * 0.5;
+        float t = iTime + 1.0 / u;
         
-        for (int i = 0; i < 4; i++) {
-            float fi = float(i);
-            float2 q = p * (1.5 - fi * 0.2); // Different scales for depth
-            q.y -= time * (0.4 + fi * 0.15); // Move upwards
-            q.x += sin(time * 0.2 + fi) * 0.2; // Gentle sway
-            
-            float2 id = floor(q);
-            float2 f = fract(q) - 0.5;
-            
-            float r = hash12(id + fi * 10.0);
-            float r2 = hash12(id + fi * 20.0);
-            
-            // Spawn orb if random > threshold
-            if (r > 0.3) {
-                float2 offset = float2(r - 0.5, r2 - 0.5) * 0.4;
-                float d = length(f - offset);
-                
-                float radius = 0.05 + r * 0.1 + iEnergy * 0.05;
-                
-                // Soft glowing edges (Bokeh look)
-                float circle = smoothstep(radius, radius * 0.4, d);
-                float ring = smoothstep(radius, radius * 0.9, d) - smoothstep(radius * 0.9, radius * 0.4, d);
-                
-                float intensity = (0.2 + r * 0.8) * (1.0 + iEnergy * 2.0);
-                
-                half3 orbColor = mix(colorVibrant.rgb, colorLightVibrant.rgb, r2);
-                
-                col += orbColor * (circle * 0.3 + ring * 0.4) * intensity;
-            }
-        }
+        float val_f = smoothstep(0.0, 1.0, sin(5.0 * (iTime + sin(11.0 * u * 3.7)) + 10.0 * v) + cos(t * 10.0));
         
-        // Background gradient based on vibrant color
-        col += mix(half3(0.05, 0.05, 0.05), colorVibrant.rgb * 0.3, 1.0 - min(1.0, length(p_screen * 0.6))) * (1.0 + iEnergy * 0.5);
+        // Ensure baseline brightness for dark palettes
+        half3 brightColor = max(colorVibrant.rgb, vec3(0.15));
+        brightColor = brightColor + (1.0 - brightColor) * 0.15;
         
-        return half4(col, 1.0);
+        half3 dimColor = max(colorLightVibrant.rgb, vec3(0.05)) * 0.15 + vec3(0.05);
+        
+        half3 colour = brightColor * val_f + (0.9 - val_f) * dimColor;
+        colour *= clamp(u / 1.0, 0.0, 1.0);
+        
+        // Energy adds subtle brightness pulse
+        colour *= 1.0 + iEnergy * 0.6;
+        
+        return half4(colour, 1.0);
     }
 """
 
@@ -124,14 +96,16 @@ fun LuminousBackground(
     val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
     
+    var accumulatedTime by remember { mutableFloatStateOf(0f) }
+    
     LaunchedEffect(Unit) {
         var smoothEnergy = 0f
         var lastTime = 0L
         while (true) {
-            withFrameMillis { time ->
-                if (lastTime == 0L) lastTime = time
-                val dt = ((time - lastTime) / 1000f).coerceAtMost(0.1f)
-                lastTime = time
+            withFrameMillis { frameTime ->
+                if (lastTime == 0L) lastTime = frameTime
+                val dt = ((frameTime - lastTime) / 1000f).coerceAtMost(0.1f)
+                lastTime = frameTime
                 
                 val currentAmps = amplitudesState.value
                 var sumAmps = 0f
@@ -141,19 +115,18 @@ fun LuminousBackground(
                 }
                 val rawEnergy = if (limit > 0) sumAmps / limit else 0f
                 
-                smoothEnergy += (rawEnergy - smoothEnergy) * (1f - kotlin.math.exp(-15f * dt))
-                val reactFactor = if (currentIsPlayerScreen) 0.8f else 0.2f
+                // Fluid smoothing
+                smoothEnergy += (rawEnergy - smoothEnergy) * (1f - kotlin.math.exp(-5f * dt))
+                val reactFactor = if (currentIsPlayerScreen) 1.0f else 0.2f
                 dynamicEnergy = smoothEnergy * reactFactor
+                
+                // Fluid accumulated time
+                val baseSpeed = if (currentIsPlayerScreen) 0.05f else 0.02f
+                val energySpeed = dynamicEnergy * 0.4f
+                accumulatedTime += (baseSpeed + energySpeed) * dt
             }
         }
     }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "bokeh_anim")
-    val time by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 100000f,
-        animationSpec = infiniteRepeatable(tween(10000000, easing = LinearEasing), RepeatMode.Restart),
-        label = "time"
-    )
 
     val runtimeShader = remember {
         try { RuntimeEffect.makeForShader(LUMINOUS_SHADER_SRC) } catch (e: Exception) { null }
@@ -172,16 +145,14 @@ fun LuminousBackground(
                 val lVib = lightVibrantState.value
                 
                 val finalSpeed = if (isPlayerScreen) 1.0f else 0.2f
-                val dynamicOffsetX = if (isPlayerScreen) -(currentCoverOffset.x / size.height) else 0f
-                val dynamicOffsetY = if (isPlayerScreen) {
-                    val base = if (currentAlbumArtCenterY != null) ((size.height / 2f) - currentAlbumArtCenterY) / size.height else 0f
-                    base - (currentCoverOffset.y / size.height)
-                } else 0f
+                
+                val centerX = size.width / 2f + currentCoverOffset.x
+                val centerY = (currentAlbumArtCenterY ?: (size.height / 2f)) + currentCoverOffset.y
                 
                 val buffer = ByteBuffer.allocate(56).order(ByteOrder.LITTLE_ENDIAN)
                 buffer.putFloat(size.width)
                 buffer.putFloat(size.height)
-                buffer.putFloat(time * 0.5f * finalSpeed)
+                buffer.putFloat(accumulatedTime * finalSpeed)
                 buffer.putFloat(dynamicEnergy)
                 buffer.putFloat(vib.red)
                 buffer.putFloat(vib.green)
@@ -191,8 +162,8 @@ fun LuminousBackground(
                 buffer.putFloat(lVib.green)
                 buffer.putFloat(lVib.blue)
                 buffer.putFloat(lVib.alpha)
-                buffer.putFloat(dynamicOffsetX)
-                buffer.putFloat(dynamicOffsetY)
+                buffer.putFloat(centerX)
+                buffer.putFloat(centerY)
 
                 val shader = runtimeShader.makeShader(
                     uniforms = Data.makeFromBytes(buffer.array()),

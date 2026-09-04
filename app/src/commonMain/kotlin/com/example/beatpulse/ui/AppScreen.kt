@@ -68,6 +68,7 @@ fun AppScreen(
     val effectsPreset by playerViewModel.effectsPreset.collectAsState()
     val currentPosition by playerViewModel.currentPosition.collectAsState()
     val duration by playerViewModel.duration.collectAsState()
+    val coverDragEnabled by playerViewModel.coverDragEnabled.collectAsState()
     
     val isMicModeActive by playerViewModel.isMicModeActive.collectAsState()
     val streamConfigEffectsVisible by playerViewModel.streamConfigEffectsVisible.collectAsState()
@@ -166,7 +167,8 @@ fun AppScreen(
         ) { innerPadding ->
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier.fillMaxSize(),
+                userScrollEnabled = !coverDragEnabled
             ) { page ->
                 when (page % 3) {
                     0 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize().clipToBounds()) {
@@ -271,6 +273,16 @@ fun AppScreen(
                 12 -> ZenClearBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
                 13 -> SandsFlowBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
                 14 -> com.example.beatpulse.ui.components.backgrounds.LullabyEyesBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                15 -> {
+                    val amps = visualizerManager.combinedAmplitudes.collectAsState().value
+                    val energy = if (amps.isNotEmpty()) amps.average().toFloat() else 0f
+                    com.example.beatpulse.ui.components.backgrounds.RetroCRTBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = energy, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = currentPage == 2) { content() }
+                }
+                16 -> {
+                    val amps = visualizerManager.combinedAmplitudes.collectAsState().value
+                    val energy = if (amps.isNotEmpty()) amps.average().toFloat() else 0f
+                    com.example.beatpulse.ui.components.backgrounds.ProceduralCRTCdc3rxBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = energy, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = currentPage == 2) { content() }
+                }
                 else -> { Box(modifier = Modifier.fillMaxSize().then(bgModifier)) { content() } }
             }
         }
