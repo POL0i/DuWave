@@ -38,3 +38,16 @@ expect fun SystemBackHandler(onBack: () -> Unit)
 
 @androidx.compose.runtime.Composable
 expect fun getLocalizedString(key: String): String
+
+expect suspend fun trimAudioFile(inputPath: String, outputDir: String, outputFileNameBase: String, startMs: Long, endMs: Long): String?
+
+expect fun getAudioDuration(filePath: String): Long
+
+@androidx.compose.runtime.Composable
+expect fun AudioPreviewPlayer(
+    path: String,
+    isPlaying: Boolean,
+    startMs: Long,
+    endMs: Long,
+    onPlaybackCompleted: () -> Unit
+)

@@ -95,6 +95,10 @@ class DummyAppPreferences : AppPreferences {
         set(value) { _isPatreonUnlockedFlow.value = value }
     override var showFps = false
     override var showRemainingTime = false
+    override val favoriteBackgroundStylesFlow: StateFlow<Set<Int>> = MutableStateFlow(emptySet())
+    override var favoriteBackgroundStyles: Set<Int> = emptySet()
+    override val favoriteVisualizerStylesFlow: StateFlow<Set<String>> = MutableStateFlow(emptySet())
+    override var favoriteVisualizerStyles: Set<String> = emptySet()
 }
 
 

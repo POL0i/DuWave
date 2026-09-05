@@ -323,7 +323,7 @@ class DesktopPlayerViewModel(
         shuffleModeEnabled.value = enabled
     }
 
-    fun setRepeatMode(mode: Int) {
+    override fun setRepeatMode(mode: Int) {
         repeatMode.value = mode
     }
 

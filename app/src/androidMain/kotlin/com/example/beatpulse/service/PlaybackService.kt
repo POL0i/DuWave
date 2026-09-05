@@ -103,6 +103,15 @@ class PlaybackService : MediaSessionService() {
         exoPlayer?.addListener(object : androidx.media3.common.Player.Listener {
             override fun onAudioSessionIdChanged(audioSessionId: Int) {
                 audioSessionIdFlow.value = audioSessionId
+                try {
+                    presetReverb?.release()
+                    presetReverb = PresetReverb(0, audioSessionId).apply {
+                        preset = PresetReverb.PRESET_LARGEHALL
+                        enabled = reverbEnabledFlow.value
+                    }
+                } catch (e: Exception) {
+                    presetReverb = null
+                }
             }
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
                 updateWidget()

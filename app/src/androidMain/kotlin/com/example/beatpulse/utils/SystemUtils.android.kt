@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import com.example.beatpulse.BeatPulseApp
+import kotlinx.coroutines.isActive
 
 actual object SystemUtils {
     actual fun showToast(message: String) {
@@ -127,4 +128,88 @@ actual fun getLocalizedString(key: String): String {
     val context = androidx.compose.ui.platform.LocalContext.current
     val resId = context.resources.getIdentifier(key, "string", context.packageName)
     return if (resId != 0) context.getString(resId) else key
+}
+
+actual suspend fun trimAudioFile(inputPath: String, outputDir: String, outputFileNameBase: String, startMs: Long, endMs: Long): String? {
+    return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        com.example.beatpulse.utils.AudioTrimmer.trimAudio(inputPath, outputDir, outputFileNameBase, startMs, endMs)
+    }
+}
+
+actual fun getAudioDuration(filePath: String): Long {
+    var retriever: android.media.MediaMetadataRetriever? = null
+    try {
+        retriever = android.media.MediaMetadataRetriever()
+        retriever.setDataSource(filePath)
+        val durationStr = retriever.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)
+        return durationStr?.toLongOrNull() ?: 0L
+    } catch (e: Exception) {
+        e.printStackTrace()
+        return 0L
+    } finally {
+        try {
+            retriever?.release()
+        } catch (e: Exception) {}
+    }
+}
+
+@androidx.compose.runtime.Composable
+actual fun AudioPreviewPlayer(
+    path: String,
+    isPlaying: Boolean,
+    startMs: Long,
+    endMs: Long,
+    onPlaybackCompleted: () -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val mediaPlayer = androidx.compose.runtime.remember { android.media.MediaPlayer() }
+    
+    androidx.compose.runtime.DisposableEffect(path) {
+        try {
+            mediaPlayer.reset()
+            mediaPlayer.setDataSource(path)
+            mediaPlayer.prepare()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        onDispose {
+            try {
+                mediaPlayer.stop()
+                mediaPlayer.release()
+            } catch (e: Exception) {}
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(isPlaying, startMs) {
+        try {
+            if (isPlaying) {
+                mediaPlayer.seekTo(startMs.toInt())
+                mediaPlayer.start()
+            } else {
+                if (mediaPlayer.isPlaying) {
+                    mediaPlayer.pause()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    // Monitor for reaching endMs
+    androidx.compose.runtime.LaunchedEffect(isPlaying, endMs) {
+        if (isPlaying) {
+            while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+                try {
+                    if (mediaPlayer.isPlaying && mediaPlayer.currentPosition >= endMs) {
+                        mediaPlayer.pause()
+                        onPlaybackCompleted()
+                        break
+                    }
+                } catch (e: Exception) {
+                    break
+                }
+                kotlinx.coroutines.delay(100)
+            }
+        }
+    }
 }

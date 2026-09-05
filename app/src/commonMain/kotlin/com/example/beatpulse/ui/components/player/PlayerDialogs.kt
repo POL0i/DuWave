@@ -72,5 +72,59 @@ fun PlayerEffectsDialog(
     effectsPreset: String, onApplyPreset: (String) -> Unit
 ) {
     if (!showEffectsDialog) return
-    AlertDialog(onDismissRequest = onDismissRequest, confirmButton = { TextButton(onClick = onDismissRequest) { Text("OK") } }, text = { Text("Effects") })
+    AlertDialog(
+        onDismissRequest = onDismissRequest,
+        confirmButton = { TextButton(onClick = onDismissRequest) { Text("OK", color = colorVibrant) } },
+        title = { Text(com.example.beatpulse.utils.getLocalizedString("audio_effects"), color = colorVibrant) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Reverberación", color = Color.White)
+                    Switch(
+                        checked = reverbEnabled,
+                        onCheckedChange = onSetReverb,
+                        colors = SwitchDefaults.colors(checkedThumbColor = colorVibrant, checkedTrackColor = colorDominant)
+                    )
+                }
+                
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(com.example.beatpulse.utils.getLocalizedString("speed_and_pitch") + " - Velocidad: ${String.format("%.2fx", playbackSpeed)}", color = Color.Gray)
+                    Slider(
+                        value = playbackSpeed,
+                        onValueChange = onSetSpeed,
+                        valueRange = 0.5f..2.0f,
+                        colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
+                    )
+                }
+
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(com.example.beatpulse.utils.getLocalizedString("speed_and_pitch") + " - Tono: ${String.format("%.2fx", playbackPitch)}", color = Color.Gray)
+                    Slider(
+                        value = playbackPitch,
+                        onValueChange = onSetPitch,
+                        valueRange = 0.5f..2.0f,
+                        colors = SliderDefaults.colors(thumbColor = colorVibrant, activeTrackColor = colorVibrant)
+                    )
+                }
+                
+                Button(
+                    onClick = {
+                        onSetReverb(false)
+                        onSetSpeed(1.0f)
+                        onSetPitch(1.0f)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = colorDominant),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, colorVibrant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Restablecer a valores por defecto", color = Color.White)
+                }
+            }
+        },
+        containerColor = colorDominant.copy(alpha = 0.95f)
+    )
 }

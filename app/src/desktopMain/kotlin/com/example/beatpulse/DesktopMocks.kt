@@ -65,6 +65,7 @@ class DesktopPlayerViewModel : IPlayerViewModel {
     override val paletteColors: StateFlow<PaletteColors> = MutableStateFlow(PaletteColors())
     override val repeatMode: MutableStateFlow<Int> = MutableStateFlow(0)
     override val shuffleModeEnabled: MutableStateFlow<Boolean> = MutableStateFlow(false)
+    override fun setRepeatMode(mode: Int) {}
     override val playbackSpeed: MutableStateFlow<Float> = MutableStateFlow(1f)
     override val playbackPitch: StateFlow<Float> = MutableStateFlow(1f)
     override val reverbEnabled: StateFlow<Boolean> = MutableStateFlow(false)

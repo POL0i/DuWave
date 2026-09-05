@@ -198,7 +198,9 @@ fun AppScreen(
                         )
                     }
                     2 -> Box(modifier = Modifier.fillMaxSize().clipToBounds()) {
+                        com.example.beatpulse.utils.SystemStatusBarVisibility(visible = pagerState.currentPage != 2)
                         PlayerScreen(
+                            isFocused = pagerState.currentPage == 2,
                             modifier = Modifier,
                             playerViewModel = playerViewModel,
                             dynamicColorsPlus = playerViewModel.dynamicColorsPlus.collectAsState().value,

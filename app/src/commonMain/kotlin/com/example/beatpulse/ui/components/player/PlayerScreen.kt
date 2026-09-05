@@ -197,6 +197,7 @@ fun PlayerScreen(
     equalizerManager: IEqualizerManager,
     state: PlayerScreenState,
     callbacks: PlayerScreenCallbacks,
+    isFocused: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     // Delegate to the internal implementation to keep the top-level function's register count low
@@ -215,6 +216,7 @@ fun PlayerScreen(
         equalizerManager = equalizerManager,
         state = state,
         callbacks = callbacks,
+        isFocused = isFocused,
         modifier = modifier
     )
 }
@@ -236,6 +238,7 @@ private fun PlayerScreenContent(
     equalizerManager: IEqualizerManager,
     state: PlayerScreenState,
     callbacks: PlayerScreenCallbacks,
+    isFocused: Boolean = true,
     modifier: Modifier = Modifier
 ) {
         val currentTrack = state.currentTrack
@@ -413,23 +416,23 @@ private fun PlayerScreenContent(
         onDispose { }
     }
 
-    if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) {
-        com.example.beatpulse.utils.SystemStatusBarVisibility(false)
-    }
-
     var settingsButtonVisible by remember { mutableStateOf(true) }
     var settingsButtonBlink by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        // Blink for 3 seconds
-        repeat(3) {
-            settingsButtonBlink = true
-            delay(500)
+    LaunchedEffect(isFocused) {
+        if (isFocused) {
+            settingsButtonVisible = true
             settingsButtonBlink = false
-            delay(500)
+            // Blink for 3 seconds
+            repeat(3) {
+                settingsButtonBlink = true
+                delay(500)
+                settingsButtonBlink = false
+                delay(500)
+            }
+            // Fade out
+            settingsButtonVisible = false
         }
-        // Fade out
-        settingsButtonVisible = false
     }
 
     val settingsAlpha by androidx.compose.animation.core.animateFloatAsState(

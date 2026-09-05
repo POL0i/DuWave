@@ -136,9 +136,11 @@ class AudioVisualizerManager(private val prefs: AppPreferences) : AppVisualizerM
         val sampleRate = 44100
         val channelConfig = AudioFormat.CHANNEL_IN_MONO
         val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-        val minBufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+        var minBufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
+        if (minBufferSize <= 0) {
+            minBufferSize = 4096 // Fallback
+        }
         
-        // Ensure buffer is large enough for FFT_SIZE (1024 floats = 2048 bytes)
         val bufferSize = maxOf(minBufferSize, 2048)
 
         try {
@@ -149,6 +151,11 @@ class AudioVisualizerManager(private val prefs: AppPreferences) : AppVisualizerM
                 audioFormat,
                 bufferSize
             )
+
+            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
+                Log.e("AudioVisualizerManager", "AudioRecord initialization failed")
+                return
+            }
 
             audioRecord?.startRecording()
 

@@ -225,3 +225,23 @@ private val desktopStrings = mapOf(
 actual fun getLocalizedString(key: String): String {
     return desktopStrings[key] ?: key
 }
+
+actual suspend fun trimAudioFile(inputPath: String, outputDir: String, outputFileNameBase: String, startMs: Long, endMs: Long): String? {
+    return null
+}
+
+actual fun getAudioDuration(filePath: String): Long {
+    // Desktop not implemented
+    return 0L
+}
+
+@androidx.compose.runtime.Composable
+actual fun AudioPreviewPlayer(
+    path: String,
+    isPlaying: Boolean,
+    startMs: Long,
+    endMs: Long,
+    onPlaybackCompleted: () -> Unit
+) {
+    // No-op on desktop
+}
