@@ -185,6 +185,18 @@ fun LibraryScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        com.example.beatpulse.core.focus.AppFocusManager.focusActions.collect { action ->
+            if (prefs.lastMainScreenPage == 1) { // 1 == Global Lists
+                if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT) {
+                    if (selectedTabIndex > 0) selectedTabIndex -= 1
+                } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT) {
+                    if (selectedTabIndex < 2) selectedTabIndex += 1
+                }
+            }
+        }
+    }
+
     LaunchedEffect(onlineSearchQuery, selectedTabIndex) {
         if (selectedTabIndex == 1 && onlineSearchQuery.isNotBlank()) {
             kotlinx.coroutines.delay(500)

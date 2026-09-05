@@ -1,6 +1,6 @@
 package com.example.beatpulse.ui.screens
 import com.example.beatpulse.utils.getLocalizedString
-
+import com.example.beatpulse.core.focus.animatedFocusBorder
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
+import androidx.compose.ui.input.key.*
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -71,6 +72,7 @@ fun UnifiedLibraryScreen(
     val shapeIdx by prefs.thumbnailShapeFlow.collectAsState()
     
     val coroutineScope = rememberCoroutineScope()
+
     val isScanning by viewModel.isScanning.collectAsState()
     val isOnlineServiceDown by viewModel.isOnlineServiceDown.collectAsState()
 
@@ -222,6 +224,7 @@ fun UnifiedLibraryScreen(
                         var showSettingsMenu by remember { mutableStateOf(false) }
                         var showLanguageDialog by remember { mutableStateOf(false) }
                         var showDesignSettings by remember { mutableStateOf(false) }
+                        var showKeyboardSettings by remember { mutableStateOf(false) }
 
                         if (showLanguageDialog) {
                             androidx.compose.material3.AlertDialog(
@@ -314,6 +317,22 @@ fun UnifiedLibraryScreen(
                             )
                         }
 
+                        IconButton(onClick = { showKeyboardSettings = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Keyboard,
+                                contentDescription = "Atajos de Teclado",
+                                tint = paletteColors.vibrant
+                            )
+                        }
+
+                        if (showKeyboardSettings) {
+                            KeyboardSettingsDialog(
+                                onDismiss = { showKeyboardSettings = false },
+                                paletteColors = paletteColors,
+                                prefs = prefs
+                            )
+                        }
+
                         if (showDesignSettings) {
                             DesignSettingsDialog(
                                 prefs = prefs,
@@ -327,9 +346,37 @@ fun UnifiedLibraryScreen(
                     }
                 }
 
-                val pagerState = rememberPagerState(initialPage = prefs.lastLibraryTab, pageCount = { 4 })
+                val pagerState = rememberPagerState(initialPage = prefs.lastLibraryTab.coerceIn(0, 3), pageCount = { 4 })
                 LaunchedEffect(pagerState.currentPage) {
                     prefs.lastLibraryTab = pagerState.currentPage % 4
+                }
+                
+                LaunchedEffect(Unit) {
+                    com.example.beatpulse.core.focus.AppFocusManager.focusActions.collect { action ->
+                        println("DEBUG ACTION [UnifiedLibraryScreen]: Received action: $action, currentPage: ${prefs.lastMainScreenPage}")
+                        if (prefs.lastMainScreenPage == 0) { // Only if we are on the Library screen
+                            println("DEBUG ACTION [UnifiedLibraryScreen]: on library screen, processing action $action.")
+                            if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT) {
+                                val prevPage = (pagerState.currentPage - 1).coerceAtLeast(0)
+                                println("DEBUG ACTION [UnifiedLibraryScreen]: NAVIGATE_LEFT. pagerState.currentPage=${pagerState.currentPage}, prevPage=$prevPage")
+                                if (prevPage != pagerState.currentPage) {
+                                    pagerState.animateScrollToPage(prevPage)
+                                    println("DEBUG ACTION [UnifiedLibraryScreen]: Scrolled left.")
+                                } else {
+                                    println("DEBUG ACTION [UnifiedLibraryScreen]: Blocked scroll left (already at 0).")
+                                }
+                            } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT) {
+                                val nextPage = (pagerState.currentPage + 1).coerceAtMost(3)
+                                println("DEBUG ACTION [UnifiedLibraryScreen]: NAVIGATE_RIGHT. pagerState.currentPage=${pagerState.currentPage}, nextPage=$nextPage")
+                                if (nextPage != pagerState.currentPage) {
+                                    pagerState.animateScrollToPage(nextPage)
+                                    println("DEBUG ACTION [UnifiedLibraryScreen]: Scrolled right.")
+                                } else {
+                                    println("DEBUG ACTION [UnifiedLibraryScreen]: Blocked scroll right (already at max).")
+                                }
+                            }
+                        }
+                    }
                 }
 
                 androidx.compose.material3.ScrollableTabRow(
@@ -371,7 +418,39 @@ fun UnifiedLibraryScreen(
 
                 HorizontalPager(
                     state = pagerState,
-                    modifier = Modifier.fillMaxSize().pointerInput(Unit) {
+                    modifier = Modifier.fillMaxSize()
+                        .onPreviewKeyEvent { event ->
+                            if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
+                                when (event.key) {
+                                    androidx.compose.ui.input.key.Key.DirectionRight -> {
+                                        println("LIBRARY_PAGER: Right arrow intercepted. Shift=${event.isShiftPressed}")
+                                        if (!event.isShiftPressed && !event.isCtrlPressed) {
+                                            coroutineScope.launch {
+                                                val next = (pagerState.currentPage + 1).coerceAtMost(3)
+                                                println("LIBRARY_PAGER: Scrolling to page $next")
+                                                pagerState.animateScrollToPage(next)
+                                            }
+                                            return@onPreviewKeyEvent true
+                                        }
+                                        false
+                                    }
+                                    androidx.compose.ui.input.key.Key.DirectionLeft -> {
+                                        println("LIBRARY_PAGER: Left arrow intercepted. Shift=${event.isShiftPressed}")
+                                        if (!event.isShiftPressed && !event.isCtrlPressed) {
+                                            coroutineScope.launch {
+                                                val prev = (pagerState.currentPage - 1).coerceAtLeast(0)
+                                                println("LIBRARY_PAGER: Scrolling to page $prev")
+                                                pagerState.animateScrollToPage(prev)
+                                            }
+                                            return@onPreviewKeyEvent true
+                                        }
+                                        false
+                                    }
+                                    else -> false
+                                }
+                            } else false
+                        }
+                        .pointerInput(Unit) {
                         awaitPointerEventScope {
                             while(true) {
                                 val event = awaitPointerEvent()

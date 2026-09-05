@@ -125,6 +125,7 @@ fun AlbumsScreen(
                     Row {
                         var showSettingsMenu by remember { mutableStateOf(false) }
                         var showDesignSettings by remember { mutableStateOf(false) }
+                        var showKeyboardSettings by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { showSettingsMenu = true }) {
                                 Icon(Icons.Default.Settings, contentDescription = "Ajustes", tint = paletteColors.vibrant)
@@ -150,6 +151,22 @@ fun AlbumsScreen(
                                 imageVector = Icons.Default.Palette,
                                 contentDescription = "Ajustes de Diseño",
                                 tint = paletteColors.vibrant
+                            )
+                        }
+
+                        IconButton(onClick = { showKeyboardSettings = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Keyboard,
+                                contentDescription = "Atajos de Teclado",
+                                tint = paletteColors.vibrant
+                            )
+                        }
+
+                        if (showKeyboardSettings) {
+                            KeyboardSettingsDialog(
+                                onDismiss = { showKeyboardSettings = false },
+                                paletteColors = paletteColors,
+                                prefs = prefs
                             )
                         }
 

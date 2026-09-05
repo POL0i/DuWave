@@ -2,9 +2,7 @@ package com.example.beatpulse
 
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.key.isAltPressed
-import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.*
 
 import com.example.beatpulse.audio.RealDesktopEqualizerManager
 import com.example.beatpulse.ui.components.player.DesktopPlayerViewModel
@@ -81,48 +79,126 @@ fun main() = application {
         title = "DuWave",
         onPreviewKeyEvent = { keyEvent ->
             if (keyEvent.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
-                if (keyEvent.isAltPressed) {
-                    when (keyEvent.key) {
-                        androidx.compose.ui.input.key.Key.DirectionRight -> {
-                            playerViewModel.seekToNext()
-                            true
-                        }
-                        androidx.compose.ui.input.key.Key.DirectionLeft -> {
-                            playerViewModel.seekToPrevious()
-                            true
-                        }
-                        else -> false
+                val keyName = keyEvent.key.toString()
+                val shift = if (keyEvent.isShiftPressed) "Shift+" else ""
+                val alt = if (keyEvent.isAltPressed) "Alt+" else ""
+                val ctrl = if (keyEvent.isCtrlPressed) "Ctrl+" else ""
+                val meta = if (keyEvent.isMetaPressed) "Meta+" else ""
+                
+                val baseKey = when(keyEvent.key) {
+                    androidx.compose.ui.input.key.Key.DirectionRight -> "DirectionRight"
+                    androidx.compose.ui.input.key.Key.DirectionLeft -> "DirectionLeft"
+                    androidx.compose.ui.input.key.Key.DirectionUp -> "DirectionUp"
+                    androidx.compose.ui.input.key.Key.DirectionDown -> "DirectionDown"
+                    androidx.compose.ui.input.key.Key.Enter, androidx.compose.ui.input.key.Key.NumPadEnter -> "Enter"
+                    androidx.compose.ui.input.key.Key.Spacebar -> "Spacebar"
+                    androidx.compose.ui.input.key.Key.Escape -> "Escape"
+                    androidx.compose.ui.input.key.Key.Tab -> "Tab"
+                    else -> {
+                        val name = keyEvent.key.toString()
+                        var ext = name.substringAfterLast("Key: ").substringBefore(")")
+                        if (!name.contains("Key:")) ext = keyEvent.key.nativeKeyCode.toString()
+                        if (ext.contains("Unknown")) ext = "Unknown"
+                        ext
                     }
+                }
+                
+                val eventStr = "$ctrl$alt$meta$shift$baseKey"
+
+                println("DEBUG KEY: Raw=${keyEvent.key}, Parsed=${eventStr}, Next=${prefs.keyMapNextPage}, Prev=${prefs.keyMapPrevPage}")
+
+                // Global consumption of Arrow keys to prevent Focus Search crashes on desktop Compose Pagers
+                var consumed = false
+
+                if (keyEvent.key == androidx.compose.ui.input.key.Key.Tab) {
+                    if (keyEvent.isShiftPressed) {
+                        com.example.beatpulse.core.focus.AppFocusManager.cycleTabNavigation(currentPage = prefs.lastMainScreenPage, forward = false)
+                    } else {
+                        println("DEBUG ACTION: Tab detected. Current page: ${prefs.lastMainScreenPage}, Forward: true")
+                        com.example.beatpulse.core.focus.AppFocusManager.cycleTabNavigation(currentPage = prefs.lastMainScreenPage, forward = true)
+                    }
+                    consumed = true
+                } else if (com.example.beatpulse.core.focus.AppFocusManager.isTabNavigationActive) {
+                    // Only intercept unmodified arrow keys for focus navigation
+                    if (!keyEvent.isShiftPressed && !keyEvent.isAltPressed && !keyEvent.isCtrlPressed && !keyEvent.isMetaPressed) {
+                        val action = when (keyEvent.key) {
+                            androidx.compose.ui.input.key.Key.DirectionUp -> com.example.beatpulse.core.focus.FocusAction.NAVIGATE_UP
+                            androidx.compose.ui.input.key.Key.DirectionDown -> com.example.beatpulse.core.focus.FocusAction.NAVIGATE_DOWN
+                            androidx.compose.ui.input.key.Key.DirectionLeft -> com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT
+                            androidx.compose.ui.input.key.Key.DirectionRight -> com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT
+                            androidx.compose.ui.input.key.Key.Enter, androidx.compose.ui.input.key.Key.Spacebar -> com.example.beatpulse.core.focus.FocusAction.ACTION_ENTER
+                            else -> null
+                        }
+                        if (action != null) {
+                            println("DEBUG ACTION: isTabNavigationActive=true. Arrow detected: $action")
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(action)
+                            consumed = true
+                        }
+                    }
+                }
+
+                if (!consumed && (keyEvent.key == androidx.compose.ui.input.key.Key.DirectionRight || keyEvent.key == androidx.compose.ui.input.key.Key.DirectionLeft)) {
+                    if (eventStr != prefs.keyMapNextPage && eventStr != prefs.keyMapPrevPage) {
+                        // For now, to prevent the crash, we MUST return true if they are on Library screen and not using Shift.
+                        if (prefs.lastMainScreenPage == 0 || prefs.lastMainScreenPage == 1) { // 0 == Unified Library, 1 == Global Lists
+                            val direction = if (keyEvent.key == androidx.compose.ui.input.key.Key.DirectionRight) 1 else -1
+                            println("DEBUG ACTION: Dispatching Library Navigation. Direction: $direction")
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(
+                                if (direction == 1) com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT 
+                                else com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT
+                            )
+                            consumed = true
+                        } else if (prefs.lastMainScreenPage == 2) { // 2 == Player
+                            // Dispatch explicitly to Player for seeking
+                            val direction = if (keyEvent.key == androidx.compose.ui.input.key.Key.DirectionRight) 1 else -1
+                            println("DEBUG ACTION: Dispatching Player Seeking. Direction: $direction")
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(
+                                if (direction == 1) com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT 
+                                else com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT
+                            )
+                            consumed = true
+                        }
+                    }
+                }
+
+                if (consumed) {
+                    true
                 } else {
-                    when (keyEvent.key) {
-                        androidx.compose.ui.input.key.Key.DirectionRight -> {
-                            println("RIGHT ARROW PRESSED!")
-                            prefs.lastMainScreenPage = (prefs.lastMainScreenPage + 1).coerceAtMost(2)
-                            true
-                        }
-                        androidx.compose.ui.input.key.Key.DirectionLeft -> {
-                            println("LEFT ARROW PRESSED!")
-                            prefs.lastMainScreenPage = (prefs.lastMainScreenPage - 1).coerceAtLeast(0)
-                            true
-                        }
-                        androidx.compose.ui.input.key.Key.Spacebar -> {
-                            playerViewModel.togglePlayPause()
-                            true
-                        }
-                        androidx.compose.ui.input.key.Key.S, androidx.compose.ui.input.key.Key.X, androidx.compose.ui.input.key.Key.C -> {
-                            playerViewModel.triggerStreamConfigDialog()
-                            true
-                        }
-                        androidx.compose.ui.input.key.Key.Escape -> {
-                            playerViewModel.triggerSettingsMenu()
-                            true
-                        }
-                        androidx.compose.ui.input.key.Key.F1 -> {
-                            playerViewModel.triggerSupportDialog()
-                            true
-                        }
-                        else -> false
+                    when (eventStr) {
+                    prefs.keyMapNextPage -> {
+                        prefs.lastMainScreenPage = (prefs.lastMainScreenPage + 1) % 3
+                        true
                     }
+                    prefs.keyMapPrevPage -> {
+                        prefs.lastMainScreenPage = (prefs.lastMainScreenPage + 2) % 3 // equivalent to (val - 1) % 3 safely
+                        true
+                    }
+                    prefs.keyMapPlayPause -> {
+                        playerViewModel.togglePlayPause()
+                        true
+                    }
+                    else -> {
+                        // Fallback global shortcuts for legacy behaviors if needed,
+                        // but avoid capturing plain arrows which are now for focus navigation.
+                        when (keyEvent.key) {
+                            androidx.compose.ui.input.key.Key.S, androidx.compose.ui.input.key.Key.X, androidx.compose.ui.input.key.Key.C -> {
+                                if (keyEvent.isAltPressed) {
+                                    playerViewModel.triggerStreamConfigDialog()
+                                    true
+                                } else false
+                            }
+                            androidx.compose.ui.input.key.Key.Escape -> {
+                                playerViewModel.triggerSettingsMenu()
+                                true
+                            }
+                            androidx.compose.ui.input.key.Key.F1 -> {
+                                playerViewModel.triggerSupportDialog()
+                                true
+                            }
+                            else -> false
+                        }
+                    }
+                }
                 }
             } else false
         }

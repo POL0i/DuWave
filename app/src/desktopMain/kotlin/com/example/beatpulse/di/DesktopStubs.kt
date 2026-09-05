@@ -97,8 +97,22 @@ class DummyAppPreferences : AppPreferences {
     override var showRemainingTime = false
     override val favoriteBackgroundStylesFlow: StateFlow<Set<Int>> = MutableStateFlow(emptySet())
     override var favoriteBackgroundStyles: Set<Int> = emptySet()
-    override val favoriteVisualizerStylesFlow: StateFlow<Set<String>> = MutableStateFlow(emptySet())
+    override val favoriteVisualizerStylesFlow: kotlinx.coroutines.flow.StateFlow<Set<String>> = kotlinx.coroutines.flow.MutableStateFlow(emptySet())
     override var favoriteVisualizerStyles: Set<String> = emptySet()
+
+    // Keyboard Shortcuts
+    override var keyMapNextPage: String = "Shift+DirectionRight"
+    override var keyMapPrevPage: String = "Shift+DirectionLeft"
+    override var keyMapSeekForward: String = "DirectionRight"
+    override var keyMapSeekBackward: String = "DirectionLeft"
+    override var keyMapNavigateUp: String = "DirectionUp"
+    override var keyMapNavigateDown: String = "DirectionDown"
+    override var keyMapNavigateLeft: String = "DirectionLeft"
+    override var keyMapNavigateRight: String = "DirectionRight"
+    override var keyMapTabNext: String = "Tab"
+    override var keyMapTabPrev: String = "Shift+Tab"
+    override var keyMapAction: String = "Enter"
+    override var keyMapPlayPause: String = "Spacebar"
 }
 
 

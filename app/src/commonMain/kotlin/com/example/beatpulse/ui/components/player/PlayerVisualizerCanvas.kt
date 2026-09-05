@@ -59,6 +59,7 @@ fun PlayerVisualizerCanvas(
     activeDraggingHandle: String?,
     animatedScale: Float,
     coverScale: Float,
+    cleanUiMode: Boolean = false,
     onPlayheadPosChanged: (Offset) -> Unit
 ) {
     val basePath = remember { Path() }
@@ -646,7 +647,7 @@ fun PlayerVisualizerCanvas(
         // Progress ring
         val activePosition = dragSeekTimeMs ?: currentPosition
         val progressFraction = if (duration > 0) activePosition.toFloat() / duration else 0f
-        drawPath(path = basePath, color = colorDominant.copy(alpha = 0.3f), style = Stroke(width = 4f))
+        if (!cleanUiMode) drawPath(path = basePath, color = colorDominant.copy(alpha = 0.3f), style = Stroke(width = 4f))
         progressMeasure.setPath(basePath, forceClosed = false)
         val pLen = progressMeasure.length
         progressPath.reset()
@@ -660,7 +661,7 @@ fun PlayerVisualizerCanvas(
                 progressMeasure.getSegment(startD, pLen, progressPath, true)
                 progressMeasure.getSegment(0f, endD % pLen, progressPath, true)
             }
-            drawPath(path = progressPath, brush = sweepGradient, style = Stroke(width = 6f, cap = StrokeCap.Round))
+            if (!cleanUiMode) drawPath(path = progressPath, brush = sweepGradient, style = Stroke(width = 6f, cap = StrokeCap.Round))
             val thumbDist = endD % pLen
             var thumbPos = progressMeasure.getPosition(thumbDist)
             if (thumbnailShapeIdx != 0 && (thumbPos == Offset.Unspecified || thumbPos == Offset.Zero)) {
@@ -671,12 +672,12 @@ fun PlayerVisualizerCanvas(
             }
             if (thumbPos != Offset.Unspecified && thumbPos != Offset.Zero) {
                 onPlayheadPosChanged(thumbPos)
-                drawCircle(color = Color.White, radius = 8f, center = thumbPos)
+                if (!cleanUiMode) drawCircle(color = Color.White, radius = 8f, center = thumbPos)
             }
         }
 
         // A-B Repeat markers
-        if (abRepeatModeEnabled) {
+        if (abRepeatModeEnabled && !cleanUiMode) {
             val getPosFromProgress = { progress: Float ->
                 val pl = progressMeasure.length
                 if (pl <= 0f) center

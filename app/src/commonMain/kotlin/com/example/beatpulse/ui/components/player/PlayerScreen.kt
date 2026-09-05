@@ -185,6 +185,7 @@ val HexagonShape = GenericShape { size, _ ->
 fun PlayerScreen(
     playerViewModel: IPlayerViewModel,
     dynamicColorsPlus: Boolean,
+    activeDynamicColor: Color?,
     dynamicColorsInterval: Int,
     cleanUiMode: Boolean,
     coverDragEnabled: Boolean,
@@ -204,6 +205,7 @@ fun PlayerScreen(
     PlayerScreenContent(
         playerViewModel = playerViewModel,
         dynamicColorsPlus = dynamicColorsPlus,
+        activeDynamicColor = activeDynamicColor,
         dynamicColorsInterval = dynamicColorsInterval,
         cleanUiMode = cleanUiMode,
         coverDragEnabled = coverDragEnabled,
@@ -226,6 +228,7 @@ fun PlayerScreen(
 private fun PlayerScreenContent(
     playerViewModel: IPlayerViewModel,
     dynamicColorsPlus: Boolean,
+    activeDynamicColor: Color?,
     dynamicColorsInterval: Int,
     cleanUiMode: Boolean,
     coverDragEnabled: Boolean,
@@ -270,6 +273,20 @@ private fun PlayerScreenContent(
         )
     }
     LaunchedEffect(currentStyle) { prefs.visualizerStyle = currentStyle.name.lowercase() }
+
+    LaunchedEffect(Unit) {
+        com.example.beatpulse.core.focus.AppFocusManager.focusActions.collect { action ->
+            if (prefs.lastMainScreenPage == 2) {
+                val curPos = playerViewModel.currentPosition.value
+                val maxDuration = playerViewModel.duration.value
+                if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT) {
+                    playerViewModel.seekTo((curPos - 10000).coerceAtLeast(0))
+                } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT) {
+                    playerViewModel.seekTo((curPos + 10000).coerceAtMost(if (maxDuration > 0) maxDuration else Long.MAX_VALUE))
+                }
+            }
+        }
+    }
 
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val currentPosition by playerViewModel.currentPosition.collectAsState()
@@ -343,29 +360,6 @@ private fun PlayerScreenContent(
     val combinedAmplitudesState = visualizerManager.combinedAmplitudes.collectAsState()
     var showAdvancedSettings by remember { mutableStateOf(false) }
 
-    var activeDynamicColor by remember { mutableStateOf<Color?>(null) }
-    LaunchedEffect(dynamicColorsPlus, dynamicColorsInterval, paletteColors) {
-        if (!dynamicColorsPlus) {
-            activeDynamicColor = null
-            return@LaunchedEffect
-        }
-        val colors = listOf(
-            paletteColors.dominant,
-            paletteColors.vibrant,
-            paletteColors.muted
-        )
-        if (colors.isEmpty()) {
-            activeDynamicColor = null
-            return@LaunchedEffect
-        }
-        var index = 0
-        while (true) {
-            activeDynamicColor = colors[index % colors.size]
-            index++
-            kotlinx.coroutines.delay(dynamicColorsInterval * 1000L)
-        }
-    }
-
     val targetColor = if (dynamicColorsPlus && activeDynamicColor != null) activeDynamicColor!! else paletteColors.dominant
     val colorDominant by animateColorAsState(targetColor, animationSpec = androidx.compose.animation.core.tween(3000), label = "color_dom")
     val colorVibrant by animateColorAsState(paletteColors.vibrant, label = "color_vib")
@@ -390,6 +384,24 @@ private fun PlayerScreenContent(
     var showEffectsDialog by remember { mutableStateOf(false) }
     var showEditorDialog by remember { mutableStateOf(false) }
     var showSettingsMenu by remember { mutableStateOf(false) }
+    var isTrackInfoPopupVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        com.example.beatpulse.core.focus.AppFocusManager.focusActions.collect { action ->
+            if (prefs.lastMainScreenPage == 0) { // Only if we are on the Player screen
+                if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT) {
+                    val curPos = playerViewModel.currentPosition.value
+                    playerViewModel.seekTo((curPos - 10000).coerceAtLeast(0))
+                } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT) {
+                    val curPos = playerViewModel.currentPosition.value
+                    val curDur = playerViewModel.duration.value
+                    val maxDuration = if (curDur > 0L) curDur else Long.MAX_VALUE
+                    playerViewModel.seekTo((curPos + 10000).coerceAtMost(maxDuration))
+                }
+            }
+        }
+    }
+
     val coroutineScope = rememberCoroutineScope()
     var showSupportDialog by remember { mutableStateOf(false) }
 
@@ -541,6 +553,7 @@ private fun PlayerScreenContent(
         if (!isMicModeCleanUI) {
             PlayerTrackInfoHeader(
             currentTrack = currentTrack,
+            cleanUiMode = cleanUiMode,
             isMicModeActive = isMicModeActive,
             streamConfigUiVisible = streamConfigUiVisible,
             colorVibrant = colorVibrant,
@@ -623,6 +636,7 @@ private fun PlayerScreenContent(
             coverVisibilityMode = playerViewModel.coverVisibilityMode.collectAsState().value,
             chromaKeyColor = playerViewModel.chromaKeyColor.collectAsState().value,
             coverScale = playerViewModel.coverScale.collectAsState().value,
+            dynamicColorsPlus = dynamicColorsPlus,
             coverOffsetX = playerViewModel.coverOffsetX.collectAsState().value,
             coverOffsetY = playerViewModel.coverOffsetY.collectAsState().value,
             albumArtBitmap = albumArtBitmap,
@@ -728,17 +742,19 @@ private fun PlayerScreenContent(
     }
 
     // Floating Settings Button
-    Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-        IconButton(
-            onClick = { showSettingsMenu = true },
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = 24.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Settings,
-                contentDescription = "Ajustes de reproducción",
-                tint = colorVibrant.copy(alpha = settingsAlpha),
-                modifier = Modifier.size(28.dp)
-            )
+    if (!cleanUiMode) {
+        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+            IconButton(
+                onClick = { showSettingsMenu = true },
+                modifier = Modifier.align(Alignment.TopEnd).padding(top = 24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Ajustes de reproducción",
+                    tint = colorVibrant.copy(alpha = settingsAlpha),
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
     }
 
@@ -1178,6 +1194,7 @@ fun PlayerTerrainBackground(
 @Composable
 private fun PlayerTrackInfoHeader(
     currentTrack: TrackEntity?,
+    cleanUiMode: Boolean,
     isMicModeActive: Boolean, streamConfigUiVisible: Boolean,
     colorVibrant: Color, paletteColors: com.example.beatpulse.theme.PaletteColors,
     abRepeatModeEnabled: Boolean, abPointA: Float, abPointB: Float,
@@ -1205,14 +1222,16 @@ private fun PlayerTrackInfoHeader(
                         }
                     ) {
                         Text(text = track.artist, style = MaterialTheme.typography.bodyMedium, color = colorVibrant, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        val formatTime = { ms: Long -> val s = ms / 1000; String.format("%02d:%02d", s / 60, s % 60) }
-                        val timeText = if (abRepeatModeEnabled) {
-                            val aTime = (abPointA * duration).toLong(); val bTime = (abPointB * duration).toLong()
-                            val posStr = if (showRemainingTime) "-${formatTime(duration - currentPosition)}" else formatTime(currentPosition)
-                            "$posStr / A:${formatTime(aTime)} - B:${formatTime(bTime)}"
-                        } else { if (showRemainingTime) "-${formatTime(duration - currentPosition)} / ${formatTime(duration)}" else "${formatTime(currentPosition)} / ${formatTime(duration)}" }
-                        Text(text = timeText, style = MaterialTheme.typography.bodyMedium, color = colorVibrant)
+                        if (!cleanUiMode) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            val formatTime = { ms: Long -> val s = ms / 1000; String.format("%02d:%02d", s / 60, s % 60) }
+                            val timeText = if (abRepeatModeEnabled) {
+                                val aTime = (abPointA * duration).toLong(); val bTime = (abPointB * duration).toLong()
+                                val posStr = if (showRemainingTime) "-${formatTime(duration - currentPosition)}" else formatTime(currentPosition)
+                                "$posStr / A:${formatTime(aTime)} - B:${formatTime(bTime)}"
+                            } else { if (showRemainingTime) "-${formatTime(duration - currentPosition)} / ${formatTime(duration)}" else "${formatTime(currentPosition)} / ${formatTime(duration)}" }
+                            Text(text = timeText, style = MaterialTheme.typography.bodyMedium, color = colorVibrant)
+                        }
                     }
                 }
                 Row(modifier = Modifier.align(Alignment.CenterStart)) {
@@ -1287,6 +1306,7 @@ private fun ColumnScope.PlayerVisualizerArea(
     coverVisibilityMode: String,
     chromaKeyColor: String,
     coverScale: Float,
+    dynamicColorsPlus: Boolean,
     coverOffsetX: Float,
     coverOffsetY: Float,
     albumArtBitmap: androidx.compose.ui.graphics.ImageBitmap?,
@@ -1295,9 +1315,10 @@ private fun ColumnScope.PlayerVisualizerArea(
     availableLyricsResults: List<Any>, autoAnalyzeLyrics: Boolean,
     showLyricsMatches: Boolean, onShowLyricsMatches: () -> Unit
 ) {
-    var currentDragAction by remember { mutableStateOf(DragAction.NONE) }
+    var currentDragAction by remember { mutableStateOf(com.example.beatpulse.ui.components.player.DragAction.NONE) }
     var lastAngle by remember { mutableStateOf<Float?>(null) }
     var dragSeekTimeMs by remember { mutableStateOf<Long?>(null) }
+
     val coverRotationAnim = remember { androidx.compose.animation.core.Animatable(0f) }
     val sparks = remember { mutableListOf<Spark>() }
     var playheadPos by remember { mutableStateOf(Offset.Zero) }
@@ -1411,7 +1432,7 @@ private fun ColumnScope.PlayerVisualizerArea(
             bassAvg = bassAvg, midAvg = midAvg, trebleAvg = trebleAvg,
             bassOpacity = bassOpacity, midOpacity = midOpacity, highOpacity = highOpacity,
             visualizerArchetype = visualizerArchetype,
-            colorDominant = colorDominant, colorVibrant = colorVibrant, colorMuted = colorMuted,
+                        colorDominant = colorDominant, colorVibrant = colorVibrant, colorMuted = colorMuted,
             paletteColors = paletteColors,
             rotationAngle = rotationAngle, fastRotationAngle = fastRotationAngle,
             currentPosition = currentPosition, duration = duration,
@@ -1421,6 +1442,7 @@ private fun ColumnScope.PlayerVisualizerArea(
             activeDraggingHandle = activeDraggingHandle,
             animatedScale = animatedScaleAnim.value,
             coverScale = coverScale,
+            cleanUiMode = cleanUiMode,
             onPlayheadPosChanged = { playheadPos = it }
         )
           // Central Album Art
@@ -1436,8 +1458,17 @@ private fun ColumnScope.PlayerVisualizerArea(
                     .offset { androidx.compose.ui.unit.IntOffset(coverOffsetX.toInt(), coverOffsetY.toInt()) }
                     .size(160.dp)
                     .graphicsLayer {
-                        scaleX = animatedScaleAnim.value * coverScale
-                        scaleY = animatedScaleAnim.value * coverScale
+                        val baseScale = animatedScaleAnim.value * coverScale
+                        if (dynamicColorsPlus) {
+                            val midPeak = if (midAvg > 0.50f) (midAvg - 0.50f) * 3.0f else 0f
+                            val treblePeak = if (trebleAvg > 0.25f) (trebleAvg - 0.25f) * 4.0f else 0f
+                            
+                            scaleX = baseScale * (1f + treblePeak).coerceAtMost(1.7f)
+                            scaleY = baseScale * (1f + midPeak).coerceAtMost(1.7f)
+                        } else {
+                            scaleX = baseScale
+                            scaleY = baseScale
+                        }
                         if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value
                     }
                     .then(

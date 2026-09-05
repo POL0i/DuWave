@@ -100,4 +100,18 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var favoriteVisualizerStyles: Set<String>
         get() = _favoriteVisualizerStylesFlow.value
         set(value) { _favoriteVisualizerStylesFlow.value = value }
+
+    // Keyboard Shortcuts
+    override var keyMapNextPage: String = "Shift+DirectionRight"
+    override var keyMapPrevPage: String = "Shift+DirectionLeft"
+    override var keyMapSeekForward: String = "DirectionRight"
+    override var keyMapSeekBackward: String = "DirectionLeft"
+    override var keyMapNavigateUp: String = "DirectionUp"
+    override var keyMapNavigateDown: String = "DirectionDown"
+    override var keyMapNavigateLeft: String = "DirectionLeft"
+    override var keyMapNavigateRight: String = "DirectionRight"
+    override var keyMapTabNext: String = "Tab"
+    override var keyMapTabPrev: String = "Shift+Tab"
+    override var keyMapAction: String = "Enter"
+    override var keyMapPlayPause: String = "Spacebar"
 }

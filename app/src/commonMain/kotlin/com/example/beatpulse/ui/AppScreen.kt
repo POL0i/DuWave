@@ -60,7 +60,67 @@ fun AppScreen(
     val isPlaying by playerViewModel.isPlaying.collectAsState()
     val currentTrack by playerViewModel.currentTrack.collectAsState()
     val currentQueue by playerViewModel.currentQueue.collectAsState()
-    val paletteColors by playerViewModel.paletteColors.collectAsState()
+    val paletteColorsFlow by playerViewModel.paletteColors.collectAsState()
+    val cleanUiMode = playerViewModel.cleanUiMode.collectAsState().value
+    val dynamicColorsPlus = playerViewModel.dynamicColorsPlus.collectAsState().value
+    val dynamicColorsInterval = playerViewModel.dynamicColorsInterval.collectAsState().value
+    
+    var activeDynamicColor by remember { mutableStateOf<Color?>(null) }
+    LaunchedEffect(dynamicColorsPlus, dynamicColorsInterval, paletteColorsFlow) {
+        if (!dynamicColorsPlus) {
+            activeDynamicColor = null
+            return@LaunchedEffect
+        }
+        val colors = listOf(
+            paletteColorsFlow.dominant,
+            paletteColorsFlow.vibrant,
+            paletteColorsFlow.lightVibrant,
+            paletteColorsFlow.darkVibrant,
+            paletteColorsFlow.muted,
+            paletteColorsFlow.darkMuted
+        ).distinct().filter { it != Color.Black && it != Color.White && it != Color.Transparent }
+        
+        if (colors.isEmpty()) {
+            activeDynamicColor = null
+            return@LaunchedEffect
+        }
+        
+        val recentColors = mutableListOf<Color>()
+        while (true) {
+            val availableColors = colors.filter { it !in recentColors }
+            val nextColor = if (availableColors.isNotEmpty()) {
+                availableColors.random()
+            } else {
+                colors.random()
+            }
+            
+            activeDynamicColor = nextColor
+            recentColors.add(nextColor)
+            if (recentColors.size >= colors.size / 2 && recentColors.size > 0) {
+                recentColors.removeAt(0)
+            }
+            
+            kotlinx.coroutines.delay(dynamicColorsInterval * 1000L)
+        }
+    }
+    
+    val animatedDominantColor by animateColorAsState(
+        targetValue = activeDynamicColor ?: paletteColorsFlow.dominant, 
+        animationSpec = tween(3000)
+    )
+    
+    val paletteColors = if (dynamicColorsPlus && activeDynamicColor != null) {
+        paletteColorsFlow.copy(
+            dominant = animatedDominantColor,
+            vibrant = animatedDominantColor,
+            lightVibrant = animatedDominantColor,
+            darkVibrant = animatedDominantColor,
+            muted = animatedDominantColor,
+            darkMuted = animatedDominantColor
+        )
+    } else {
+        paletteColorsFlow
+    }
     val repeatModeState by playerViewModel.repeatMode.collectAsState()
     val shuffleModeState by playerViewModel.shuffleModeEnabled.collectAsState()
     val playbackSpeed by playerViewModel.playbackSpeed.collectAsState()
@@ -143,7 +203,7 @@ fun AppScreen(
             containerColor = Color.Transparent,
             bottomBar = {
                 val streamConfigUiVisible by playerViewModel.streamConfigUiVisible.collectAsState()
-                val hideBottomBar = currentPage == 2 && isMicModeActive && !streamConfigUiVisible
+                val hideBottomBar = currentPage == 2 && (cleanUiMode || (isMicModeActive && !streamConfigUiVisible))
 
                 AnimatedVisibility(
                     visible = !hideBottomBar,
@@ -203,9 +263,10 @@ fun AppScreen(
                             isFocused = pagerState.currentPage == 2,
                             modifier = Modifier,
                             playerViewModel = playerViewModel,
-                            dynamicColorsPlus = playerViewModel.dynamicColorsPlus.collectAsState().value,
-                            dynamicColorsInterval = playerViewModel.dynamicColorsInterval.collectAsState().value,
-                            cleanUiMode = playerViewModel.cleanUiMode.collectAsState().value,
+                            dynamicColorsPlus = dynamicColorsPlus,
+                            activeDynamicColor = activeDynamicColor,
+                            dynamicColorsInterval = dynamicColorsInterval,
+                            cleanUiMode = cleanUiMode,
                             coverDragEnabled = playerViewModel.coverDragEnabled.collectAsState().value,
                             coverVisibilityMode = playerViewModel.coverVisibilityMode.collectAsState().value,
                             chromaKeyColor = playerViewModel.chromaKeyColor.collectAsState().value,

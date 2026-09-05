@@ -299,4 +299,42 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
             _favoriteVisualizerStylesFlow.value = value
             setString("favoriteVisualizerStyles", value.joinToString(","))
         }
+
+    // Keyboard Shortcuts
+    override var keyMapNextPage: String
+        get() = getString("keyMapNextPage", "Shift+DirectionRight")
+        set(value) = setString("keyMapNextPage", value)
+    override var keyMapPrevPage: String
+        get() = getString("keyMapPrevPage", "Shift+DirectionLeft")
+        set(value) = setString("keyMapPrevPage", value)
+    override var keyMapSeekForward: String
+        get() = getString("keyMapSeekForward", "DirectionRight")
+        set(value) = setString("keyMapSeekForward", value)
+    override var keyMapSeekBackward: String
+        get() = getString("keyMapSeekBackward", "DirectionLeft")
+        set(value) = setString("keyMapSeekBackward", value)
+    override var keyMapNavigateUp: String
+        get() = getString("keyMapNavigateUp", "DirectionUp")
+        set(value) = setString("keyMapNavigateUp", value)
+    override var keyMapNavigateDown: String
+        get() = getString("keyMapNavigateDown", "DirectionDown")
+        set(value) = setString("keyMapNavigateDown", value)
+    override var keyMapNavigateLeft: String
+        get() = getString("keyMapNavigateLeft", "DirectionLeft")
+        set(value) = setString("keyMapNavigateLeft", value)
+    override var keyMapNavigateRight: String
+        get() = getString("keyMapNavigateRight", "DirectionRight")
+        set(value) = setString("keyMapNavigateRight", value)
+    override var keyMapTabNext: String
+        get() = getString("keyMapTabNext", "Tab")
+        set(value) = setString("keyMapTabNext", value)
+    override var keyMapTabPrev: String
+        get() = getString("keyMapTabPrev", "Shift+Tab")
+        set(value) = setString("keyMapTabPrev", value)
+    override var keyMapAction: String
+        get() = getString("keyMapAction", "Enter")
+        set(value) = setString("keyMapAction", value)
+    override var keyMapPlayPause: String
+        get() = getString("keyMapPlayPause", "Spacebar")
+        set(value) = setString("keyMapPlayPause", value)
 }

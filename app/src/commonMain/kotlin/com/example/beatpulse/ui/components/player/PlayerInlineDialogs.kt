@@ -903,6 +903,7 @@ fun PlayerSettingsSheet(
                                 }
                         Spacer(modifier = Modifier.height(12.dp))
                         // Pager indicators
+                        val coroutineScope = rememberCoroutineScope()
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.Center
@@ -914,7 +915,8 @@ fun PlayerSettingsSheet(
                                         .padding(4.dp)
                                         .clip(androidx.compose.foundation.shape.CircleShape)
                                         .background(color)
-                                        .size(6.dp)
+                                        .size(12.dp) // made bigger for easier clicking
+                                        .clickable { coroutineScope.launch { pagerState.animateScrollToPage(iteration) } }
                                 )
                             }
                         }

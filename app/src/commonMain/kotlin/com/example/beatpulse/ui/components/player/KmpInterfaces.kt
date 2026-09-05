@@ -25,6 +25,21 @@ interface IPreferencesManager {
     var isPatreonUnlocked: Boolean
     val isPatreonUnlockedFlow: StateFlow<Boolean>
     var showFps: Boolean
+
+    // Keyboard Shortcuts
+    var keyMapNextPage: String
+    var keyMapPrevPage: String
+    var keyMapSeekForward: String
+    var keyMapSeekBackward: String
+    var keyMapNavigateUp: String
+    var keyMapNavigateDown: String
+    var keyMapNavigateLeft: String
+    var keyMapNavigateRight: String
+    var keyMapTabNext: String
+    var keyMapTabPrev: String
+    var keyMapAction: String
+    var keyMapPlayPause: String
+
     val favoriteBackgroundStylesFlow: StateFlow<Set<Int>>
     var favoriteBackgroundStyles: Set<Int>
     val favoriteVisualizerStylesFlow: StateFlow<Set<String>>
