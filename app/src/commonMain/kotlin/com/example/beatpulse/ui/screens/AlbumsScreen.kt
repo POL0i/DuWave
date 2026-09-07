@@ -417,18 +417,28 @@ fun PlaylistFolderItem(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tint: androidx.compose.ui.graphics.Color,
     textColor: androidx.compose.ui.graphics.Color,
+    isFocused: Boolean = false,
     onClick: () -> Unit
 ) {
+    val isDesktop = !com.example.beatpulse.utils.SystemUtils.isMobilePlatform
+    val boxSize = if (isDesktop) 72.dp else 48.dp
+    val iconSize = if (isDesktop) 36.dp else 24.dp
+    val paddingVert = if (isDesktop) 24.dp else 12.dp
+    val titleStyle = if (isDesktop) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+    val subtitleStyle = if (isDesktop) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium
+
+    val focusedBg = if (isFocused) tint.copy(alpha = 0.2f) else androidx.compose.ui.graphics.Color.Transparent
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 12.dp),
+            .background(focusedBg)
+            .padding(horizontal = 24.dp, vertical = paddingVert),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(boxSize)
                 .clip(RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
@@ -437,18 +447,19 @@ fun PlaylistFolderItem(
                 imageVector = icon,
                 contentDescription = null,
                 tint = tint,
-                modifier = Modifier.size(24.dp)
+                modifier = Modifier.size(iconSize)
             )
         }
         Spacer(modifier = Modifier.width(16.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = title, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium), color = textColor)
-            Text(text = "$count canciones", style = MaterialTheme.typography.bodyMedium, color = textColor.copy(alpha = 0.7f))
+            Text(text = title, style = titleStyle, color = textColor)
+            Text(text = "$count canciones", style = subtitleStyle, color = textColor.copy(alpha = 0.7f))
         }
         Icon(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
-            tint = textColor.copy(alpha = 0.5f)
+            tint = textColor.copy(alpha = 0.5f),
+            modifier = Modifier.size(iconSize)
         )
     }
 }

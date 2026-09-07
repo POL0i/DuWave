@@ -243,24 +243,8 @@ class DesktopPlayerAdapter : AppPlayer {
 
     private fun calculateDuration(uri: String): Long {
         try {
-            val file = if (uri.startsWith("file://")) File(URI(uri)) else File(uri)
-            if (!file.exists()) return 0L
-            
-            val fileFormat = AudioSystem.getAudioFileFormat(file)
-            val properties = fileFormat.properties()
-            val durationMicroseconds = properties["duration"] as? Long
-            if (durationMicroseconds != null) {
-                return durationMicroseconds / 1000L
-            }
-            
-            // Fallback estimation
-            val lengthInBytes = file.length()
-            val sampleRate = fileFormat.format.sampleRate
-            val frameSize = fileFormat.format.frameSize
-            val frameRate = fileFormat.format.frameRate
-            if (frameSize > 0 && frameRate > 0) {
-                return (lengthInBytes * 1000L / (frameSize * frameRate)).toLong()
-            }
+            val path = if (uri.startsWith("file://")) URI(uri).path else uri
+            return com.example.beatpulse.utils.getAudioDuration(path)
         } catch (e: Exception) {
             e.printStackTrace()
         }

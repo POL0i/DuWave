@@ -331,4 +331,111 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
             prefs.edit().putStringSet("favoriteVisualizerStyles", value).apply()
             _favoriteVisualizerStylesFlow.value = value
         }
+    override var keyMapNextPage: String
+        get() = prefs.getString("keyMapNextPage", "Alt+DirectionRight") ?: "Alt+DirectionRight"
+        set(value) = prefs.edit().putString("keyMapNextPage", value).apply()
+
+    override var keyMapPrevPage: String
+        get() = prefs.getString("keyMapPrevPage", "Alt+DirectionLeft") ?: "Alt+DirectionLeft"
+        set(value) = prefs.edit().putString("keyMapPrevPage", value).apply()
+
+    override var keyMapSeekForward: String
+        get() = prefs.getString("keyMapSeekForward", "Shift+DirectionRight") ?: "Shift+DirectionRight"
+        set(value) = prefs.edit().putString("keyMapSeekForward", value).apply()
+
+    override var keyMapSeekBackward: String
+        get() = prefs.getString("keyMapSeekBackward", "Shift+DirectionLeft") ?: "Shift+DirectionLeft"
+        set(value) = prefs.edit().putString("keyMapSeekBackward", value).apply()
+
+    override var keyMapNavigateUp: String
+        get() = prefs.getString("keyMapNavigateUp", "DirectionUp") ?: "DirectionUp"
+        set(value) = prefs.edit().putString("keyMapNavigateUp", value).apply()
+
+    override var keyMapNavigateDown: String
+        get() = prefs.getString("keyMapNavigateDown", "DirectionDown") ?: "DirectionDown"
+        set(value) = prefs.edit().putString("keyMapNavigateDown", value).apply()
+
+    override var keyMapNavigateLeft: String
+        get() = prefs.getString("keyMapNavigateLeft", "DirectionLeft") ?: "DirectionLeft"
+        set(value) = prefs.edit().putString("keyMapNavigateLeft", value).apply()
+
+    override var keyMapNavigateRight: String
+        get() = prefs.getString("keyMapNavigateRight", "DirectionRight") ?: "DirectionRight"
+        set(value) = prefs.edit().putString("keyMapNavigateRight", value).apply()
+
+    override var keyMapTabNext: String
+        get() = prefs.getString("keyMapTabNext", "Tab") ?: "Tab"
+        set(value) = prefs.edit().putString("keyMapTabNext", value).apply()
+
+    override var keyMapTabPrev: String
+        get() = prefs.getString("keyMapTabPrev", "Shift+Tab") ?: "Shift+Tab"
+        set(value) = prefs.edit().putString("keyMapTabPrev", value).apply()
+
+    override var keyMapAction: String
+        get() = prefs.getString("keyMapAction", "Enter") ?: "Enter"
+        set(value) = prefs.edit().putString("keyMapAction", value).apply()
+
+    override var keyMapPlayPause: String
+        get() = prefs.getString("keyMapPlayPause", "Spacebar") ?: "Spacebar"
+        set(value) = prefs.edit().putString("keyMapPlayPause", value).apply()
+
+    override var keyMapGlobalList: String
+        get() = prefs.getString("keyMapGlobalList", "Ctrl+L") ?: "Ctrl+L"
+        set(value) = prefs.edit().putString("keyMapGlobalList", value).apply()
+
+    override var keyMapGlobalSearch: String
+        get() = prefs.getString("keyMapGlobalSearch", "Ctrl+F") ?: "Ctrl+F"
+        set(value) = prefs.edit().putString("keyMapGlobalSearch", value).apply()
+
+    override var keyMapRecommendations: String
+        get() = prefs.getString("keyMapRecommendations", "Ctrl+R") ?: "Ctrl+R"
+        set(value) = prefs.edit().putString("keyMapRecommendations", value).apply()
+
+    override var keyMapLibraryPlaylists: String
+        get() = prefs.getString("keyMapLibraryPlaylists", "Ctrl+1") ?: "Ctrl+1"
+        set(value) = prefs.edit().putString("keyMapLibraryPlaylists", value).apply()
+
+    override var keyMapLibraryArtists: String
+        get() = prefs.getString("keyMapLibraryArtists", "Ctrl+2") ?: "Ctrl+2"
+        set(value) = prefs.edit().putString("keyMapLibraryArtists", value).apply()
+
+    override var keyMapLibraryAlbums: String
+        get() = prefs.getString("keyMapLibraryAlbums", "Ctrl+3") ?: "Ctrl+3"
+        set(value) = prefs.edit().putString("keyMapLibraryAlbums", value).apply()
+
+    override var keyMapLibraryFolders: String
+        get() = prefs.getString("keyMapLibraryFolders", "Ctrl+4") ?: "Ctrl+4"
+        set(value) = prefs.edit().putString("keyMapLibraryFolders", value).apply()
+
+    override var keyMapPlayerScreen: String
+        get() = prefs.getString("keyMapPlayerScreen", "Ctrl+P") ?: "Ctrl+P"
+        set(value) = prefs.edit().putString("keyMapPlayerScreen", value).apply()
+
+    override var keyMapOpenStats: String
+        get() = prefs.getString("keyMapOpenStats", "Ctrl+S") ?: "Ctrl+S"
+        set(value) = prefs.edit().putString("keyMapOpenStats", value).apply()
+
+    override var keyMapOpenDesign: String
+        get() = prefs.getString("keyMapOpenDesign", "Ctrl+D") ?: "Ctrl+D"
+        set(value) = prefs.edit().putString("keyMapOpenDesign", value).apply()
+
+    override var keyMapOpenKeyboard: String
+        get() = prefs.getString("keyMapOpenKeyboard", "Ctrl+K") ?: "Ctrl+K"
+        set(value) = prefs.edit().putString("keyMapOpenKeyboard", value).apply()
+
+    override var keyMapOpenTimer: String
+        get() = prefs.getString("keyMapOpenTimer", "Ctrl+T") ?: "Ctrl+T"
+        set(value) = prefs.edit().putString("keyMapOpenTimer", value).apply()
+
+    override var keyMapOpenEqualizer: String
+        get() = prefs.getString("keyMapOpenEqualizer", "Ctrl+E") ?: "Ctrl+E"
+        set(value) = prefs.edit().putString("keyMapOpenEqualizer", value).apply()
+
+    override var keyMapOpenAudioEffects: String
+        get() = prefs.getString("keyMapOpenAudioEffects", "Ctrl+A") ?: "Ctrl+A"
+        set(value) = prefs.edit().putString("keyMapOpenAudioEffects", value).apply()
+
+    override var keyMapOpenPatreon: String
+        get() = prefs.getString("keyMapOpenPatreon", "Ctrl+Shift+P") ?: "Ctrl+Shift+P"
+        set(value) = prefs.edit().putString("keyMapOpenPatreon", value).apply()
 }

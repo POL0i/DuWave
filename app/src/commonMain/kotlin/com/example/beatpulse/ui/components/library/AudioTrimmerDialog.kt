@@ -28,129 +28,229 @@ import kotlinx.coroutines.launch
 fun AudioTrimmerDialog(
     track: TrackEntity,
     onDismiss: () -> Unit,
-    onTrimSuccess: (String) -> Unit
+    onTrimSuccess: (String) -> Unit,
+    colorVibrant: Color = MaterialTheme.colorScheme.primary,
+    colorSurface: Color = MaterialTheme.colorScheme.surface,
+    colorText: Color = MaterialTheme.colorScheme.onSurface
 ) {
+    com.example.beatpulse.utils.SystemBackHandler { onDismiss() }
     val coroutineScope = rememberCoroutineScope()
     var isTrimming by remember { mutableStateOf(false) }
     var trimError by remember { mutableStateOf<String?>(null) }
+    val trimErrorMsg = com.example.beatpulse.utils.getLocalizedString("trim_error_generic")
     
-    val maxDurationMs = remember { com.example.beatpulse.utils.getAudioDuration(track.dataPath) }
-    val safeMax = if (maxDurationMs > 0) maxDurationMs.toFloat() else 60000f
+    val maxDurationMs = track.duration
+    val safeMax = if (maxDurationMs > 0) maxDurationMs.toFloat() else {
+        val fallback = remember { com.example.beatpulse.utils.getAudioDuration(track.dataPath) }
+        if (fallback > 0) fallback.toFloat() else 60000f
+    }
     
     var startMs by remember { mutableStateOf(0f) }
     var endMs by remember { mutableStateOf(safeMax) }
     var anchorMs by remember { mutableStateOf(0f) }
-    var isPlaying by remember { mutableStateOf(false) }
     
-    val colorVibrant = MaterialTheme.colorScheme.primary
+    var isReady by remember { mutableStateOf(false) }
+    var isChecking by remember { mutableStateOf(true) }
+    var isDownloadingDeps by remember { mutableStateOf(false) }
+    var downloadProgress by remember { mutableStateOf(0f) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var playSessionId by remember { mutableStateOf(0) }
 
+    LaunchedEffect(Unit) {
+        isReady = com.example.beatpulse.utils.isAudioTrimmerReady()
+        isChecking = false
+    }
+    
+    LaunchedEffect(isPlaying, playSessionId) {
+        if (isPlaying) {
+            while (true) {
+                kotlinx.coroutines.delay(100)
+                anchorMs += 100f
+                if (anchorMs >= endMs) {
+                    anchorMs = startMs
+                    isPlaying = false
+                }
+            }
+        }
+    }
+
+    val playerStartMs = androidx.compose.runtime.remember(playSessionId) { anchorMs.toLong() }
+    val playerEndMs = androidx.compose.runtime.remember(playSessionId) { endMs.toLong() }
+    
     com.example.beatpulse.utils.AudioPreviewPlayer(
         path = track.dataPath,
         isPlaying = isPlaying,
-        startMs = anchorMs.toLong(),
-        endMs = endMs.toLong(),
+        startMs = playerStartMs,
+        endMs = playerEndMs,
         onPlaybackCompleted = { isPlaying = false }
     )
 
+    fun playFrom(timeMs: Float) {
+        anchorMs = timeMs
+        playSessionId++
+        isPlaying = true
+    }
+
     AlertDialog(
+        modifier = Modifier.fillMaxWidth(0.95f).wrapContentHeight(),
+        containerColor = colorSurface,
+        titleContentColor = colorText,
+        textContentColor = colorText,
         onDismissRequest = { if (!isTrimming) onDismiss() },
-        title = { Text("Recortar Audio") },
+        title = { Text(com.example.beatpulse.utils.getLocalizedString("trim_audio")) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                if (maxDurationMs <= 0) {
-                    Text("Nota: No se pudo obtener la duración exacta.", color = Color.Yellow)
-                }
-                
-                Text(
-                    text = "Ancla actual: ${formatTime(anchorMs.toLong())}",
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Inicio: ${formatTime(startMs.toLong())}", color = colorVibrant)
-                    Text("Fin: ${formatTime(endMs.toLong())}", color = colorVibrant)
-                }
-
-                TrimmerTimeline(
-                    maxDurationMs = safeMax,
-                    startMs = startMs,
-                    endMs = endMs,
-                    anchorMs = anchorMs,
-                    onStartChange = { startMs = it },
-                    onEndChange = { endMs = it },
-                    onAnchorChange = { 
-                        anchorMs = it
-                        if (isPlaying) { isPlaying = false }
-                    },
-                    colorVibrant = colorVibrant,
-                    modifier = Modifier.fillMaxWidth().height(80.dp)
-                )
-
-                Button(
-                    onClick = { isPlaying = !isPlaying },
-                    colors = ButtonDefaults.buttonColors(containerColor = if (isPlaying) Color.Red else colorVibrant)
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
-                        contentDescription = null
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(if (isPlaying) "Detener" else "Reproducir desde ancla")
-                }
-
-                if (trimError != null) {
-                    Text(trimError!!, color = Color.Red)
-                }
-                if (isTrimming) {
+                if (isChecking) {
                     CircularProgressIndicator()
+                    Text(com.example.beatpulse.utils.getLocalizedString("checking_dependencies"))
+                } else if (!isReady) {
+                    Text(com.example.beatpulse.utils.getLocalizedString("ffmpeg_required_desc"), color = colorText)
+                    if (isDownloadingDeps) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(com.example.beatpulse.utils.getLocalizedString("downloading_ffmpeg"))
+                            LinearProgressIndicator(progress = downloadProgress, modifier = Modifier.fillMaxWidth())
+                            Text("${(downloadProgress * 100).toInt()}%")
+                        }
+                    } else {
+                        Button(
+                            onClick = {
+                                isDownloadingDeps = true
+                                trimError = null
+                                coroutineScope.launch {
+                                    try {
+                                        com.example.beatpulse.utils.downloadAudioTrimmerDependencies { progress ->
+                                            downloadProgress = progress
+                                        }
+                                        isReady = true
+                                    } catch (e: Exception) {
+                                        trimError = "Error en la descarga: ${e.message}"
+                                    } finally {
+                                        isDownloadingDeps = false
+                                    }
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
+                        ) {
+                            Text(com.example.beatpulse.utils.getLocalizedString("download_ffmpeg_btn"), color = colorSurface)
+                        }
+                    }
+                    if (trimError != null) {
+                        Text(trimError!!, color = Color.Red)
+                    }
+                } else {
+                    if (maxDurationMs <= 0) {
+                        Text(com.example.beatpulse.utils.getLocalizedString("duration_unknown_note"), color = Color.Yellow)
+                    }
+                    
+                    Text(
+                        text = com.example.beatpulse.utils.getLocalizedString("trim_audio_anchor").replace("%s", formatTime(anchorMs.toLong())),
+                        fontWeight = FontWeight.Bold,
+                        color = colorText
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(com.example.beatpulse.utils.getLocalizedString("start_time").replace("%s", formatTime(startMs.toLong())), color = colorVibrant)
+                        Text(com.example.beatpulse.utils.getLocalizedString("end_time").replace("%s", formatTime(endMs.toLong())), color = colorVibrant)
+                    }
+
+                    TrimmerTimeline(
+                        maxDurationMs = safeMax,
+                        startMs = startMs,
+                        endMs = endMs,
+                        anchorMs = anchorMs,
+                        onStartChange = { startMs = it },
+                        onEndChange = { endMs = it },
+                        onAnchorChange = { 
+                            anchorMs = it
+                            if (isPlaying) { isPlaying = false }
+                        },
+                        colorVibrant = colorVibrant,
+                        modifier = Modifier.fillMaxWidth().height(100.dp).padding(vertical = 16.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { playFrom(startMs) },
+                            colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+                            Spacer(Modifier.width(4.dp))
+                            Text(com.example.beatpulse.utils.getLocalizedString("trim_audio_start_btn"), color = Color.White)
+                        }
+
+                        Button(
+                            onClick = { if (isPlaying) isPlaying = false else playFrom(anchorMs) },
+                            colors = ButtonDefaults.buttonColors(containerColor = if (isPlaying) Color.Red else colorVibrant)
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                tint = Color.White
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(if (isPlaying) com.example.beatpulse.utils.getLocalizedString("trim_audio_stop") else com.example.beatpulse.utils.getLocalizedString("trim_audio_play_anchor"), color = Color.White)
+                        }
+
+                        Button(
+                            onClick = { playFrom((endMs - 10000f).coerceAtLeast(startMs)) },
+                            colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
+                        ) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
+                            Spacer(Modifier.width(4.dp))
+                            Text(com.example.beatpulse.utils.getLocalizedString("trim_audio_minus_10s"), color = Color.White)
+                        }
+                    }
+
+                    if (trimError != null) {
+                        Text(trimError!!, color = Color.Red)
+                    }
+                    if (isTrimming) {
+                        CircularProgressIndicator()
+                    }
                 }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = !isTrimming,
+                enabled = !isTrimming && isReady,
                 onClick = {
-                    if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) {
-                        isTrimming = true
-                        isPlaying = false // Stop preview before trimming
-                        coroutineScope.launch {
-                            val outputDir = track.dataPath.substringBeforeLast("/")
-                            val outputPath = com.example.beatpulse.utils.trimAudioFile(
-                                inputPath = track.dataPath,
-                                outputDir = outputDir,
-                                outputFileNameBase = "trimmed_${track.title}_${startMs.toLong()}",
-                                startMs = startMs.toLong(),
-                                endMs = endMs.toLong()
-                            )
-                            isTrimming = false
-                            if (outputPath != null) {
-                                onTrimSuccess(outputPath)
-                                onDismiss()
-                            } else {
-                                trimError = "Error al recortar el audio."
-                            }
+                    isTrimming = true
+                    isPlaying = false // Stop preview before trimming
+                    coroutineScope.launch {
+                        val outputDir = track.dataPath.substringBeforeLast("/")
+                        val outputPath = com.example.beatpulse.utils.trimAudioFile(
+                            inputPath = track.dataPath,
+                            outputDir = outputDir,
+                            outputFileNameBase = "trimmed_${track.title}_${startMs.toLong()}",
+                            startMs = startMs.toLong(),
+                            endMs = endMs.toLong()
+                        )
+                        isTrimming = false
+                        if (outputPath != null) {
+                            onTrimSuccess(outputPath)
+                            onDismiss()
+                        } else {
+                            trimError = trimErrorMsg
                         }
-                    } else {
-                        trimError = "Recorte de audio no soportado en esta plataforma."
                     }
                 }
             ) {
-                Text("Recortar", color = colorVibrant)
+                Text(com.example.beatpulse.utils.getLocalizedString("trim_audio_trim_btn"), color = if (!isTrimming && isReady) colorVibrant else Color.Gray)
             }
         },
         dismissButton = {
             TextButton(
-                enabled = !isTrimming,
-                onClick = { 
-                    isPlaying = false
-                    onDismiss()
-                }
+                onClick = { if (!isTrimming) onDismiss() },
+                enabled = !isTrimming
             ) {
-                Text("Cancelar")
+                Text(com.example.beatpulse.utils.getLocalizedString("cancel"), color = colorText)
             }
         }
     )
@@ -177,6 +277,11 @@ fun TrimmerTimeline(
 ) {
     var width by remember { mutableStateOf(0f) }
 
+    val currentStart by androidx.compose.runtime.rememberUpdatedState(startMs)
+    val currentEnd by androidx.compose.runtime.rememberUpdatedState(endMs)
+    val currentAnchor by androidx.compose.runtime.rememberUpdatedState(anchorMs)
+    val currentMax by androidx.compose.runtime.rememberUpdatedState(maxDurationMs)
+
     Canvas(
         modifier = modifier
             .pointerInput(Unit) {
@@ -186,9 +291,9 @@ fun TrimmerTimeline(
                         width = size.width.toFloat()
                         if (width == 0f) return@detectHorizontalDragGestures
                         
-                        val startX = (startMs / maxDurationMs) * width
-                        val endX = (endMs / maxDurationMs) * width
-                        val anchorX = (anchorMs / maxDurationMs) * width
+                        val startX = (currentStart / currentMax) * width
+                        val endX = (currentEnd / currentMax) * width
+                        val anchorX = (currentAnchor / currentMax) * width
                         
                         val touchX = offset.x
                         
@@ -196,11 +301,11 @@ fun TrimmerTimeline(
                         val distEnd = kotlin.math.abs(touchX - endX)
                         val distAnchor = kotlin.math.abs(touchX - anchorX)
                         
-                        // Hitbox logic. Anchor gets priority if very close.
+                        // Hitbox logic: prioritize start and end handles
                         draggingHandle = when {
-                            distAnchor < 60f && distAnchor <= distStart && distAnchor <= distEnd -> "anchor"
-                            distStart < 60f && distStart <= distEnd -> "start"
-                            distEnd < 60f -> "end"
+                            distStart < 50f -> "start"
+                            distEnd < 50f -> "end"
+                            distAnchor < 60f -> "anchor"
                             else -> null
                         }
                     },
@@ -209,20 +314,20 @@ fun TrimmerTimeline(
                     onHorizontalDrag = { change, dragAmount ->
                         change.consume()
                         if (width == 0f) return@detectHorizontalDragGestures
-                        val msPerPixel = maxDurationMs / width
+                        val msPerPixel = currentMax / width
                         val msChange = dragAmount * msPerPixel
                         
                         when (draggingHandle) {
                             "start" -> {
-                                val newStart = (startMs + msChange).coerceIn(0f, anchorMs)
+                                val newStart = (currentStart + msChange).coerceIn(0f, currentEnd - 500f)
                                 onStartChange(newStart)
                             }
                             "end" -> {
-                                val newEnd = (endMs + msChange).coerceIn(anchorMs, maxDurationMs)
+                                val newEnd = (currentEnd + msChange).coerceIn(currentStart + 500f, currentMax)
                                 onEndChange(newEnd)
                             }
                             "anchor" -> {
-                                val newAnchor = (anchorMs + msChange).coerceIn(startMs, endMs)
+                                val newAnchor = (currentAnchor + msChange).coerceIn(currentStart, currentEnd)
                                 onAnchorChange(newAnchor)
                             }
                         }

@@ -21,36 +21,44 @@ class DesktopLibraryScanner(private val dao: TrackDao) : ILibraryScanner {
 
         root.walkTopDown().forEach { file ->
             if (file.isFile && supportedExtensions.contains(file.extension.lowercase())) {
-                try {
-                    val audioFile = AudioFileIO.read(file)
-                    val header = audioFile.audioHeader
-                    val tag = audioFile.tag
-
-                    val title = tag?.getFirst(FieldKey.TITLE)?.takeIf { it.isNotBlank() } ?: file.nameWithoutExtension
-                    // Desktop fallback translations for unknown artist/album
-                    val artist = tag?.getFirst(FieldKey.ARTIST)?.takeIf { it.isNotBlank() } ?: "Artista Desconocido"
-                    val album = tag?.getFirst(FieldKey.ALBUM)?.takeIf { it.isNotBlank() } ?: "Álbum Desconocido"
-                    
-                    val durationMs = header?.trackLength?.toLong()?.times(1000L) ?: 0L
-                    
-                    // Handle artwork
+                    var title = file.nameWithoutExtension
+                    var artist = "Artista Desconocido"
+                    var album = "Álbum Desconocido"
+                    var durationMs = 0L
                     var coverPath: String? = null
-                    val artwork = tag?.firstArtwork
-                    if (artwork != null) {
-                        val coversDir = File(System.getProperty("user.home"), ".beatpulse/covers")
-                        coversDir.mkdirs()
-                        // Use a hash of the album+artist to avoid duplicating cover files for the same album
-                        val coverName = "${album}_${artist}".hashCode().toString() + ".jpg"
-                        val destFile = File(coversDir, coverName)
-                        if (!destFile.exists()) {
-                            destFile.writeBytes(artwork.binaryData)
+
+                    try {
+                        val audioFile = AudioFileIO.read(file)
+                        val header = audioFile.audioHeader
+                        val tag = audioFile.tag
+
+                        title = tag?.getFirst(FieldKey.TITLE)?.takeIf { it.isNotBlank() } ?: file.nameWithoutExtension
+                        artist = tag?.getFirst(FieldKey.ARTIST)?.takeIf { it.isNotBlank() } ?: "Artista Desconocido"
+                        album = tag?.getFirst(FieldKey.ALBUM)?.takeIf { it.isNotBlank() } ?: "Álbum Desconocido"
+                        
+                        durationMs = header?.trackLength?.toLong()?.times(1000L) ?: 0L
+                        val artwork = tag?.firstArtwork
+                        if (artwork != null) {
+                            val coversDir = File(System.getProperty("user.home"), ".beatpulse/covers")
+                            coversDir.mkdirs()
+                            val coverName = "${album}_${artist}".hashCode().toString() + ".jpg"
+                            val destFile = File(coversDir, coverName)
+                            if (!destFile.exists()) {
+                                destFile.writeBytes(artwork.binaryData)
+                            }
+                            coverPath = destFile.absolutePath
                         }
-                        coverPath = destFile.absolutePath
+                    } catch (e: Exception) {
+                        println("Warning: Could not read metadata for ${file.name} - ${e.message}")
+                    }
+
+                    if (durationMs == 0L) {
+                        durationMs = com.example.beatpulse.utils.getAudioDuration(file.absolutePath)
                     }
 
                     scannedTracks.add(
                         TrackEntity(
-                            id = file.absolutePath.hashCode().toLong(), // Generate a consistent ID based on path
+                            id = file.absolutePath.hashCode().toLong(),
                             title = title,
                             artist = artist,
                             album = album,
@@ -61,9 +69,6 @@ class DesktopLibraryScanner(private val dao: TrackDao) : ILibraryScanner {
                             dateAdded = System.currentTimeMillis()
                         )
                     )
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
             }
         }
 

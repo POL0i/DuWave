@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">DuWave</string>
     <string name="swipe_to_choose">Swipe the mini-player sideways to switch sections!</string>
@@ -205,10 +205,8 @@
     <string name="gesture_vinyl_seek">Rotate the cover to seek</string>
     <string name="gesture_playlist_swipe">Swipe up to open playlist</string>
     <string name="gesture_confirmations_toggle">Visual gesture confirmations</string>
-
     <string name="download_completed">Download completed</string>
     <string name="download_completed_desc">Download completed: %1$s</string>
-
     <string name="search_in_category">Search in %1$s...</string>
     <string name="folders_category">Folders</string>
     <string name="no_playlists_created">You have no playlists. Create one from the Albums tab.</string>
@@ -218,19 +216,16 @@
     <string name="play_trimmed">Play Trim</string>
     <string name="pause_trimmed">Pause</string>
     <string name="stats_time_format">%1$d hours %2$d minutes</string>
-
     <string name="toast_fetching_link">Fetching link for %1$s...</string>
     <string name="toast_download_started">Download started: %1$s</string>
     <string name="toast_download_failed_link">Could not get link for %1$s</string>
     <string name="toast_download_error">Error processing download for %1$s</string>
     <string name="toast_downloading">Downloading %1$s...</string>
-
     <string name="all_songs_title">All Songs</string>
     <string name="recent_plays_title">Recently Played</string>
     <string name="favorites_title">Favorites</string>
     <string name="top_plays_title">Top Played</string>
     <string name="recently_added_title">Recently Added</string>
-
     <string name="playback_error">Error playing: File not found or corrupted.</string>
     <string name="online_service_down">The service is currently unavailable, please wait for a new update.</string>
     <string name="mic_test_title">Live Audio Test</string>
@@ -306,4 +301,17 @@
     <string name="patreon_code">Patreon Code</string>
     <string name="redeem_code">Redeem Code</string>
     <string name="patreon_wall">Patreon Wall</string>
+    <string name="checking_dependencies">Checking dependencies...</string>
+    <string name="ffmpeg_required_desc">To trim audio on computer, you need to download FFmpeg (a secure open-source library).</string>
+    <string name="downloading_ffmpeg">Downloading and installing FFmpeg...</string>
+    <string name="download_ffmpeg_btn">Download FFmpeg</string>
+    <string name="duration_unknown_note">Note: Could not get exact duration.</string>
+    <string name="trim_audio_anchor">Current anchor: %1$s</string>
+    <string name="trim_audio_start_btn">Start</string>
+    <string name="trim_audio_play_anchor">From anchor</string>
+    <string name="trim_audio_stop">Stop</string>
+    <string name="trim_audio_minus_10s">-10s to end</string>
+    <string name="trim_audio_trim_btn">Trim</string>
+    <string name="trim_error_generic">Error trimming audio.</string>
+    <string name="reset_defaults">Reset to defaults</string>
 </resources>

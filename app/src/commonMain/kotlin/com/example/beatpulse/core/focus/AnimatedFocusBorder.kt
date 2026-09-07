@@ -22,12 +22,6 @@ fun Modifier.animatedFocusBorder(
     activeColor: Color = Color(0xFF00FFCC),
     strokeWidth: Dp = 3.dp
 ): Modifier = composed {
-    val isFocused = AppFocusManager.isTabNavigationActive && AppFocusManager.currentFocusedSection == section
-    
-    if (!isFocused) {
-        return@composed this
-    }
-
     val infiniteTransition = rememberInfiniteTransition()
     val rotation by infiniteTransition.animateFloat(
         initialValue = 0f,
@@ -42,16 +36,17 @@ fun Modifier.animatedFocusBorder(
         Modifier.drawWithCache {
             onDrawWithContent {
                 drawContent()
-                val sweepGradient = Brush.sweepGradient(
-                    colors = listOf(activeColor.copy(alpha = 0f), activeColor, activeColor.copy(alpha = 0f)),
-                    center = Offset(size.width / 2f, size.height / 2f)
-                )
-                drawRect(
-                    brush = sweepGradient,
-                    style = Stroke(width = strokeWidth.toPx())
-                )
-                // A true rotating border requires a custom shader or rotating the canvas
-                // For simplicity and performance, we'll draw a dashed/moving line or just a simple border that highlights
+                val isFocused = AppFocusManager.isTabNavigationActive && AppFocusManager.currentFocusedSection == section
+                if (isFocused) {
+                    val sweepGradient = Brush.sweepGradient(
+                        colors = listOf(activeColor.copy(alpha = 0f), activeColor, activeColor.copy(alpha = 0f)),
+                        center = Offset(size.width / 2f, size.height / 2f)
+                    )
+                    drawRect(
+                        brush = sweepGradient,
+                        style = Stroke(width = strokeWidth.toPx())
+                    )
+                }
             }
         }
     )

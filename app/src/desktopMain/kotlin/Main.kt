@@ -35,7 +35,7 @@ fun main() = application {
     val libraryScanner = DesktopLibraryScanner(db.trackDao())
     val musicRepository = MusicRepository(db, libraryScanner, prefs)
     val onlineRepository = OnlineMusicRepository()
-    val platformHelper = com.example.beatpulse.data.DesktopLibraryPlatformHelper(prefs)
+    val platformHelper = com.example.beatpulse.data.DesktopLibraryPlatformHelper(prefs, libraryScanner)
     val libraryViewModel = com.example.beatpulse.ui.screens.LibraryViewModel(platformHelper, musicRepository, onlineRepository, prefs)
     val visualizerManager = RealDesktopVisualizerManager()
     visualizerManager.start(0)
@@ -110,51 +110,66 @@ fun main() = application {
                 // Global consumption of Arrow keys to prevent Focus Search crashes on desktop Compose Pagers
                 var consumed = false
 
-                if (keyEvent.key == androidx.compose.ui.input.key.Key.Tab) {
-                    if (keyEvent.isShiftPressed) {
-                        com.example.beatpulse.core.focus.AppFocusManager.cycleTabNavigation(currentPage = prefs.lastMainScreenPage, forward = false)
-                    } else {
-                        println("DEBUG ACTION: Tab detected. Current page: ${prefs.lastMainScreenPage}, Forward: true")
-                        com.example.beatpulse.core.focus.AppFocusManager.cycleTabNavigation(currentPage = prefs.lastMainScreenPage, forward = true)
-                    }
-                    consumed = true
-                } else if (com.example.beatpulse.core.focus.AppFocusManager.isTabNavigationActive) {
-                    // Only intercept unmodified arrow keys for focus navigation
-                    if (!keyEvent.isShiftPressed && !keyEvent.isAltPressed && !keyEvent.isCtrlPressed && !keyEvent.isMetaPressed) {
-                        val action = when (keyEvent.key) {
-                            androidx.compose.ui.input.key.Key.DirectionUp -> com.example.beatpulse.core.focus.FocusAction.NAVIGATE_UP
-                            androidx.compose.ui.input.key.Key.DirectionDown -> com.example.beatpulse.core.focus.FocusAction.NAVIGATE_DOWN
-                            androidx.compose.ui.input.key.Key.DirectionLeft -> com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT
-                            androidx.compose.ui.input.key.Key.DirectionRight -> com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT
-                            androidx.compose.ui.input.key.Key.Enter, androidx.compose.ui.input.key.Key.Spacebar -> com.example.beatpulse.core.focus.FocusAction.ACTION_ENTER
-                            else -> null
-                        }
-                        if (action != null) {
-                            println("DEBUG ACTION: isTabNavigationActive=true. Arrow detected: $action")
-                            com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(action)
+                if (keyEvent.key == androidx.compose.ui.input.key.Key.Escape) {
+                    com.example.beatpulse.core.focus.AppFocusManager.cancelTabNavigation()
+                }
+
+                if (keyEvent.isShiftPressed) {
+                    when (keyEvent.key) {
+                        androidx.compose.ui.input.key.Key.L -> {
+                            prefs.lastLibraryGeneralTab = 0
+                            if (prefs.lastMainScreenPage == 1) com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_GLOBAL_TODOS)
+                            prefs.lastMainScreenPage = 1
                             consumed = true
                         }
+                        androidx.compose.ui.input.key.Key.K -> {
+                            prefs.lastLibraryGeneralTab = 1
+                            if (prefs.lastMainScreenPage == 1) com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_GLOBAL_NAVEGADOR)
+                            prefs.lastMainScreenPage = 1
+                            consumed = true
+                        }
+                        androidx.compose.ui.input.key.Key.J -> {
+                            prefs.lastLibraryGeneralTab = 2
+                            if (prefs.lastMainScreenPage == 1) com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_GLOBAL_RECOMENDACIONES)
+                            prefs.lastMainScreenPage = 1
+                            consumed = true
+                        }
+                        androidx.compose.ui.input.key.Key.M -> {
+                            prefs.lastLibraryTab = 0
+                            if (prefs.lastMainScreenPage == 0) com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_LIBRARY_PLAYLISTS)
+                            prefs.lastMainScreenPage = 0
+                            consumed = true
+                        }
+                        androidx.compose.ui.input.key.Key.N -> {
+                            prefs.lastLibraryTab = 1
+                            if (prefs.lastMainScreenPage == 0) com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_LIBRARY_ARTISTS)
+                            prefs.lastMainScreenPage = 0
+                            consumed = true
+                        }
+                        androidx.compose.ui.input.key.Key.B -> {
+                            prefs.lastLibraryTab = 2
+                            if (prefs.lastMainScreenPage == 0) com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_LIBRARY_ALBUMS)
+                            prefs.lastMainScreenPage = 0
+                            consumed = true
+                        }
+                        androidx.compose.ui.input.key.Key.V -> {
+                            prefs.lastLibraryTab = 3
+                            if (prefs.lastMainScreenPage == 0) com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_LIBRARY_FOLDERS)
+                            prefs.lastMainScreenPage = 0
+                            consumed = true
+                        }
+                        else -> {}
                     }
                 }
 
                 if (!consumed && (keyEvent.key == androidx.compose.ui.input.key.Key.DirectionRight || keyEvent.key == androidx.compose.ui.input.key.Key.DirectionLeft)) {
                     if (eventStr != prefs.keyMapNextPage && eventStr != prefs.keyMapPrevPage) {
-                        // For now, to prevent the crash, we MUST return true if they are on Library screen and not using Shift.
-                        if (prefs.lastMainScreenPage == 0 || prefs.lastMainScreenPage == 1) { // 0 == Unified Library, 1 == Global Lists
+                        if (!com.example.beatpulse.core.focus.AppFocusManager.isTabNavigationActive) {
                             val direction = if (keyEvent.key == androidx.compose.ui.input.key.Key.DirectionRight) 1 else -1
-                            println("DEBUG ACTION: Dispatching Library Navigation. Direction: $direction")
                             com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(
                                 if (direction == 1) com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT 
-                                else com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT
-                            )
-                            consumed = true
-                        } else if (prefs.lastMainScreenPage == 2) { // 2 == Player
-                            // Dispatch explicitly to Player for seeking
-                            val direction = if (keyEvent.key == androidx.compose.ui.input.key.Key.DirectionRight) 1 else -1
-                            println("DEBUG ACTION: Dispatching Player Seeking. Direction: $direction")
-                            com.example.beatpulse.core.focus.AppFocusManager.dispatchAction(
-                                if (direction == 1) com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT 
-                                else com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT
+                                else com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT,
+                                withCoyoteTime = true
                             )
                             consumed = true
                         }

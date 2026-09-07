@@ -1,5 +1,6 @@
 package com.example.beatpulse.ui.screens
 
+import androidx.compose.foundation.border
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.AnimatedVisibility
@@ -41,6 +42,7 @@ import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.ui.viewmodels.PlaylistViewData
 import com.example.beatpulse.ui.screens.LibraryViewModel
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -48,6 +50,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.material.icons.filled.MoreVert
@@ -126,6 +133,26 @@ fun LibraryScreen(
     LaunchedEffect(selectedTabIndex) {
         prefs.lastLibraryGeneralTab = selectedTabIndex
     }
+
+    LaunchedEffect(Unit) {
+        com.example.beatpulse.core.focus.AppFocusManager.focusActions.collect { action ->
+            if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_GLOBAL_TODOS) {
+                selectedTabIndex = 0
+            } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_GLOBAL_NAVEGADOR) {
+                selectedTabIndex = 1
+            } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_GLOBAL_RECOMENDACIONES) {
+                selectedTabIndex = 2
+            } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT) {
+                if (!com.example.beatpulse.core.focus.AppFocusManager.isTabNavigationActive && prefs.lastMainScreenPage == 1) {
+                    selectedTabIndex = if (selectedTabIndex == 0) 2 else selectedTabIndex - 1
+                }
+            } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT) {
+                if (!com.example.beatpulse.core.focus.AppFocusManager.isTabNavigationActive && prefs.lastMainScreenPage == 1) {
+                    selectedTabIndex = if (selectedTabIndex == 2) 0 else selectedTabIndex + 1
+                }
+            }
+        }
+    }
     val tabs = listOf(getLocalizedString("tab_all"), getLocalizedString("tab_browser"), getLocalizedString("tab_recommendations"))
 
     val allTracks by viewModel.allTracks.collectAsState()
@@ -185,13 +212,24 @@ fun LibraryScreen(
         }
     }
 
+
+
     LaunchedEffect(Unit) {
-        com.example.beatpulse.core.focus.AppFocusManager.focusActions.collect { action ->
-            if (prefs.lastMainScreenPage == 1) { // 1 == Global Lists
-                if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT) {
-                    if (selectedTabIndex > 0) selectedTabIndex -= 1
-                } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT) {
-                    if (selectedTabIndex < 2) selectedTabIndex += 1
+        com.example.beatpulse.core.focus.AppFocusManager.appShortcuts.collect { shortcut ->
+            if (prefs.lastMainScreenPage == 1) {
+                when (shortcut) {
+                    com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_GLOBAL_LIST -> {
+                        selectedTabIndex = 0
+                        viewModel.searchQuery.value = ""
+                    }
+                    com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_GLOBAL_SEARCH -> {
+                        selectedTabIndex = 1
+                    }
+                    com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_RECOMMENDATIONS -> {
+                        selectedTabIndex = 2
+                        viewModel.searchQuery.value = ""
+                    }
+                    else -> {}
                 }
             }
         }
@@ -347,6 +385,8 @@ fun LibraryScreen(
                     initialFirstVisibleItemIndex = prefs.libraryScrollIndex,
                     initialFirstVisibleItemScrollOffset = prefs.libraryScrollOffset
                 )
+
+
                 
                 DisposableEffect(listState) {
                     onDispose {
@@ -394,7 +434,8 @@ fun LibraryScreen(
                                                 modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 8.dp)
                                             )
                                         }
-                                        itemsIndexed(tracks, key = { index, track -> "${category}_${track.id}_$index" }) { _, track ->
+                                        itemsIndexed(tracks, key = { index, track -> "${category}_${track.id}_$index" }) { index, track ->
+                                            val globalIndex = index
                                             TrackItem(
                                                 track = track,
                                                 paletteColors = paletteColors,
@@ -430,7 +471,8 @@ fun LibraryScreen(
                     } else {
                         LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
                             val itemsToShow = if (isSearchingOnline) onlineSearchResults else currentList
-                            items(itemsToShow, key = { it.id }) { track ->
+                            itemsIndexed(itemsToShow, key = { _, t -> t.id }) { index, track ->
+
                                 TrackItem(
                                     track = track,
                                     paletteColors = paletteColors,
@@ -689,6 +731,9 @@ fun LibraryScreen(
             com.example.beatpulse.ui.components.library.AudioTrimmerDialog(
                 track = track,
                 onDismiss = { trackPendingTrim = null },
+                colorVibrant = paletteColors.vibrant,
+                colorSurface = paletteColors.dominant,
+                colorText = dynamicTextColor,
                 onTrimSuccess = { newPath ->
                     viewModel.copyMetadataForTrimmedTrack(track, newPath)
                 }
@@ -865,8 +910,15 @@ fun TrackItem(
     isResolving: Boolean = false,
     isPlaying: Boolean = false,
     isActuallyPlaying: Boolean = false,
-    isServiceDown: Boolean = false
+    isServiceDown: Boolean = false,
+    isDisabled: Boolean = false,
+    hasMenuOptions: Boolean = true
 ) {
+    var isMenuExpanded by remember { mutableStateOf(false) }
+    var isRowFocused by remember { mutableStateOf(false) }
+    var isFavoriteFocused by remember { mutableStateOf(false) }
+    var isMenuFocused by remember { mutableStateOf(false) }
+
     val accentColor = paletteColors.vibrant
     val bgColor = paletteColors.dominant
     val isOnline = track.dataPath.startsWith("youtube://")
@@ -885,19 +937,30 @@ fun TrackItem(
         }
     }
 
+    val isDesktop = !com.example.beatpulse.utils.SystemUtils.isMobilePlatform
+    val imageSize = if (isDesktop) 72.dp else 52.dp
+    val titleStyle = if (isDesktop) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge
+    val subtitleStyle = if (isDesktop) MaterialTheme.typography.bodyLarge else MaterialTheme.typography.bodySmall
+    val iconSize = if (isDesktop) 32.dp else 24.dp
+    val paddingVert = if (isDesktop) 16.dp else 10.dp
+
+    val focusedBg = if (isRowFocused) accentColor.copy(alpha = 0.1f) else Color.Transparent
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .then(if (isDisabled) Modifier else Modifier.clickable(onClick = onClick))
-            .padding(horizontal = 16.dp, vertical = 10.dp)
-            .background(if (isDisabled) Color.Black.copy(alpha = 0.2f) else Color.Transparent),
+            .onFocusChanged { isRowFocused = it.isFocused }
+            .padding(horizontal = 16.dp, vertical = paddingVert)
+            .background(if (isDisabled) Color.Black.copy(alpha = 0.2f) else focusedBg)
+            .then(if (isRowFocused) Modifier.border(2.dp, accentColor, androidx.compose.foundation.shape.RoundedCornerShape(8.dp)) else Modifier),
         verticalAlignment = Alignment.CenterVertically
     ) {
         val albumArt = rememberAlbumArt(track = track)
         
         Box(
             modifier = Modifier
-                .size(52.dp)
+                .size(imageSize)
                 .clip(shape)
                 .background(bgBrush),
             contentAlignment = Alignment.Center
@@ -914,7 +977,7 @@ fun TrackItem(
                     imageVector = Icons.Default.Favorite,
                     contentDescription = null,
                     tint = Color.White.copy(alpha = 0.3f),
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(iconSize)
                 )
             }
         }
@@ -929,7 +992,7 @@ fun TrackItem(
                 }
                 Text(
                     text = track.customTitle ?: track.title,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = titleStyle,
                     color = if (isPlaying) accentColor else textColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -944,18 +1007,23 @@ fun TrackItem(
                 }
                 Text(
                     text = "$displayArtist • $displayAlbum",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = subtitleStyle,
                     color = if (isDisabled) Color.Red.copy(alpha = 0.7f) else textColor.copy(alpha = 0.7f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
         }
-        IconButton(onClick = onToggleFavorite) {
+        IconButton(
+            onClick = onToggleFavorite,
+            modifier = Modifier.onFocusChanged { isFavoriteFocused = it.isFocused }
+                .then(if (isFavoriteFocused) Modifier.border(2.dp, accentColor, androidx.compose.foundation.shape.CircleShape).background(accentColor.copy(alpha = 0.2f), androidx.compose.foundation.shape.CircleShape) else Modifier)
+        ) {
             Icon(
                 imageVector = if (track.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                 contentDescription = "Favorite",
-                tint = if (track.isFavorite) accentColor else Color.Gray
+                tint = if (track.isFavorite) accentColor else Color.Gray,
+                modifier = Modifier.size(iconSize)
             )
         }
         val hasMenuOptions = onAddToPlaylist != null || onDeleteTrack != null || onDownloadTrack != null || onRemoveFromPlaylist != null || onTrimTrack != null || onChangeCover != null
@@ -966,10 +1034,13 @@ fun TrackItem(
                 strokeWidth = 2.dp
             )
         } else if (hasMenuOptions) {
-            var isMenuExpanded by remember { mutableStateOf(false) }
             Box {
-                IconButton(onClick = { isMenuExpanded = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = Color.Gray)
+                IconButton(
+                    onClick = { isMenuExpanded = true },
+                    modifier = Modifier.onFocusChanged { isMenuFocused = it.isFocused }
+                        .then(if (isMenuFocused) Modifier.border(2.dp, accentColor, androidx.compose.foundation.shape.CircleShape).background(accentColor.copy(alpha = 0.2f), androidx.compose.foundation.shape.CircleShape) else Modifier)
+                ) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = Color.Gray, modifier = Modifier.size(iconSize))
                 }
                 androidx.compose.material3.MaterialTheme(
                     colorScheme = androidx.compose.material3.MaterialTheme.colorScheme.copy(
@@ -1096,7 +1167,7 @@ fun ChangeCoverDialog(
                                     Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray), contentAlignment = Alignment.Center) {
                                         androidx.compose.material3.CircularProgressIndicator(color = paletteColors.vibrant)
                                     }
-                                }
+                                    }
                             }
                         }
                     }

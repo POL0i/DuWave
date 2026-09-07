@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 
 enum class FocusSection {
     // Player sections
@@ -54,17 +55,80 @@ object AppFocusManager {
         }
     }
 
-    fun dispatchAction(action: FocusAction) {
-        println("DEBUG ACTION: dispatchAction called with action: $action")
-        val result = _focusActions.tryEmit(action)
-        println("DEBUG ACTION: tryEmit result: $result")
+    private var pendingActionJob: kotlinx.coroutines.Job? = null
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
+
+    fun dispatchAction(action: FocusAction, withCoyoteTime: Boolean = false) {
+        if (withCoyoteTime) {
+            pendingActionJob?.cancel()
+            pendingActionJob = scope.launch {
+                kotlinx.coroutines.delay(40) // 40ms coyote time
+                val result = _focusActions.tryEmit(action)
+                println("DEBUG ACTION: coyote time elapsed, tryEmit result: $result for action: $action")
+            }
+        } else {
+            pendingActionJob?.cancel()
+            println("DEBUG ACTION: dispatchAction called with action: $action")
+            val result = _focusActions.tryEmit(action)
+            println("DEBUG ACTION: tryEmit result: $result")
+        }
+    }
+
+    private val _appShortcuts = MutableSharedFlow<AppShortcut>(
+        extraBufferCapacity = 64,
+        onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
+    )
+    val appShortcuts = _appShortcuts.asSharedFlow()
+
+    fun dispatchShortcut(shortcut: AppShortcut) {
+        println("DEBUG SHORTCUT: dispatchShortcut called with: $shortcut")
+        _appShortcuts.tryEmit(shortcut)
+    }
+
+    fun cancelTabNavigation(): Boolean {
+        pendingActionJob?.cancel()
+        if (isTabNavigationActive) {
+            isTabNavigationActive = false
+            println("DEBUG ACTION: Cancelled tab navigation")
+            return true
+        }
+        return false
     }
 }
+
+enum class AppShortcut {
+    NAVIGATE_GLOBAL_LIST,
+    NAVIGATE_GLOBAL_SEARCH,
+    NAVIGATE_RECOMMENDATIONS,
+    NAVIGATE_LIBRARY_PLAYLISTS,
+    NAVIGATE_LIBRARY_ARTISTS,
+    NAVIGATE_LIBRARY_ALBUMS,
+    NAVIGATE_LIBRARY_FOLDERS,
+    NAVIGATE_PLAYER,
+    OPEN_STATS,
+    OPEN_DESIGN_SETTINGS,
+    OPEN_KEYBOARD_SHORTCUTS,
+    OPEN_TIMER,
+    OPEN_EQUALIZER,
+    OPEN_AUDIO_EFFECTS,
+    OPEN_PATREON
+}
+
+
 
 enum class FocusAction {
     NAVIGATE_UP,
     NAVIGATE_DOWN,
     NAVIGATE_LEFT,
     NAVIGATE_RIGHT,
-    ACTION_ENTER
+    ACTION_ENTER,
+    ACTION_TAB,
+    ACTION_SHIFT_TAB,
+    NAVIGATE_TO_GLOBAL_TODOS,
+    NAVIGATE_TO_GLOBAL_NAVEGADOR,
+    NAVIGATE_TO_GLOBAL_RECOMENDACIONES,
+    NAVIGATE_TO_LIBRARY_PLAYLISTS,
+    NAVIGATE_TO_LIBRARY_ARTISTS,
+    NAVIGATE_TO_LIBRARY_ALBUMS,
+    NAVIGATE_TO_LIBRARY_FOLDERS
 }

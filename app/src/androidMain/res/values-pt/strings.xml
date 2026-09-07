@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version='1.0' encoding='utf-8'?>
 <resources>
     <string name="app_name">DuWave</string>
     <string name="swipe_to_choose">Deslize o mini-player para os lados para mudar de seção!</string>
@@ -205,10 +205,8 @@
     <string name="gesture_vinyl_seek">Gire a capa para avançar ou voltar</string>
     <string name="gesture_playlist_swipe">Deslize para cima para abrir a lista</string>
     <string name="gesture_confirmations_toggle">Confirmações visuais de gestos</string>
-
     <string name="download_completed">Download concluído</string>
     <string name="download_completed_desc">Download concluído: %1$s</string>
-
     <string name="search_in_category">Pesquisar em %1$s...</string>
     <string name="folders_category">Pastas</string>
     <string name="no_playlists_created">Você não tem playlists. Crie uma na guia Álbuns.</string>
@@ -218,19 +216,16 @@
     <string name="play_trimmed">Ouvir Corte</string>
     <string name="pause_trimmed">Pausar</string>
     <string name="stats_time_format">%1$d horas %2$d minutos</string>
-
     <string name="toast_fetching_link">Obtendo link de %1$s...</string>
     <string name="toast_download_started">Download iniciado: %1$s</string>
     <string name="toast_download_failed_link">Não foi possível obter o link de %1$s</string>
     <string name="toast_download_error">Erro ao processar download de %1$s</string>
     <string name="toast_downloading">Baixando %1$s...</string>
-
     <string name="all_songs_title">Todas as músicas</string>
     <string name="recent_plays_title">Reproduções Recentes</string>
     <string name="favorites_title">Favoritos</string>
     <string name="top_plays_title">Mais Tocadas</string>
     <string name="recently_added_title">Adicionadas Recentemente</string>
-
     <string name="playback_error">Erro ao reproduzir: Arquivo não encontrado ou corrompido.</string>
     <string name="online_service_down">O serviço está indisponível no momento, por favor, aguarde uma nova atualização.</string>
     <string name="mic_test_title">Teste de Áudio ao Vivo</string>
@@ -306,4 +301,17 @@
     <string name="patreon_code">Código do Patreon</string>
     <string name="redeem_code">Resgatar Código</string>
     <string name="patreon_wall">Mural Patreon</string>
+    <string name="checking_dependencies">Verificando dependências...</string>
+    <string name="ffmpeg_required_desc">Para cortar áudios no computador, é necessário baixar o FFmpeg (uma biblioteca segura de código aberto).</string>
+    <string name="downloading_ffmpeg">Baixando e instalando o FFmpeg...</string>
+    <string name="download_ffmpeg_btn">Baixar FFmpeg</string>
+    <string name="duration_unknown_note">Nota: Não foi possível obter a duração exata.</string>
+    <string name="trim_audio_anchor">Âncora atual: %1$s</string>
+    <string name="trim_audio_start_btn">Início</string>
+    <string name="trim_audio_play_anchor">Da âncora</string>
+    <string name="trim_audio_stop">Parar</string>
+    <string name="trim_audio_minus_10s">-10s para o fim</string>
+    <string name="trim_audio_trim_btn">Cortar</string>
+    <string name="trim_error_generic">Erro ao cortar o áudio.</string>
+    <string name="reset_defaults">Redefinir para os padrões</string>
 </resources>

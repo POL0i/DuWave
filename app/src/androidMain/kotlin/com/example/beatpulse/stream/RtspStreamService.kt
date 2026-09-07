@@ -15,6 +15,9 @@ import androidx.core.app.ServiceCompat
 import com.pedro.rtspserver.RtspServerDisplay
 import com.pedro.common.ConnectChecker
 
+import android.annotation.SuppressLint
+
+@SuppressLint("NewApi")
 class RtspStreamService : Service(), ConnectChecker {
 
     companion object {

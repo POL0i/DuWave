@@ -80,6 +80,7 @@ fun PlayerTimerDialog(
     onSetSleepTimer: (Int) -> Unit
 ) {
     if (!showTimerDialog) return
+    com.example.beatpulse.utils.SystemBackHandler { onDismissRequest() }
     
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -141,6 +142,7 @@ fun PlayerEqDialog(
     equalizerManager: IEqualizerManager
 ) {
     if (!showEqDialog) return
+    com.example.beatpulse.utils.SystemBackHandler { onDismissRequest() }
     val isEqEnabled by equalizerManager.isEnabled.collectAsState()
     val isAutoMode by equalizerManager.isAutoMode.collectAsState()
     val presets by equalizerManager.presets.collectAsState()
@@ -165,7 +167,7 @@ fun PlayerEqDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Activar Ecualizador", color = Color.White)
+                    Text(getLocalizedString("enable_equalizer"), color = Color.White)
                     Switch(
                         checked = isEqEnabled,
                         onCheckedChange = { equalizerManager.setEnabled(it) },
@@ -180,7 +182,7 @@ fun PlayerEqDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("Modo Auto Loudness", color = Color.White)
+                        Text(getLocalizedString("auto_loudness"), color = Color.White)
                         Switch(
                             checked = isAutoMode,
                             onCheckedChange = { equalizerManager.setAutoMode(it) },
@@ -190,7 +192,7 @@ fun PlayerEqDialog(
 
                     if (!isAutoMode) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Ajustes Preestablecidos", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Text(getLocalizedString("presets"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                         var expanded by remember { mutableStateOf(false) }
                         Box {
                             OutlinedButton(
@@ -268,6 +270,7 @@ fun PlayerEditorDialog(
     onUpdateTrackMetadata: (Long, String?, String?, String?, String?) -> Unit
 ) {
     if (!showEditorDialog || currentTrack == null) return
+    com.example.beatpulse.utils.SystemBackHandler { onDismissRequest() }
     var editTitle by remember { mutableStateOf(currentTrack.customTitle ?: currentTrack.title) }
     var editArtist by remember { mutableStateOf(currentTrack.customArtist ?: currentTrack.artist) }
     var editAlbum by remember { mutableStateOf(currentTrack.customAlbum ?: currentTrack.album) }
@@ -338,6 +341,7 @@ fun PlayerStreamConfigDialog(
     playerViewModel: IPlayerViewModel
 ) {
     if (!showStreamConfigDialog) return
+    com.example.beatpulse.utils.SystemBackHandler { onDismissRequest() }
     var showAvatarPreview by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var selectedAvatarPath by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     
@@ -571,6 +575,7 @@ fun PlayerSupportDialog(
     prefs: IPreferencesManager
 ) {
     if (!showSupportDialog) return
+    com.example.beatpulse.utils.SystemBackHandler { onDismissRequest() }
     
     val colorVibrant by animateColorAsState(paletteColors.vibrant, label = "sv")
     val colorDominant by animateColorAsState(paletteColors.dominant, label = "sd")

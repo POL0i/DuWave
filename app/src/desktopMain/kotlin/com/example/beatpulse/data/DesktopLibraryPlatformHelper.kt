@@ -7,7 +7,7 @@ import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.images.ArtworkFactory
 
-class DesktopLibraryPlatformHelper(private val prefs: AppPreferences) : ILibraryPlatformHelper {
+class DesktopLibraryPlatformHelper(private val prefs: AppPreferences, private val scanner: ILibraryScanner? = null) : ILibraryPlatformHelper {
     override fun scanFileToSystem(filePath: String, onCompleted: () -> Unit) {
         // Desktop doesn't have a system MediaStore, so just complete.
         onCompleted()
@@ -120,18 +120,32 @@ class DesktopLibraryPlatformHelper(private val prefs: AppPreferences) : ILibrary
     }
 
     private val downloadScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
-    private val okHttpClient = okhttp3.OkHttpClient()
+    private val okHttpClient = okhttp3.OkHttpClient.Builder()
+        .readTimeout(10, java.util.concurrent.TimeUnit.MINUTES)
+        .build()
 
     override fun downloadTrack(streamUrl: String, title: String, artist: String, coverPath: String?) {
         println("Starting download: $title by $artist")
-        prefs.showToast(getLocalizedString("download_started_desc", title))
+        downloadScope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            prefs.showToast(getLocalizedString("download_started_desc", title))
+        }
         
         downloadScope.launch {
             try {
                 val request = okhttp3.Request.Builder().url(streamUrl).build()
                 val response = okHttpClient.newCall(request).execute()
                 if (response.isSuccessful) {
-                    val musicDir = File(System.getProperty("user.home"), "Music/DuWave")
+                    val homeDir = System.getProperty("user.home")
+                    val possibleMusicDirs = listOf(
+                        File(homeDir, "Música"),
+                        File(homeDir, "Music"),
+                        File(homeDir, "música"),
+                        File(homeDir, "music"),
+                        File(homeDir, "Downloads"),
+                        File(homeDir, "Descargas")
+                    )
+                    val baseMusicDir = possibleMusicDirs.firstOrNull { it.exists() } ?: File(homeDir, "Music")
+                    val musicDir = File(baseMusicDir, "DuWave")
                     if (!musicDir.exists()) musicDir.mkdirs()
                     
                     val safeTitle = title.replace(Regex("[^a-zA-Z0-9.-]"), "_")
@@ -143,11 +157,57 @@ class DesktopLibraryPlatformHelper(private val prefs: AppPreferences) : ILibrary
                         val outputStream = java.io.FileOutputStream(file)
                         val buffer = ByteArray(8192)
                         var bytesRead: Int
-                        while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                            outputStream.write(buffer, 0, bytesRead)
+                        val contentLength = response.body()?.contentLength() ?: -1L
+                        var totalBytesRead = 0L
+                        var lastUpdateTime = 0L
+
+                        val taskId = title + artist
+                        AppDownloadManager.addOrUpdateTask(AppDownloadTask(taskId, title, artist, 0, DownloadState.DOWNLOADING))
+
+                        try {
+                            while (true) {
+                                val state = AppDownloadManager.getDownloadState(taskId)
+                                if (state == 2) {
+                                    throw Exception("Descarga cancelada")
+                                }
+                                if (state == 1) {
+                                    kotlinx.coroutines.delay(500)
+                                    continue
+                                }
+
+                                bytesRead = inputStream.read(buffer)
+                                if (bytesRead == -1) break
+                                outputStream.write(buffer, 0, bytesRead)
+                                totalBytesRead += bytesRead
+
+                                val currentTime = System.currentTimeMillis()
+                                if (currentTime - lastUpdateTime > 500) {
+                                    lastUpdateTime = currentTime
+                                    if (contentLength > 0) {
+                                        val progress = ((totalBytesRead * 100) / contentLength).toInt()
+                                        val mbRead = String.format(java.util.Locale.US, "%.1f", totalBytesRead / 1024f / 1024f)
+                                        val mbTotal = String.format(java.util.Locale.US, "%.1f", contentLength / 1024f / 1024f)
+                                        AppDownloadManager.addOrUpdateTask(AppDownloadTask(taskId, title, artist, progress, DownloadState.DOWNLOADING, mbRead, mbTotal))
+                                    } else {
+                                        val mbRead = String.format(java.util.Locale.US, "%.1f", totalBytesRead / 1024f / 1024f)
+                                        AppDownloadManager.addOrUpdateTask(AppDownloadTask(taskId, title, artist, 0, DownloadState.DOWNLOADING, mbRead, "0.0"))
+                                    }
+                                }
+                            }
+                        } finally {
+                            outputStream.close()
+                            inputStream.close()
+                            if (AppDownloadManager.getDownloadState(taskId) == 2) {
+                                file.delete()
+                                AppDownloadManager.removeTask(taskId)
+                            } else {
+                                AppDownloadManager.addOrUpdateTask(AppDownloadTask(taskId, title, artist, 100, DownloadState.COMPLETED))
+                                kotlinx.coroutines.delay(2000)
+                                AppDownloadManager.removeTask(taskId)
+                            }
                         }
-                        outputStream.close()
-                        inputStream.close()
+                        
+                        if (AppDownloadManager.getDownloadState(taskId) == 2) return@launch
                         println("Download complete: ${file.absolutePath}")
                         
                         // Inject ID3 Tags
@@ -188,13 +248,15 @@ class DesktopLibraryPlatformHelper(private val prefs: AppPreferences) : ILibrary
                             
                             audioFile.commit()
                             println("ID3 tags injected successfully.")
-                            
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                prefs.showToast(getLocalizedString("download_completed_desc", title))
-                            }
                         } catch (e: Exception) {
                             println("Error injecting ID3 tags: ${e.message}")
                         }
+                        
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            prefs.showToast(getLocalizedString("download_completed_desc", title))
+                        }
+                        
+                        scanner?.scanMusic()
                     }
                 } else {
                     println("Download failed with code: ${response.code()}")

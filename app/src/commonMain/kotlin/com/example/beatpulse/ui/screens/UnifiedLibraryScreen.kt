@@ -14,11 +14,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
@@ -100,11 +103,16 @@ fun UnifiedLibraryScreen(
     var trackPendingConfirmation by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingTrim by remember { mutableStateOf<TrackEntity?>(null) }
     var showStats by remember { mutableStateOf(false) }
+    var showDesignSettings by remember { mutableStateOf(false) }
+    var showKeyboardSettings by remember { mutableStateOf(false) }
+    var showEcosystemScreen by remember { mutableStateOf(false) }
     
+    val trackDeletedMsg = getLocalizedString("track_deleted")
+
     val deleteLauncher = com.example.beatpulse.ui.utils.rememberTrackDeleteHandler(onDeleted = {
         trackToDelete?.let { track ->
             viewModel.completeDeletion(track.id)
-            prefs.showToast("Pista eliminada")
+            prefs.showToast(trackDeletedMsg)
             viewModel.scanMediaStore()
         }
         trackToDelete = null
@@ -135,6 +143,9 @@ fun UnifiedLibraryScreen(
                     Text(getLocalizedString("searching_music"), color = dynamicTextColor)
                 }
             }
+        } else if (showEcosystemScreen) {
+            SystemBackHandler { showEcosystemScreen = false }
+            EcosystemScreen(onNavigateBack = { showEcosystemScreen = false })
         } else if (showStats) {
             SystemBackHandler { showStats = false }
             StatsScreen(
@@ -223,8 +234,6 @@ fun UnifiedLibraryScreen(
                     Row {
                         var showSettingsMenu by remember { mutableStateOf(false) }
                         var showLanguageDialog by remember { mutableStateOf(false) }
-                        var showDesignSettings by remember { mutableStateOf(false) }
-                        var showKeyboardSettings by remember { mutableStateOf(false) }
 
                         if (showLanguageDialog) {
                             androidx.compose.material3.AlertDialog(
@@ -261,7 +270,10 @@ fun UnifiedLibraryScreen(
                         }
 
                         Box {
-                            IconButton(onClick = { showSettingsMenu = true }) {
+                            IconButton(
+                                onClick = { showSettingsMenu = true },
+                                modifier = Modifier.background(color = paletteColors.dominant.copy(alpha = 0.6f), shape = CircleShape)
+                            ) {
                                 Icon(Icons.Default.Settings, contentDescription = "Ajustes", tint = paletteColors.vibrant)
                             }
                             androidx.compose.material3.MaterialTheme(
@@ -305,11 +317,22 @@ fun UnifiedLibraryScreen(
                                             onRescan()
                                         }
                                     )
+                                    DropdownMenuItem(
+                                        text = { Text("Transferir música (Red Local/Online)") },
+                                        onClick = {
+                                            showSettingsMenu = false
+                                            showEcosystemScreen = true
+                                        }
+                                    )
                                 }
                             }
                         }
                         
-                        IconButton(onClick = { showDesignSettings = true }) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = { showDesignSettings = true },
+                            modifier = Modifier.background(color = paletteColors.dominant.copy(alpha = 0.6f), shape = CircleShape)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Palette,
                                 contentDescription = "Ajustes de Diseño",
@@ -317,7 +340,11 @@ fun UnifiedLibraryScreen(
                             )
                         }
 
-                        IconButton(onClick = { showKeyboardSettings = true }) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(
+                            onClick = { showKeyboardSettings = true },
+                            modifier = Modifier.background(color = paletteColors.dominant.copy(alpha = 0.6f), shape = CircleShape)
+                        ) {
                             Icon(
                                 imageVector = Icons.Default.Keyboard,
                                 contentDescription = "Atajos de Teclado",
@@ -353,27 +380,42 @@ fun UnifiedLibraryScreen(
                 
                 LaunchedEffect(Unit) {
                     com.example.beatpulse.core.focus.AppFocusManager.focusActions.collect { action ->
-                        println("DEBUG ACTION [UnifiedLibraryScreen]: Received action: $action, currentPage: ${prefs.lastMainScreenPage}")
                         if (prefs.lastMainScreenPage == 0) { // Only if we are on the Library screen
-                            println("DEBUG ACTION [UnifiedLibraryScreen]: on library screen, processing action $action.")
-                            if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT) {
-                                val prevPage = (pagerState.currentPage - 1).coerceAtLeast(0)
-                                println("DEBUG ACTION [UnifiedLibraryScreen]: NAVIGATE_LEFT. pagerState.currentPage=${pagerState.currentPage}, prevPage=$prevPage")
-                                if (prevPage != pagerState.currentPage) {
-                                    pagerState.animateScrollToPage(prevPage)
-                                    println("DEBUG ACTION [UnifiedLibraryScreen]: Scrolled left.")
-                                } else {
-                                    println("DEBUG ACTION [UnifiedLibraryScreen]: Blocked scroll left (already at 0).")
+                            when (action) {
+                                com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_LIBRARY_PLAYLISTS -> pagerState.animateScrollToPage(0)
+                                com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_LIBRARY_ARTISTS -> pagerState.animateScrollToPage(1)
+                                com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_LIBRARY_ALBUMS -> pagerState.animateScrollToPage(2)
+                                com.example.beatpulse.core.focus.FocusAction.NAVIGATE_TO_LIBRARY_FOLDERS -> pagerState.animateScrollToPage(3)
+                                com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT -> {
+                                    if (!com.example.beatpulse.core.focus.AppFocusManager.isTabNavigationActive) {
+                                        val prevPage = (pagerState.currentPage - 1).coerceAtLeast(0)
+                                        if (prevPage != pagerState.currentPage) pagerState.animateScrollToPage(prevPage)
+                                    }
                                 }
-                            } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT) {
-                                val nextPage = (pagerState.currentPage + 1).coerceAtMost(3)
-                                println("DEBUG ACTION [UnifiedLibraryScreen]: NAVIGATE_RIGHT. pagerState.currentPage=${pagerState.currentPage}, nextPage=$nextPage")
-                                if (nextPage != pagerState.currentPage) {
-                                    pagerState.animateScrollToPage(nextPage)
-                                    println("DEBUG ACTION [UnifiedLibraryScreen]: Scrolled right.")
-                                } else {
-                                    println("DEBUG ACTION [UnifiedLibraryScreen]: Blocked scroll right (already at max).")
+                                com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT -> {
+                                    if (!com.example.beatpulse.core.focus.AppFocusManager.isTabNavigationActive) {
+                                        val nextPage = (pagerState.currentPage + 1).coerceAtMost(3)
+                                        if (nextPage != pagerState.currentPage) pagerState.animateScrollToPage(nextPage)
+                                    }
                                 }
+                                else -> {}
+                            }
+                        }
+                    }
+                }
+
+                LaunchedEffect(Unit) {
+                    com.example.beatpulse.core.focus.AppFocusManager.appShortcuts.collect { shortcut ->
+                        if (prefs.lastMainScreenPage == 0) {
+                            when (shortcut) {
+                                com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_LIBRARY_PLAYLISTS -> pagerState.scrollToPage(0)
+                                com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_LIBRARY_ARTISTS -> pagerState.scrollToPage(1)
+                                com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_LIBRARY_ALBUMS -> pagerState.scrollToPage(2)
+                                com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_LIBRARY_FOLDERS -> pagerState.scrollToPage(3)
+                                com.example.beatpulse.core.focus.AppShortcut.OPEN_STATS -> showStats = true
+                                com.example.beatpulse.core.focus.AppShortcut.OPEN_DESIGN_SETTINGS -> showDesignSettings = true
+                                com.example.beatpulse.core.focus.AppShortcut.OPEN_KEYBOARD_SHORTCUTS -> showKeyboardSettings = true
+                                else -> {}
                             }
                         }
                     }
@@ -382,13 +424,12 @@ fun UnifiedLibraryScreen(
                 androidx.compose.material3.ScrollableTabRow(
                     selectedTabIndex = pagerState.currentPage % 4,
                     containerColor = Color.Transparent,
-                    contentColor = paletteColors.vibrant,
+                    contentColor = dynamicTextColor,
                     edgePadding = 8.dp,
                     indicator = { tabPositions ->
                         TabRowDefaults.SecondaryIndicator(
                             modifier = Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage % 4]),
-                            color = paletteColors.vibrant,
-                            height = 3.dp
+                            color = dynamicTextColor
                         )
                     }
                 ) {
@@ -408,7 +449,7 @@ fun UnifiedLibraryScreen(
                             text = { 
                                 Text(
                                     title, 
-                                    color = if ((pagerState.currentPage % 4) == index) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.6f),
+                                    color = if ((pagerState.currentPage % 4) == index) dynamicTextColor else dynamicTextColor.copy(alpha = 0.6f),
                                     fontWeight = if ((pagerState.currentPage % 4) == index) FontWeight.Bold else FontWeight.Normal
                                 ) 
                             }
@@ -419,36 +460,13 @@ fun UnifiedLibraryScreen(
                 HorizontalPager(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize()
-                        .onPreviewKeyEvent { event ->
+                        .onKeyEvent { event ->
                             if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
-                                when (event.key) {
-                                    androidx.compose.ui.input.key.Key.DirectionRight -> {
-                                        println("LIBRARY_PAGER: Right arrow intercepted. Shift=${event.isShiftPressed}")
-                                        if (!event.isShiftPressed && !event.isCtrlPressed) {
-                                            coroutineScope.launch {
-                                                val next = (pagerState.currentPage + 1).coerceAtMost(3)
-                                                println("LIBRARY_PAGER: Scrolling to page $next")
-                                                pagerState.animateScrollToPage(next)
-                                            }
-                                            return@onPreviewKeyEvent true
-                                        }
-                                        false
-                                    }
-                                    androidx.compose.ui.input.key.Key.DirectionLeft -> {
-                                        println("LIBRARY_PAGER: Left arrow intercepted. Shift=${event.isShiftPressed}")
-                                        if (!event.isShiftPressed && !event.isCtrlPressed) {
-                                            coroutineScope.launch {
-                                                val prev = (pagerState.currentPage - 1).coerceAtLeast(0)
-                                                println("LIBRARY_PAGER: Scrolling to page $prev")
-                                                pagerState.animateScrollToPage(prev)
-                                            }
-                                            return@onPreviewKeyEvent true
-                                        }
-                                        false
-                                    }
-                                    else -> false
+                                if (event.key == androidx.compose.ui.input.key.Key.DirectionRight || event.key == androidx.compose.ui.input.key.Key.DirectionLeft) {
+                                    return@onKeyEvent true // Guard against native HorizontalPager edge crash
                                 }
-                            } else false
+                            }
+                            false
                         }
                         .pointerInput(Unit) {
                         awaitPointerEventScope {
@@ -612,7 +630,7 @@ fun UnifiedLibraryScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text((getLocalizedString("search_in_category") + " " + currentViewData.title), color = dynamicTextColor.copy(alpha=0.5f)) },
+                    placeholder = { Text(getLocalizedString("search_in_category").replace("%s", currentViewData.title), color = dynamicTextColor.copy(alpha=0.5f)) },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = dynamicTextColor.copy(alpha=0.5f)) },
@@ -718,7 +736,10 @@ fun UnifiedLibraryScreen(
                         onDismiss = { trackPendingTrim = null },
                         onTrimSuccess = { newPath ->
                             viewModel.copyMetadataForTrimmedTrack(track, newPath)
-                        }
+                        },
+                        colorVibrant = paletteColors.vibrant,
+                        colorSurface = paletteColors.dominant.copy(alpha = 0.95f),
+                        colorText = dynamicTextColor
                     )
                 }
 
@@ -785,7 +806,7 @@ fun UnifiedLibraryScreen(
                                         trackToDelete = t
                                         deleteLauncher(t.id, sender)
                                     } else {
-                                        prefs.showToast("Pista eliminada")
+                                        prefs.showToast(trackDeletedMsg)
                                         viewModel.scanMediaStore()
                                     }
                                 }
@@ -912,7 +933,7 @@ fun ListsSubPage(
             )
         }
         
-        items(playlists, key = { "pl_${it.playlistId}" }) { pl ->
+        itemsIndexed(items = playlists, key = { _, it -> "pl_${it.playlistId}" }) { index, pl ->
             val trackCount by viewModel.getPlaylistTrackCountFlow(pl.playlistId).collectAsState(initial = 0)
             PlaylistFolderItem(
                 title = pl.name,

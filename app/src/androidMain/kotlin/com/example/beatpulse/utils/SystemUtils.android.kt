@@ -47,6 +47,12 @@ actual object SystemUtils {
     }
 
     actual val isMobilePlatform: Boolean = true
+
+    actual fun dispatchSystemBack(): Boolean {
+        // Android natively handles back navigation with OnBackPressedDispatcher,
+        // so we don't need to manually dispatch it via Esc globally.
+        return false
+    }
 }
 
 @androidx.compose.runtime.Composable
@@ -128,6 +134,11 @@ actual fun getLocalizedString(key: String): String {
     val context = androidx.compose.ui.platform.LocalContext.current
     val resId = context.resources.getIdentifier(key, "string", context.packageName)
     return if (resId != 0) context.getString(resId) else key
+}
+
+actual suspend fun isAudioTrimmerReady(): Boolean = true
+actual suspend fun downloadAudioTrimmerDependencies(onProgress: (Float) -> Unit) {
+    // No-op for Android
 }
 
 actual suspend fun trimAudioFile(inputPath: String, outputDir: String, outputFileNameBase: String, startMs: Long, endMs: Long): String? {

@@ -63,7 +63,10 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
 
     override var appLanguage: String
         get() = getString("appLanguage", "en")
-        set(value) = setString("appLanguage", value)
+        set(value) {
+            setString("appLanguage", value)
+            com.example.beatpulse.utils.currentAppLanguageState.value = value
+        }
     override var visualizerStyle: String
         get() = getString("visualizerStyle", "bars")
         set(value) = setString("visualizerStyle", value)
@@ -337,4 +340,64 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
     override var keyMapPlayPause: String
         get() = getString("keyMapPlayPause", "Spacebar")
         set(value) = setString("keyMapPlayPause", value)
+
+    override var keyMapGlobalList: String
+        get() = getString("keyMapGlobalList", "Shift+L")
+        set(value) = setString("keyMapGlobalList", value)
+
+    override var keyMapGlobalSearch: String
+        get() = getString("keyMapGlobalSearch", "Shift+K")
+        set(value) = setString("keyMapGlobalSearch", value)
+
+    override var keyMapRecommendations: String
+        get() = getString("keyMapRecommendations", "Shift+J")
+        set(value) = setString("keyMapRecommendations", value)
+
+    override var keyMapLibraryPlaylists: String
+        get() = getString("keyMapLibraryPlaylists", "Shift+M")
+        set(value) = setString("keyMapLibraryPlaylists", value)
+
+    override var keyMapLibraryArtists: String
+        get() = getString("keyMapLibraryArtists", "Shift+N")
+        set(value) = setString("keyMapLibraryArtists", value)
+
+    override var keyMapLibraryAlbums: String
+        get() = getString("keyMapLibraryAlbums", "Shift+B")
+        set(value) = setString("keyMapLibraryAlbums", value)
+
+    override var keyMapLibraryFolders: String
+        get() = getString("keyMapLibraryFolders", "Shift+V")
+        set(value) = setString("keyMapLibraryFolders", value)
+
+    override var keyMapPlayerScreen: String
+        get() = getString("keyMapPlayerScreen", "Shift+Z")
+        set(value) = setString("keyMapPlayerScreen", value)
+
+    override var keyMapOpenStats: String
+        get() = getString("keyMapOpenStats", "Ctrl+Z")
+        set(value) = setString("keyMapOpenStats", value)
+
+    override var keyMapOpenDesign: String
+        get() = getString("keyMapOpenDesign", "Ctrl+X")
+        set(value) = setString("keyMapOpenDesign", value)
+
+    override var keyMapOpenKeyboard: String
+        get() = getString("keyMapOpenKeyboard", "Ctrl+C")
+        set(value) = setString("keyMapOpenKeyboard", value)
+
+    override var keyMapOpenTimer: String
+        get() = getString("keyMapOpenTimer", "Ctrl+V")
+        set(value) = setString("keyMapOpenTimer", value)
+
+    override var keyMapOpenEqualizer: String
+        get() = getString("keyMapOpenEqualizer", "Ctrl+B")
+        set(value) = setString("keyMapOpenEqualizer", value)
+
+    override var keyMapOpenAudioEffects: String
+        get() = getString("keyMapOpenAudioEffects", "Ctrl+N")
+        set(value) = setString("keyMapOpenAudioEffects", value)
+
+    override var keyMapOpenPatreon: String
+        get() = getString("keyMapOpenPatreon", "Ctrl+D")
+        set(value) = setString("keyMapOpenPatreon", value)
 }

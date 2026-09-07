@@ -386,24 +386,22 @@ private fun PlayerScreenContent(
     var showSettingsMenu by remember { mutableStateOf(false) }
     var isTrackInfoPopupVisible by remember { mutableStateOf(false) }
 
+    val coroutineScope = rememberCoroutineScope()
+    var showSupportDialog by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
-        com.example.beatpulse.core.focus.AppFocusManager.focusActions.collect { action ->
-            if (prefs.lastMainScreenPage == 0) { // Only if we are on the Player screen
-                if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_LEFT) {
-                    val curPos = playerViewModel.currentPosition.value
-                    playerViewModel.seekTo((curPos - 10000).coerceAtLeast(0))
-                } else if (action == com.example.beatpulse.core.focus.FocusAction.NAVIGATE_RIGHT) {
-                    val curPos = playerViewModel.currentPosition.value
-                    val curDur = playerViewModel.duration.value
-                    val maxDuration = if (curDur > 0L) curDur else Long.MAX_VALUE
-                    playerViewModel.seekTo((curPos + 10000).coerceAtMost(maxDuration))
+        com.example.beatpulse.core.focus.AppFocusManager.appShortcuts.collect { shortcut ->
+            if (prefs.lastMainScreenPage == 2) {
+                when (shortcut) {
+                    com.example.beatpulse.core.focus.AppShortcut.OPEN_TIMER -> showTimerDialog = true
+                    com.example.beatpulse.core.focus.AppShortcut.OPEN_EQUALIZER -> showEqDialog = true
+                    com.example.beatpulse.core.focus.AppShortcut.OPEN_AUDIO_EFFECTS -> showEffectsDialog = true
+                    com.example.beatpulse.core.focus.AppShortcut.OPEN_PATREON -> showSupportDialog = true
+                    else -> {}
                 }
             }
         }
     }
-
-    val coroutineScope = rememberCoroutineScope()
-    var showSupportDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         playerViewModel.settingsMenuRequested.collect {

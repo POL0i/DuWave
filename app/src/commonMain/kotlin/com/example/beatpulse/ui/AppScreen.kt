@@ -18,6 +18,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.isAltPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.example.beatpulse.ui.components.player.IPreferencesManager
@@ -198,8 +205,158 @@ fun AppScreen(
         }
     }
 
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
+
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    
+    LaunchedEffect(prefs) {
+        prefs.toastFlow.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
+
     val content: @Composable () -> Unit = {
         Scaffold(
+            snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
+            floatingActionButton = {
+                com.example.beatpulse.ui.components.DownloadsFab(
+                    modifier = Modifier.padding(bottom = 16.dp, end = 16.dp),
+                    paletteColors = paletteColors
+                )
+            },
+            modifier = Modifier.onPreviewKeyEvent { event ->
+                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
+                    val isShift = event.isShiftPressed
+                    val isCtrl = event.isCtrlPressed
+                    
+
+                    if (event.key == androidx.compose.ui.input.key.Key.Tab) {
+                        com.example.beatpulse.core.focus.AppFocusManager.cycleTabNavigation(currentPage, forward = !isShift)
+                        return@onPreviewKeyEvent false // Let Native Compose Focus Manager handle Tab
+                    }
+                    if (com.example.beatpulse.core.focus.AppFocusManager.isTabNavigationActive) {
+                        if (event.key == androidx.compose.ui.input.key.Key.DirectionLeft && isShift) {
+                            com.example.beatpulse.core.focus.AppFocusManager.cancelTabNavigation()
+                            focusManager.clearFocus()
+                            return@onPreviewKeyEvent true
+                        }
+                        if (event.key == androidx.compose.ui.input.key.Key.Escape) {
+                            com.example.beatpulse.core.focus.AppFocusManager.cancelTabNavigation()
+                            focusManager.clearFocus()
+                            return@onPreviewKeyEvent false
+                        }
+                    } else {
+                        if (event.key == androidx.compose.ui.input.key.Key.Escape) {
+                            if (com.example.beatpulse.utils.SystemUtils.dispatchSystemBack()) {
+                                return@onPreviewKeyEvent true
+                            }
+                        }
+                    }
+
+                    val shiftStr = if (event.isShiftPressed) "Shift+" else ""
+                    val altStr = if (event.isAltPressed) "Alt+" else ""
+                    val ctrlStr = if (event.isCtrlPressed) "Ctrl+" else ""
+                    val metaStr = if (event.isMetaPressed) "Meta+" else ""
+                    
+                    val baseKey = when(event.key) {
+                        androidx.compose.ui.input.key.Key.DirectionRight -> "DirectionRight"
+                        androidx.compose.ui.input.key.Key.DirectionLeft -> "DirectionLeft"
+                        androidx.compose.ui.input.key.Key.DirectionUp -> "DirectionUp"
+                        androidx.compose.ui.input.key.Key.DirectionDown -> "DirectionDown"
+                        androidx.compose.ui.input.key.Key.Enter, androidx.compose.ui.input.key.Key.NumPadEnter -> "Enter"
+                        androidx.compose.ui.input.key.Key.Spacebar -> "Spacebar"
+                        androidx.compose.ui.input.key.Key.Escape -> "Escape"
+                        androidx.compose.ui.input.key.Key.Tab -> "Tab"
+                        else -> {
+                            val name = event.key.toString()
+                            var ext = name.substringAfterLast("Key: ").substringBefore(")")
+                            if (!name.contains("Key:")) ext = event.key.keyCode.toString()
+                            if (ext.contains("Unknown")) ext = "Unknown"
+                            ext
+                        }
+                    }
+                    val eventStr = "$ctrlStr$altStr$metaStr$shiftStr$baseKey"
+
+                    when (eventStr) {
+                        prefs.keyMapGlobalList -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_GLOBAL_LIST)
+                            currentPage = 1
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapGlobalSearch -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_GLOBAL_SEARCH)
+                            currentPage = 1
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapRecommendations -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_RECOMMENDATIONS)
+                            currentPage = 1
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapLibraryPlaylists -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_LIBRARY_PLAYLISTS)
+                            currentPage = 0
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapLibraryArtists -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_LIBRARY_ARTISTS)
+                            currentPage = 0
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapLibraryAlbums -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_LIBRARY_ALBUMS)
+                            currentPage = 0
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapLibraryFolders -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_LIBRARY_FOLDERS)
+                            currentPage = 0
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapPlayerScreen -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.NAVIGATE_PLAYER)
+                            currentPage = 2
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapOpenStats -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_STATS)
+                            currentPage = 0
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapOpenDesign -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_DESIGN_SETTINGS)
+                            currentPage = 0
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapOpenKeyboard -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_KEYBOARD_SHORTCUTS)
+                            currentPage = 0
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapOpenTimer -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_TIMER)
+                            currentPage = 2
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapOpenEqualizer -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_EQUALIZER)
+                            currentPage = 2
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapOpenAudioEffects -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_AUDIO_EFFECTS)
+                            currentPage = 2
+                            return@onPreviewKeyEvent true
+                        }
+                        prefs.keyMapOpenPatreon -> {
+                            com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_PATREON)
+                            currentPage = 2
+                            return@onPreviewKeyEvent true
+                        }
+                    }
+                }
+                false
+            },
             containerColor = Color.Transparent,
             bottomBar = {
                 val streamConfigUiVisible by playerViewModel.streamConfigUiVisible.collectAsState()

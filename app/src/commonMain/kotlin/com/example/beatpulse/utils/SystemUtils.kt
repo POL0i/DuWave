@@ -15,6 +15,8 @@ expect object SystemUtils {
     fun pickImageFile(): String?
     
     val isMobilePlatform: Boolean
+    
+    fun dispatchSystemBack(): Boolean
 }
 
 @androidx.compose.runtime.Composable
@@ -38,6 +40,9 @@ expect fun SystemBackHandler(onBack: () -> Unit)
 
 @androidx.compose.runtime.Composable
 expect fun getLocalizedString(key: String): String
+
+expect suspend fun isAudioTrimmerReady(): Boolean
+expect suspend fun downloadAudioTrimmerDependencies(onProgress: (Float) -> Unit)
 
 expect suspend fun trimAudioFile(inputPath: String, outputDir: String, outputFileNameBase: String, startMs: Long, endMs: Long): String?
 

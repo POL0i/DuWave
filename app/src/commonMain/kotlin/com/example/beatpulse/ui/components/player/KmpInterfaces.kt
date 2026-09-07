@@ -39,11 +39,31 @@ interface IPreferencesManager {
     var keyMapTabPrev: String
     var keyMapAction: String
     var keyMapPlayPause: String
+    
+    // New global and section shortcuts
+    var keyMapGlobalList: String
+    var keyMapGlobalSearch: String
+    var keyMapRecommendations: String
+    var keyMapLibraryPlaylists: String
+    var keyMapLibraryArtists: String
+    var keyMapLibraryAlbums: String
+    var keyMapLibraryFolders: String
+    var keyMapPlayerScreen: String
+    
+    var keyMapOpenStats: String
+    var keyMapOpenDesign: String
+    var keyMapOpenKeyboard: String
+    var keyMapOpenTimer: String
+    var keyMapOpenEqualizer: String
+    var keyMapOpenAudioEffects: String
+    var keyMapOpenPatreon: String
 
     val favoriteBackgroundStylesFlow: StateFlow<Set<Int>>
     var favoriteBackgroundStyles: Set<Int>
     val favoriteVisualizerStylesFlow: StateFlow<Set<String>>
     var favoriteVisualizerStyles: Set<String>
+    
+    val toastFlow: kotlinx.coroutines.flow.SharedFlow<String>
 }
 
 interface IAudioVisualizerManager {

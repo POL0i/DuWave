@@ -6,12 +6,14 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(entities = [TrackEntity::class, PlaylistEntity::class, PlaylistTrackCrossRef::class], version = 6, exportSchema = false)
+@androidx.room.ConstructedBy(AppDatabaseConstructor::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun trackDao(): TrackDao
     // Note: Migrations might need to be abstracted if we want them on Desktop, but for now we'll handle them per platform.
 }
 
 // Room KMP expects a builder constructor per platform
-interface AppDatabaseConstructor : androidx.room.RoomDatabaseConstructor<AppDatabase> {
+@Suppress("NO_ACTUAL_FOR_EXPECT")
+expect object AppDatabaseConstructor : androidx.room.RoomDatabaseConstructor<AppDatabase> {
     override fun initialize(): AppDatabase
 }

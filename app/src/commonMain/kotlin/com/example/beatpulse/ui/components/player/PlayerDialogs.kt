@@ -29,7 +29,7 @@ fun PlayerQueueSheet(
         Column(
             modifier = Modifier.fillMaxWidth().height(400.dp).padding(16.dp)
         ) {
-            Text("Cola de Reproducción", color = colorVibrant, style = MaterialTheme.typography.titleLarge)
+            Text(com.example.beatpulse.utils.getLocalizedString("playback_queue"), color = colorVibrant, style = MaterialTheme.typography.titleLarge)
             Spacer(modifier = Modifier.height(16.dp))
             LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(currentQueue) { track ->
@@ -45,13 +45,13 @@ fun PlayerQueueSheet(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = track.title ?: "Desconocido",
+                            text = track.title ?: com.example.beatpulse.utils.getLocalizedString("unknown_album"),
                             color = if (isPlaying) colorVibrant else Color.White,
                             modifier = Modifier.weight(1f),
                             maxLines = 1
                         )
                         Text(
-                            text = track.artist ?: "Desconocido",
+                            text = track.artist ?: com.example.beatpulse.utils.getLocalizedString("unknown_artist"),
                             color = Color.Gray,
                             style = MaterialTheme.typography.bodySmall
                         )
@@ -72,9 +72,10 @@ fun PlayerEffectsDialog(
     effectsPreset: String, onApplyPreset: (String) -> Unit
 ) {
     if (!showEffectsDialog) return
+    com.example.beatpulse.utils.SystemBackHandler { onDismissRequest() }
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        confirmButton = { TextButton(onClick = onDismissRequest) { Text("OK", color = colorVibrant) } },
+        confirmButton = { TextButton(onClick = onDismissRequest) { Text(com.example.beatpulse.utils.getLocalizedString("ok"), color = colorVibrant) } },
         title = { Text(com.example.beatpulse.utils.getLocalizedString("audio_effects"), color = colorVibrant) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -83,7 +84,7 @@ fun PlayerEffectsDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Reverberación", color = Color.White)
+                    Text(com.example.beatpulse.utils.getLocalizedString("eq_reverb"), color = Color.White)
                     Switch(
                         checked = reverbEnabled,
                         onCheckedChange = onSetReverb,
@@ -121,7 +122,7 @@ fun PlayerEffectsDialog(
                     border = androidx.compose.foundation.BorderStroke(1.dp, colorVibrant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Restablecer a valores por defecto", color = Color.White)
+                    Text(com.example.beatpulse.utils.getLocalizedString("reset_defaults") ?: "Restablecer a valores por defecto", color = Color.White)
                 }
             }
         },

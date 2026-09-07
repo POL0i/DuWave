@@ -53,7 +53,7 @@ interface AppPreferences : IPreferencesManager {
     var backgroundStyle: Int
     override val thumbnailShapeFlow: StateFlow<Int>
     override var thumbnailShape: Int
-    val toastFlow: SharedFlow<String>
+    override val toastFlow: SharedFlow<String>
     fun showToast(message: String)
     var autoAnalyzeLyrics: Boolean
     override var hasUsedNextPrevGesture: Boolean

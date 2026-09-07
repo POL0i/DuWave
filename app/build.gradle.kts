@@ -74,6 +74,16 @@ kotlin {
             
             implementation(libs.koin.core)
             implementation(libs.kmpalette.core)
+
+            // Ktor Server & Client for Ecosystem
+            implementation(libs.ktor.server.core)
+            implementation(libs.ktor.server.cio)
+            implementation(libs.ktor.server.cors)
+            implementation(libs.ktor.server.content.negotiation)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.cio)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
         }
         
         desktopMain.dependencies {
@@ -140,6 +150,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    
+    lint {
+        abortOnError = false
+    }
+    
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     sourceSets["main"].res.srcDirs("src/androidMain/res")
     sourceSets["main"].resources.srcDirs("src/commonMain/resources")

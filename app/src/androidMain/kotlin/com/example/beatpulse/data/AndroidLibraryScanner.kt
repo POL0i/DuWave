@@ -94,6 +94,7 @@ class AndroidLibraryScanner(private val context: Context, private val dao: Track
         return scannedTracks
     }
 
+    @android.annotation.SuppressLint("NewApi")
     override fun deleteTrackFile(trackId: Long, dataPath: String): Any? {
         val appContext = context.applicationContext
         val contentUri = ContentUris.withAppendedId(

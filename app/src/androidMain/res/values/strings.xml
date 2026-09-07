@@ -88,7 +88,6 @@
     <string name="delete_from_device">Eliminar del dispositivo</string>
     <string name="general_lists">Listas Generales</string>
     <string name="my_lists">Mis Listas</string>
-
     <string name="shuffle_playback">Reproducción Aleatoria</string>
     <string name="repeat_method">Método de Repetición</string>
     <string name="visualizer_style_opt">Estilo de Visualización</string>
@@ -109,7 +108,6 @@
     <string name="searching_recommendations">Buscando recomendaciones basadas en tus estadísticas...</string>
     <string name="searching_online">Buscando online...</string>
     <string name="search_lyrics">Letras</string>
-    
     <string name="off">Desactivado</string>
     <string name="repeat_list">Lista</string>
     <string name="repeat_one">Una</string>
@@ -154,8 +152,6 @@
     <string name="download">Descargar</string>
     <string name="remove_from_playlist">Quitar de la Playlist</string>
     <string name="download_music">Descargar música</string>
-
-    
     <string name="trim_audio">Recortar audio</string>
     <string name="save_trim">Guardar Recorte</string>
     <string name="start_time">Tiempo de inicio: %1$s</string>
@@ -198,22 +194,18 @@
     <string name="reload_covers">Recargar Portadas</string>
     <string name="reloading_covers_progress">Recargando %1$d de %2$d...</string>
     <string name="covers_reloaded">Portadas recargadas</string>
-    
     <string name="support_dialog_title">Apoyar y Sugerencias</string>
     <string name="support_ideas_title">¿Quieres aportar ideas?</string>
     <string name="support_ideas_desc">Escríbelo en las issues de GitHub para mejorar la aplicación.</string>
     <string name="support_patreon_title">Apoya el proyecto</string>
     <string name="support_patreon_desc">Para que siga creciendo con más estilos, más tipos de onda y beneficios personales.</string>
-    
     <string name="gesture_next_prev">Toca dos veces los bordes para cambiar de canción</string>
     <string name="gesture_seek_10s">Toca dos veces aquí para adelantar o retrasar 10s</string>
     <string name="gesture_vinyl_seek">Gira la portada para adelantar o retrasar</string>
     <string name="gesture_playlist_swipe">Desliza hacia arriba para abrir la lista</string>
     <string name="gesture_confirmations_toggle">Confirmaciones visuales de gestos</string>
-
     <string name="download_completed">Descarga completada</string>
     <string name="download_completed_desc">Descarga completada: %1$s</string>
-
     <string name="search_in_category">Buscar en %1$s...</string>
     <string name="folders_category">Carpetas</string>
     <string name="no_playlists_created">No tienes playlists creadas. Crea una desde la pestaña de Álbumes.</string>
@@ -223,19 +215,16 @@
     <string name="play_trimmed">Reproducir Recorte</string>
     <string name="pause_trimmed">Pausar</string>
     <string name="stats_time_format">%1$d horas %2$d minutos</string>
-
     <string name="toast_fetching_link">Obteniendo enlace de %1$s...</string>
     <string name="toast_download_started">Descarga iniciada: %1$s</string>
     <string name="toast_download_failed_link">No se pudo obtener el enlace de %1$s</string>
     <string name="toast_download_error">Error al procesar descarga de %1$s</string>
     <string name="toast_downloading">Descargando %1$s...</string>
-
     <string name="all_songs_title">Todas las canciones</string>
     <string name="recent_plays_title">Reproducciones Recientes</string>
     <string name="favorites_title">Favoritos</string>
     <string name="top_plays_title">Mejores Reproducciones</string>
     <string name="recently_added_title">Últimos Agregados</string>
-
     <string name="playback_error">Error al reproducir: Archivo no encontrado o dañado.</string>
     <string name="online_service_down">El servicio no está disponible de momento, por favor, espera una nueva actualización.</string>
     <string name="swipe_to_choose">¡Desliza el minirreproductor a los lados para cambiar de sección!</string>
@@ -322,4 +311,17 @@
     <string name="patreon_code">Código de Patreon</string>
     <string name="redeem_code">Canjear código</string>
     <string name="patreon_wall">Muro Patreon</string>
+    <string name="checking_dependencies">Comprobando dependencias...</string>
+    <string name="ffmpeg_required_desc">Para recortar audios en computadora, es necesario descargar FFmpeg (una librería segura de código abierto).</string>
+    <string name="downloading_ffmpeg">Descargando e instalando FFmpeg...</string>
+    <string name="download_ffmpeg_btn">Descargar FFmpeg</string>
+    <string name="duration_unknown_note">Nota: No se pudo obtener la duración exacta.</string>
+    <string name="trim_audio_anchor">Ancla actual: %1$s</string>
+    <string name="trim_audio_start_btn">Inicio</string>
+    <string name="trim_audio_play_anchor">Desde ancla</string>
+    <string name="trim_audio_stop">Detener</string>
+    <string name="trim_audio_minus_10s">-10s al fin</string>
+    <string name="trim_audio_trim_btn">Recortar</string>
+    <string name="trim_error_generic">Error al recortar el audio.</string>
+    <string name="reset_defaults">Restablecer a valores por defecto</string>
 </resources>

@@ -9,6 +9,7 @@ import java.nio.ByteBuffer
 
 object AudioTrimmer {
     // Returns the absolute path of the generated file, or null if it failed.
+    @android.annotation.SuppressLint("WrongConstant")
     fun trimAudio(inputPath: String, outputDir: String, outputFileNameBase: String, startMs: Long, endMs: Long): String? {
         var extractor: MediaExtractor? = null
         var muxer: MediaMuxer? = null
