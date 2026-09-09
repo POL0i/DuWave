@@ -50,9 +50,21 @@ class EcosystemClient(private val serverIp: String, private val port: Int = 8080
         }
     }
 
-    // Downloading a file would require streaming the response and writing to a local File
-    // This will be implemented in the specific platform using okio or java.io.File
-    
+    suspend fun downloadFile(trackId: String, destFile: java.io.File): Boolean {
+        return try {
+            val response: HttpResponse = client.get("$baseUrl/sync/file/$trackId")
+            if (response.status.value in 200..299) {
+                val bytes: ByteArray = response.body()
+                destFile.parentFile?.mkdirs()
+                destFile.writeBytes(bytes)
+                true
+            } else false
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
     fun close() {
         client.close()
     }

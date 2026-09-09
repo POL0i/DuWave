@@ -154,12 +154,14 @@ fun AlbumsScreen(
                             )
                         }
 
-                        IconButton(onClick = { showKeyboardSettings = true }) {
-                            Icon(
-                                imageVector = Icons.Default.Keyboard,
-                                contentDescription = "Atajos de Teclado",
-                                tint = paletteColors.vibrant
-                            )
+                        if (!com.example.beatpulse.utils.SystemUtils.isMobilePlatform) {
+                            IconButton(onClick = { showKeyboardSettings = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Keyboard,
+                                    contentDescription = "Atajos de Teclado",
+                                    tint = paletteColors.vibrant
+                                )
+                            }
                         }
 
                         if (showKeyboardSettings) {
@@ -201,6 +203,7 @@ fun AlbumsScreen(
                             PlaylistFolderItem(
                                 title = "20 Últimas Reproducciones",
                                 count = recentTracks.take(20).size,
+                                thumbnailShapeIdx = shapeIdx,
                                 icon = Icons.Default.History,
                                 tint = paletteColors.vibrant,
                                 textColor = dynamicTextColor,
@@ -214,6 +217,7 @@ fun AlbumsScreen(
                             PlaylistFolderItem(
                                 title = "Mejores Reproducciones",
                                 count = topTracks.size,
+                                thumbnailShapeIdx = shapeIdx,
                                 icon = Icons.Default.Star,
                                 tint = paletteColors.vibrant,
                                 textColor = dynamicTextColor,
@@ -227,6 +231,7 @@ fun AlbumsScreen(
                             PlaylistFolderItem(
                                 title = "Últimos Agregados",
                                 count = recentlyAdded.size,
+                                thumbnailShapeIdx = shapeIdx,
                                 icon = Icons.Default.NewReleases,
                                 tint = paletteColors.vibrant,
                                 textColor = dynamicTextColor,
@@ -250,6 +255,7 @@ fun AlbumsScreen(
                             PlaylistFolderItem(
                                 title = pl.name,
                                 count = trackCount,
+                                thumbnailShapeIdx = shapeIdx,
                                 icon = Icons.AutoMirrored.Filled.QueueMusic,
                                 tint = paletteColors.vibrant,
                                 textColor = dynamicTextColor,
@@ -286,6 +292,7 @@ fun AlbumsScreen(
                         PlaylistFolderItem(
                             title = folder.substringAfterLast("/"),
                             count = folderTracks.size,
+                            thumbnailShapeIdx = shapeIdx,
                             icon = if (bgStyle == 8) PixelIcons.Folder else Icons.Default.Folder,
                             tint = paletteColors.vibrant,
                             textColor = dynamicTextColor,
@@ -414,6 +421,7 @@ fun AlbumsScreen(
 fun PlaylistFolderItem(
     title: String,
     count: Int,
+    thumbnailShapeIdx: Int,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tint: androidx.compose.ui.graphics.Color,
     textColor: androidx.compose.ui.graphics.Color,
@@ -439,7 +447,7 @@ fun PlaylistFolderItem(
         Box(
             modifier = Modifier
                 .size(boxSize)
-                .clip(RoundedCornerShape(12.dp))
+                .clip(com.example.beatpulse.ui.utils.getShapeForIndex(thumbnailShapeIdx))
                 .background(MaterialTheme.colorScheme.surfaceVariant),
             contentAlignment = Alignment.Center
         ) {

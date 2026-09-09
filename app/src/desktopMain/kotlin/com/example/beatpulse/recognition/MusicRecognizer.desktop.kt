@@ -38,7 +38,7 @@ actual class MusicRecognizer {
             line.open(format)
             line.start()
 
-            val recordSeconds = 12
+            val recordSeconds = 8
             val targetBytes = (sampleRate * recordSeconds * 2).toInt() // 16-bit = 2 bytes per sample
             val audioBytes = ByteArray(targetBytes)
 

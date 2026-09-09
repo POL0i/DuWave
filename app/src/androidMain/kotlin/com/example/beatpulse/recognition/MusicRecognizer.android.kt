@@ -36,7 +36,7 @@ actual class MusicRecognizer actual constructor() {
         val audioFormat = AudioFormat.ENCODING_PCM_16BIT
         val bufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
         
-        val recordSeconds = 12
+        val recordSeconds = 8
         val targetSamples = sampleRate * recordSeconds
         val audioData = ShortArray(targetSamples)
         
@@ -91,13 +91,14 @@ actual class MusicRecognizer actual constructor() {
 
             // 1. Generate Signature
             val signature = try {
-                SongRecSignature.fromPcm16Mono16kHz(audioData)
+                val finalAudioData = if (samplesRead < audioData.size) audioData.copyOf(samplesRead) else audioData
+                SongRecSignature.fromPcm16Mono16kHz(finalAudioData)
             } catch (e: Exception) {
                 return@withContext Result.failure(Exception("Error generando huella acústica: ${e.message}"))
             }
 
             // 2. Query API
-            val apiResult = shazamClient.recognize(signature, (recordSeconds * 1000).toLong())
+            val apiResult = shazamClient.recognize(signature, (samplesRead * 1000L) / sampleRate)
             apiResult.map { RecognizedTrack(it.first, it.second) }
             
         } catch (e: SecurityException) {

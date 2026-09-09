@@ -8,30 +8,32 @@ import com.example.beatpulse.ui.components.player.IPreferencesManager
 interface AppPreferences : IPreferencesManager {
     var appLanguage: String
     override var visualizerStyle: String
-    var visualizerArchetype: Int
+    override var visualizerArchetype: Int
     var visualizerFftMode: String
-    var isAdvancedMode: Boolean
+    override var isAdvancedMode: Boolean
     var visualizerBandsMode: Int
     var filterMode: String
     var physicsMode: String
     var filterWhatsAppShorts: Boolean
-    var sensitivity: Float
-    var reactivity: Float
-    var bassMultiplier: Float
-    var midMultiplier: Float
-    var trebleMultiplier: Float
+    override var sensitivity: Float
+    override var reactivity: Float
+    override var bassMultiplier: Float
+    override var midMultiplier: Float
+    override var trebleMultiplier: Float
     var usePerBandMultiplier: Boolean
     override var lastMainScreenPage: Int
     override val lastMainScreenPageFlow: kotlinx.coroutines.flow.StateFlow<Int>
     var lastLibraryTab: Int
     var lastLibraryGeneralTab: Int
     var shuffleModeEnabled: Boolean
-    var repeatMode: Int
+    override var repeatMode: Int
     var eqEnabled: Boolean
     var eqPreset: Short
     var eqCustomBands: String
     var eqAutoMode: Boolean
     var lastPlayedTrackPath: String?
+    var lastQueueIds: String
+    var systemVolume: Float
     override var hasSeenTutorial: Boolean
     var hasSeenBottomBarHint: Boolean
     var hasSeenPlayerHints: Boolean
@@ -54,7 +56,7 @@ interface AppPreferences : IPreferencesManager {
     override val thumbnailShapeFlow: StateFlow<Int>
     override var thumbnailShape: Int
     override val toastFlow: SharedFlow<String>
-    fun showToast(message: String)
+    override fun showToast(message: String)
     var autoAnalyzeLyrics: Boolean
     override var hasUsedNextPrevGesture: Boolean
     override var hasUsedSeek10sGesture: Boolean

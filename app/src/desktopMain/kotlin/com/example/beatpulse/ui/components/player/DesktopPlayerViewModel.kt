@@ -12,6 +12,7 @@ import com.example.beatpulse.utils.LyricLine
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toPixelMap
@@ -45,10 +46,11 @@ class DesktopPlayerViewModel(
         muted = Color(0xFF9E9E9E),
         darkMuted = Color(0xFF616161)
     ))
-    override val repeatMode = MutableStateFlow(0)
-    override val shuffleModeEnabled = MutableStateFlow(false)
+    override val repeatMode = MutableStateFlow(prefs.repeatMode)
+    override val shuffleModeEnabled = MutableStateFlow(prefs.shuffleModeEnabled)
     override val playbackSpeed = MutableStateFlow(1.0f)
     override val playbackPitch = MutableStateFlow(1.0f)
+    // systemVolume is declared below with SystemUtils
     override val reverbEnabled = MutableStateFlow(false)
     override val effectsPreset = MutableStateFlow("NONE")
     override val abRepeatModeEnabled = MutableStateFlow(false)
@@ -69,9 +71,9 @@ class DesktopPlayerViewModel(
     override val coverVisibilityMode = MutableStateFlow("NORMAL")
     override val chromaKeyColor = MutableStateFlow("Green")
     override val coverDragEnabled = MutableStateFlow(false)
-    override val cleanUiMode = MutableStateFlow(false)
-    override val dynamicColorsPlus = MutableStateFlow(false)
-    override val dynamicColorsInterval = MutableStateFlow(30)
+    override val cleanUiMode = MutableStateFlow(prefs.cleanUiMode)
+    override val dynamicColorsPlus = MutableStateFlow(prefs.dynamicColorsPlus)
+    override val dynamicColorsInterval = MutableStateFlow(prefs.dynamicColorsInterval)
     
     override val coverOffsetX = MutableStateFlow(prefs.coverOffsetX)
     override val coverOffsetY = MutableStateFlow(prefs.coverOffsetY)
@@ -105,7 +107,14 @@ class DesktopPlayerViewModel(
     override fun triggerSettingsMenu() {
         _settingsMenuRequested.tryEmit(Unit)
     }
+    override val systemVolume = MutableStateFlow(
+        com.example.beatpulse.utils.SystemUtils.getSystemVolumeLevel().let { sysVol ->
+            val prefVol = prefs.systemVolume
+            if (prefVol > 1.0f && sysVol >= 0.99f) prefVol else sysVol
+        }
+    )
 
+    // Ensure we start with system volume set correctly
     init {
         try {
             val mixers = javax.sound.sampled.AudioSystem.getMixerInfo()
@@ -123,6 +132,8 @@ class DesktopPlayerViewModel(
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        appPlayer.setVolume(systemVolume.value)
 
         appPlayer.addListener(object : AppPlayerListener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
@@ -146,6 +157,36 @@ class DesktopPlayerViewModel(
                         darkMuted = Color(0xFF616161)
                     )
                 }
+            }
+        }
+        
+        scope.launch {
+            try {
+                val recents = repository.recentTracksFlow.first()
+                if (recents.isNotEmpty()) {
+                    val lastTrack = recents.first()
+                    currentTrack.value = lastTrack
+                    currentQueue.value = recents
+                    
+                    val bitmap = com.example.beatpulse.ui.components.loadDesktopThumbnail(lastTrack)
+                    albumArt.value = bitmap
+                    
+                    val streamUrl = if (lastTrack.dataPath.startsWith("youtube://")) {
+                        val encryptedUrl = lastTrack.dataPath.removePrefix("youtube://")
+                        onlineRepository.getStreamUrl(encryptedUrl)
+                    } else {
+                        lastTrack.dataPath
+                    }
+                    
+                    if (streamUrl != null) {
+                        withContext(Dispatchers.Main) {
+                            (appPlayer as? com.example.beatpulse.player.DesktopPlayerAdapter)?.setTrack(streamUrl, lastTrack.duration)
+                                ?: appPlayer.setTrack(streamUrl)
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
         }
     }
@@ -321,10 +362,12 @@ class DesktopPlayerViewModel(
 
     fun setShuffleMode(enabled: Boolean) {
         shuffleModeEnabled.value = enabled
+        prefs.shuffleModeEnabled = enabled
     }
 
     override fun setRepeatMode(mode: Int) {
         repeatMode.value = mode
+        prefs.repeatMode = mode
     }
 
     override fun setReverb(enabled: Boolean) {
@@ -365,9 +408,18 @@ class DesktopPlayerViewModel(
     override fun setCoverVisibilityMode(mode: String) { coverVisibilityMode.value = mode }
     override fun setChromaKeyColor(colorStr: String) { chromaKeyColor.value = colorStr }
     override fun setCoverDragEnabled(enabled: Boolean) { coverDragEnabled.value = enabled }
-    override fun setCleanUiMode(enabled: Boolean) { cleanUiMode.value = enabled }
-    override fun setDynamicColorsPlus(enabled: Boolean) { dynamicColorsPlus.value = enabled }
-    override fun setDynamicColorsInterval(seconds: Int) { dynamicColorsInterval.value = seconds }
+    override fun setCleanUiMode(enabled: Boolean) { 
+        cleanUiMode.value = enabled
+        prefs.cleanUiMode = enabled
+    }
+    override fun setDynamicColorsPlus(enabled: Boolean) { 
+        dynamicColorsPlus.value = enabled
+        prefs.dynamicColorsPlus = enabled
+    }
+    override fun setDynamicColorsInterval(seconds: Int) { 
+        dynamicColorsInterval.value = seconds
+        prefs.dynamicColorsInterval = seconds
+    }
     override fun setCoverOffset(x: Float, y: Float) {
         coverOffsetX.value = x; prefs.coverOffsetX = x
         coverOffsetY.value = y; prefs.coverOffsetY = y
@@ -396,5 +448,20 @@ class DesktopPlayerViewModel(
 
     override fun updateStreamAvatar(uri: String?) {
         streamAvatarUri.value = uri
+    }
+
+    override fun setSystemVolume(volume: Float) {
+        systemVolume.value = volume
+        prefs.systemVolume = volume
+        
+        // Update actual OS volume or internal app volume
+        if (volume <= 1.0f) {
+            com.example.beatpulse.utils.SystemUtils.setSystemVolumeLevel(volume)
+        } else {
+            // Keep system volume at max if amplifying
+            com.example.beatpulse.utils.SystemUtils.setSystemVolumeLevel(1.0f)
+        }
+        
+        appPlayer.setVolume(volume)
     }
 }

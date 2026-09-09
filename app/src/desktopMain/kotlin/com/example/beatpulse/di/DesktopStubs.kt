@@ -25,6 +25,8 @@ import com.example.beatpulse.utils.LyricLine
 class DummyAppPreferences : AppPreferences {
     override var appLanguage = "en"
     override var visualizerStyle = "BARS"
+    override var systemVolume: Float = 1.0f
+    override var lastQueueIds: String = ""
     override var visualizerArchetype = 0
     override var visualizerFftMode = "AVERAGE"
     override var isAdvancedMode = false
@@ -38,6 +40,10 @@ class DummyAppPreferences : AppPreferences {
     override var midMultiplier = 1.0f
     override var trebleMultiplier = 1.0f
     override var usePerBandMultiplier = false
+    override var damping = 0.8f
+    override var cleanUiMode = false
+    override var dynamicColorsPlus = false
+    override var dynamicColorsInterval = 5
     private val _lastMainScreenPageFlow = kotlinx.coroutines.flow.MutableStateFlow(0)
     override val lastMainScreenPageFlow: kotlinx.coroutines.flow.StateFlow<Int> = _lastMainScreenPageFlow
     override var lastMainScreenPage: Int
@@ -73,6 +79,8 @@ class DummyAppPreferences : AppPreferences {
     override var backgroundStyle = 0
     override val thumbnailShapeFlow = MutableStateFlow(0)
     override var thumbnailShape = 0
+    override val visualizerElementSizeFlow = MutableStateFlow(1.0f)
+    override var visualizerElementSize = 1.0f
     override val toastFlow = MutableSharedFlow<String>()
     override fun showToast(message: String) {}
     override var autoAnalyzeLyrics = false
@@ -93,6 +101,8 @@ class DummyAppPreferences : AppPreferences {
     override var isPatreonUnlocked: Boolean
         get() = _isPatreonUnlockedFlow.value
         set(value) { _isPatreonUnlockedFlow.value = value }
+    override var patreonFailedAttempts = 0
+    override var patreonLockoutTime = 0L
     override var showFps = false
     override var showRemainingTime = false
     override val favoriteBackgroundStylesFlow: StateFlow<Set<Int>> = MutableStateFlow(emptySet())
@@ -191,6 +201,7 @@ class DummyVisualizerManager : com.example.beatpulse.visualizer.AppVisualizerMan
     override val trebleMultiplier = MutableStateFlow(1.0f)
     override val visualizerArchetype = MutableStateFlow(0)
     override val fftMode = MutableStateFlow("AVERAGE")
+    override val elementSize = MutableStateFlow(1.0f)
 
     override fun startMicMode(context: Any) {}
     override fun stopMicMode() {}

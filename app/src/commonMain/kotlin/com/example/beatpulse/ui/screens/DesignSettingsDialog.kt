@@ -69,35 +69,10 @@ private val DummyVisualizerManager = object : IAudioVisualizerManager {
     override val trebleMultiplier: MutableStateFlow<Float> = MutableStateFlow(1f)
     override val visualizerArchetype: MutableStateFlow<Int> = MutableStateFlow(0)
     override val fftMode: MutableStateFlow<String> = MutableStateFlow("")
+    override val elementSize: MutableStateFlow<Float> = MutableStateFlow(1f)
 }
 
-val DiamondShape = GenericShape { size, _ ->
-    moveTo(size.width / 2f, 0f)
-    lineTo(size.width, size.height / 2f)
-    lineTo(size.width / 2f, size.height)
-    lineTo(0f, size.height / 2f)
-    close()
-}
-
-val HexagonShape = GenericShape { size, _ ->
-    moveTo(size.width / 2f, 0f)
-    lineTo(size.width, size.height * 0.25f)
-    lineTo(size.width, size.height * 0.75f)
-    lineTo(size.width / 2f, size.height)
-    lineTo(0f, size.height * 0.75f)
-    lineTo(0f, size.height * 0.25f)
-    close()
-}
-
-val CathedralShape = GenericShape { size, _ ->
-    moveTo(size.width / 2f, 0f)
-    quadraticTo(size.width, 0f, size.width, size.height * 0.4f)
-    lineTo(size.width, size.height)
-    lineTo(0f, size.height)
-    lineTo(0f, size.height * 0.4f)
-    quadraticTo(0f, 0f, size.width / 2f, 0f)
-    close()
-}
+// Shapes are now centralized in com.example.beatpulse.ui.utils.Shapes.kt
 
 @Composable
 fun DesignSettingsDialog(
@@ -130,7 +105,7 @@ fun DesignSettingsDialog(
                     } else false
                 }
                 .fillMaxWidth(0.95f)
-                .widthIn(max = 420.dp)
+                .widthIn(max = 560.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -207,15 +182,7 @@ fun DesignSettingsDialog(
                         
                         shapeIndices.forEach { idx ->
                             val isSelected = currentShapeIdx == idx
-                            val shapeForThumb = when (idx) {
-                                1 -> androidx.compose.ui.graphics.RectangleShape
-                                2 -> RoundedCornerShape(4.dp)
-                                3 -> RoundedCornerShape(8.dp)
-                                4 -> CathedralShape
-                                5 -> DiamondShape
-                                6 -> HexagonShape
-                                else -> CircleShape
-                            }
+                            val shapeForThumb = com.example.beatpulse.ui.utils.getShapeForIndex(idx)
                             
                             Box(
                                 modifier = Modifier
@@ -246,7 +213,7 @@ fun DesignSettingsDialog(
                             modifier = Modifier.fillMaxWidth().weight(1f)
                         ) { page ->
                             LazyVerticalGrid(
-                                columns = GridCells.Fixed(2),
+                                columns = GridCells.Adaptive(minSize = 180.dp),
                                 modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -310,11 +277,11 @@ fun DesignSettingsDialog(
                             Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                                 Text(
                                     text = getLocalizedString("close").takeIf { it != "close" } ?: getLocalizedString("close"),
-                                    color = Color.White,
+                                    color = dynamicTextColor,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(paletteColors.vibrant)
+                                        .background(dynamicTextColor.copy(alpha = 0.15f))
                                         .clickable { onDismiss() }
                                         .padding(horizontal = 24.dp, vertical = 12.dp)
                                 )

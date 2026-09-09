@@ -60,6 +60,7 @@ class PlayerViewModel(
     override fun seekTo(position: Long) {
         playerState.value?.seekTo(position)
         currentPosition.value = position
+        lastSeekTimeMs = System.currentTimeMillis()
     }
 
     override fun fastForward() {
@@ -112,6 +113,15 @@ class PlayerViewModel(
     private val _effectsPreset = MutableStateFlow("NORMAL")
     override val effectsPreset: StateFlow<String> = _effectsPreset
 
+    private val _systemVolume = MutableStateFlow(
+        // Use system volume up to 1.0f. If preferences had amplification (>1.0), append it.
+        com.example.beatpulse.utils.SystemUtils.getSystemVolumeLevel().let { sysVol ->
+            val prefVol = PreferencesManager.getInstance(context).systemVolume
+            if (prefVol > 1.0f && sysVol >= 0.99f) prefVol else sysVol
+        }
+    )
+    override val systemVolume: StateFlow<Float> = _systemVolume
+
     override val isFetchingLyrics = MutableStateFlow(false)
     override val searchFailed = MutableStateFlow(false)
     
@@ -131,9 +141,9 @@ class PlayerViewModel(
     override val coverVisibilityMode = MutableStateFlow("NORMAL")
     override val chromaKeyColor = MutableStateFlow("Green")
     override val coverDragEnabled = MutableStateFlow(false)
-    override val cleanUiMode = MutableStateFlow(false)
-    override val dynamicColorsPlus = MutableStateFlow(false)
-    override val dynamicColorsInterval = MutableStateFlow(30)
+    override val cleanUiMode = MutableStateFlow(PreferencesManager.getInstance(context).cleanUiMode)
+    override val dynamicColorsPlus = MutableStateFlow(PreferencesManager.getInstance(context).dynamicColorsPlus)
+    override val dynamicColorsInterval = MutableStateFlow(PreferencesManager.getInstance(context).dynamicColorsInterval)
     override val coverOffsetX = MutableStateFlow(0f)
     override val coverOffsetY = MutableStateFlow(0f)
     override val coverScale = MutableStateFlow(1f)
@@ -161,12 +171,16 @@ class PlayerViewModel(
         _settingsMenuRequested.tryEmit(Unit)
     }
 
+    private var lastSeekTimeMs = 0L
+
     init {
         // Poll playerState.value for currentPosition and duration
         viewModelScope.launch {
             while(true) {
                 if (playerState.value?.isPlaying == true) {
-                    currentPosition.value = playerState.value?.currentPosition ?: 0L
+                    if (System.currentTimeMillis() - lastSeekTimeMs > 500) {
+                        currentPosition.value = playerState.value?.currentPosition ?: 0L
+                    }
                     duration.value = (playerState.value?.duration ?: 1L).coerceAtLeast(1L)
                 }
                 kotlinx.coroutines.delay(50)
@@ -343,6 +357,11 @@ class PlayerViewModel(
         PlaybackService.playbackSpeedFlow.value = prefs.playbackSpeed
         PlaybackService.playbackPitchFlow.value = prefs.playbackPitch
         PlaybackService.reverbEnabledFlow.value = prefs.reverbEnabled
+        
+        if (prefs.systemVolume > 1.0f) {
+            prefs.systemVolume = 1.0f
+        }
+
         setupPlayer()
 
         // Keep currentTrack synchronized with DB changes (e.g. when cover is updated from Library)
@@ -373,6 +392,7 @@ class PlayerViewModel(
                 val prefs = PreferencesManager.getInstance(context)
                 player.shuffleModeEnabled = prefs.shuffleModeEnabled
                 player.repeatMode = prefs.repeatMode
+                player.volume = _systemVolume.value
             }
             
             // Restore current or last track
@@ -393,38 +413,54 @@ class PlayerViewModel(
                     if (recents.isNotEmpty()) {
                         val lastTrack = recents.first()
                         _currentTrack.value = lastTrack
-                        _currentQueue.value = recents
+                        val lastQueueIdsString = PreferencesManager.getInstance(context).lastQueueIds
+                        val allTracks = repository.allTracksFlow.first()
+                        var queue = emptyList<TrackEntity>()
+                        if (lastQueueIdsString.isNotEmpty()) {
+                            val idToTrack = allTracks.associateBy { it.id }
+                            queue = lastQueueIdsString.split(",").mapNotNull { idToTrack[it.toLongOrNull()] }
+                        }
+                        if (queue.isEmpty()) queue = allTracks
+
+                        _currentQueue.value = queue
                         extractColors(lastTrack)
                         
-                        val mediaItem = MediaItem.Builder()
-                            .setUri(android.net.Uri.parse(lastTrack.dataPath))
-                            .setRequestMetadata(
-                                MediaItem.RequestMetadata.Builder()
-                                    .setMediaUri(android.net.Uri.parse(lastTrack.dataPath))
-                                    .build()
-                            )
-                            .setMediaId(lastTrack.id.toString())
-                            .setMediaMetadata(
-                                MediaMetadata.Builder()
-                                    .setTitle(lastTrack.title)
-                                    .setArtist(lastTrack.artist)
-                                    .setIsPlayable(true)
-                                    .apply {
-                                        if (!lastTrack.customCoverPath.isNullOrEmpty()) {
-                                            val path = lastTrack.customCoverPath
-                                            setArtworkUri(android.net.Uri.parse(if (path.startsWith("/")) "file://$path" else path))
-                                        } else {
-                                            val fingerprint = com.example.beatpulse.ui.components.ThumbnailCache.getTrackFingerprint(lastTrack)
-                                            val fullFile = java.io.File(context.cacheDir, "full_${fingerprint}.jpg")
-                                            if (fullFile.exists() && fullFile.length() > 0) {
-                                                setArtworkUri(android.net.Uri.fromFile(fullFile))
+                        val startIndex = queue.indexOfFirst { it.id == lastTrack.id }.coerceAtLeast(0)
+                        
+                        val mediaItems = queue.map { track ->
+                            val rawUri = if (track.dataPath.startsWith("youtube://")) {
+                                val videoId = track.dataPath.removePrefix("youtube://").substringBefore("|")
+                                "youtube://$videoId"
+                            } else {
+                                track.dataPath
+                            }
+                            MediaItem.Builder()
+                                .setUri(android.net.Uri.parse(rawUri))
+                                .setRequestMetadata(
+                                    MediaItem.RequestMetadata.Builder()
+                                        .setMediaUri(android.net.Uri.parse(rawUri))
+                                        .build()
+                                )
+                                .setMediaId(track.id.toString())
+                                .setMediaMetadata(
+                                    MediaMetadata.Builder()
+                                        .setTitle(track.customTitle ?: track.title)
+                                        .setArtist(track.customArtist ?: track.artist)
+                                        .setAlbumTitle(track.customAlbum ?: track.album)
+                                        .setIsPlayable(true)
+                                        .apply {
+                                            if (!track.customCoverPath.isNullOrEmpty()) {
+                                                val path = track.customCoverPath
+                                                setArtworkUri(android.net.Uri.parse(if (path.startsWith("/")) "file://$path" else path))
                                             }
+                                            // Do NOT set artworkUri for internal cache files, it causes SystemUI crash (ENOENT/EACCES)
+                                            // Media3 automatically extracts metadata from the file itself for the notification.
                                         }
-                                    }
-                                    .build()
-                            )
-                            .build()
-                        controller?.setMediaItem(mediaItem)
+                                        .build()
+                                )
+                                .build()
+                        }
+                        controller?.setMediaItems(mediaItems, startIndex, 0L)
                         controller?.prepare()
                     }
                 }
@@ -492,6 +528,8 @@ class PlayerViewModel(
         _currentQueue.value = queue
         currentPosition.value = 0L
         
+        PreferencesManager.getInstance(context).lastQueueIds = queue.joinToString(",") { it.id.toString() }
+        
         viewModelScope.launch {
             repository.insertOrUpdateTrack(track)
             repository.markAsPlayed(track.id)
@@ -526,14 +564,8 @@ class PlayerViewModel(
                             if (!it.customCoverPath.isNullOrEmpty()) {
                                 val path = it.customCoverPath
                                 setArtworkUri(android.net.Uri.parse(if (path.startsWith("/")) "file://$path" else path))
-                            } else {
-                                val fingerprint = com.example.beatpulse.ui.components.ThumbnailCache.getTrackFingerprint(it)
-                                val fullFile = java.io.File(context.cacheDir, "full_${fingerprint}.jpg")
-                                if (fullFile.exists() && fullFile.length() > 0) {
-                                    setArtworkUri(android.net.Uri.fromFile(fullFile))
-                                }
-                                // Otherwise, let Media3 extract the ID3 tag natively during prepare()
                             }
+                            // Otherwise, let Media3 extract the ID3 tag natively during prepare()
                         }
                         .build()
                 )
@@ -575,7 +607,27 @@ class PlayerViewModel(
         }
     }
 
-    
+    override fun setSystemVolume(volume: Float) {
+        _systemVolume.value = volume
+        PreferencesManager.getInstance(context).systemVolume = volume
+        
+        // Update actual OS volume or internal app volume
+        if (volume <= 1.0f) {
+            com.example.beatpulse.utils.SystemUtils.setSystemVolumeLevel(volume)
+        } else {
+            // Keep system volume at max if amplifying
+            com.example.beatpulse.utils.SystemUtils.setSystemVolumeLevel(1.0f)
+        }
+        
+        _playerState.value?.volume = volume.coerceAtMost(1.0f)
+        
+        // Broadcast the volume > 1.0 to PlaybackService for software amplification
+        val intent = Intent(context, PlaybackService::class.java).apply {
+            action = "SET_VOLUME_AMPLIFICATION"
+            putExtra("volume", volume)
+        }
+        context.startService(intent)
+    }    
     private suspend fun extractColors(track: TrackEntity) {
         val fingerprint = com.example.beatpulse.ui.components.ThumbnailCache.getTrackFingerprint(track)
         // Check cache first — avoids re-reading the file if already processed
@@ -677,9 +729,18 @@ class PlayerViewModel(
     override fun setCoverVisibilityMode(mode: String) { coverVisibilityMode.value = mode }
     override fun setChromaKeyColor(colorStr: String) { chromaKeyColor.value = colorStr }
     override fun setCoverDragEnabled(enabled: Boolean) { coverDragEnabled.value = enabled }
-    override fun setCleanUiMode(enabled: Boolean) { cleanUiMode.value = enabled }
-    override fun setDynamicColorsPlus(enabled: Boolean) { dynamicColorsPlus.value = enabled }
-    override fun setDynamicColorsInterval(seconds: Int) { dynamicColorsInterval.value = seconds }
+    override fun setCleanUiMode(enabled: Boolean) { 
+        cleanUiMode.value = enabled
+        PreferencesManager.getInstance(context).cleanUiMode = enabled
+    }
+    override fun setDynamicColorsPlus(enabled: Boolean) { 
+        dynamicColorsPlus.value = enabled
+        PreferencesManager.getInstance(context).dynamicColorsPlus = enabled
+    }
+    override fun setDynamicColorsInterval(seconds: Int) { 
+        dynamicColorsInterval.value = seconds
+        PreferencesManager.getInstance(context).dynamicColorsInterval = seconds
+    }
     override fun setCoverOffset(x: Float, y: Float) { 
         coverOffsetX.value = x
         coverOffsetY.value = y

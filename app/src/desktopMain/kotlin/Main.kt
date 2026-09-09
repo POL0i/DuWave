@@ -37,7 +37,15 @@ fun main() = application {
     val onlineRepository = OnlineMusicRepository()
     val platformHelper = com.example.beatpulse.data.DesktopLibraryPlatformHelper(prefs, libraryScanner)
     val libraryViewModel = com.example.beatpulse.ui.screens.LibraryViewModel(platformHelper, musicRepository, onlineRepository, prefs)
-    val visualizerManager = RealDesktopVisualizerManager()
+    
+    org.koin.core.context.startKoin {
+        modules(org.koin.dsl.module {
+            single { db }
+            single { musicRepository }
+            single { prefs }
+        })
+    }
+    val visualizerManager = RealDesktopVisualizerManager(prefs)
     visualizerManager.start(0)
     val equalizerManager = RealDesktopEqualizerManager()
 

@@ -99,6 +99,22 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
         get() = prefs.getBoolean("usePerBandMultiplier", false)
         set(value) = prefs.edit().putBoolean("usePerBandMultiplier", value).apply()
 
+    override var damping: Float
+        get() = prefs.getFloat("damping", 0.6f)
+        set(value) = prefs.edit().putFloat("damping", value).apply()
+
+    override var cleanUiMode: Boolean
+        get() = prefs.getBoolean("cleanUiMode", false)
+        set(value) = prefs.edit().putBoolean("cleanUiMode", value).apply()
+
+    override var dynamicColorsPlus: Boolean
+        get() = prefs.getBoolean("dynamicColorsPlus", false)
+        set(value) = prefs.edit().putBoolean("dynamicColorsPlus", value).apply()
+
+    override var dynamicColorsInterval: Int
+        get() = prefs.getInt("dynamicColorsInterval", 30)
+        set(value) = prefs.edit().putInt("dynamicColorsInterval", value).apply()
+
     private val _lastMainScreenPageFlow = MutableStateFlow(prefs.getInt("lastMainScreenPage", 0))
     override val lastMainScreenPageFlow: StateFlow<Int> = _lastMainScreenPageFlow
     override var lastMainScreenPage: Int
@@ -143,6 +159,14 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
     override var lastPlayedTrackPath: String?
         get() = prefs.getString("lastPlayedTrackPath", null)
         set(value) = prefs.edit().putString("lastPlayedTrackPath", value).apply()
+
+    override var lastQueueIds: String
+        get() = prefs.getString("lastQueueIds", "") ?: ""
+        set(value) = prefs.edit().putString("lastQueueIds", value).apply()
+
+    override var systemVolume: Float
+        get() = prefs.getFloat("systemVolume", 1.0f)
+        set(value) = prefs.edit().putFloat("systemVolume", value).apply()
 
     override var hasSeenTutorial: Boolean
         get() = prefs.getBoolean("hasSeenTutorial", false)
@@ -237,6 +261,17 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
             prefs.edit().putInt("thumbnailShape", value).apply()
             _thumbnailShapeFlow.value = value
         }
+
+    private val _visualizerElementSizeFlow = MutableStateFlow(prefs.getFloat("visualizerElementSize", 1.0f))
+    override val visualizerElementSizeFlow: StateFlow<Float> = _visualizerElementSizeFlow
+
+    override var visualizerElementSize: Float
+        get() = prefs.getFloat("visualizerElementSize", 1.0f)
+        set(value) {
+            prefs.edit().putFloat("visualizerElementSize", value).apply()
+            _visualizerElementSizeFlow.value = value
+        }
+
     private val _toastFlow = MutableSharedFlow<String>(extraBufferCapacity = 5, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     override val toastFlow: SharedFlow<String> = _toastFlow
 
@@ -299,6 +334,14 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
             _isPatreonUnlockedFlow.value = value
             prefs.edit().putBoolean("isPatreonUnlocked", value).apply()
         }
+
+    override var patreonFailedAttempts: Int
+        get() = prefs.getInt("patreonFailedAttempts", 0)
+        set(value) = prefs.edit().putInt("patreonFailedAttempts", value).apply()
+
+    override var patreonLockoutTime: Long
+        get() = prefs.getLong("patreonLockoutTime", 0L)
+        set(value) = prefs.edit().putLong("patreonLockoutTime", value).apply()
 
     override var showFps: Boolean
         get() = prefs.getBoolean("showFps", false)

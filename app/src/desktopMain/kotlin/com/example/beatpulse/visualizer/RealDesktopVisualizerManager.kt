@@ -5,21 +5,43 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 import kotlin.math.*
 
-class RealDesktopVisualizerManager : AppVisualizerManager {
+import com.example.beatpulse.data.AppPreferences
+
+class RealDesktopVisualizerManager(private val prefs: AppPreferences) : AppVisualizerManager {
+    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Default)
     override val bassAmplitudes = MutableStateFlow(FloatArray(0))
     override val midAmplitudes = MutableStateFlow(FloatArray(0))
     override val highAmplitudes = MutableStateFlow(FloatArray(0))
     override val combinedAmplitudes = MutableStateFlow(FloatArray(0))
-    override val isAdvancedMode = MutableStateFlow(false)
-    override val filterMode = MutableStateFlow<Any>(FilterMode.ALL)
-    override val sensitivity = MutableStateFlow(1.0f)
-    override val reactivity = MutableStateFlow(1.0f)
-    override val damping = MutableStateFlow(0.8f)
-    override val bassMultiplier = MutableStateFlow(1.0f)
-    override val midMultiplier = MutableStateFlow(1.0f)
-    override val trebleMultiplier = MutableStateFlow(1.0f)
-    override val visualizerArchetype = MutableStateFlow(0)
-    override val fftMode = MutableStateFlow("AVERAGE")
+    override val isAdvancedMode = MutableStateFlow(prefs.isAdvancedMode)
+    override val filterMode = MutableStateFlow<Any>(runCatching { FilterMode.valueOf(prefs.filterMode) }.getOrDefault(FilterMode.ALL))
+    override val sensitivity = MutableStateFlow(prefs.sensitivity)
+    override val reactivity = MutableStateFlow(prefs.reactivity)
+    override val damping = MutableStateFlow(prefs.damping)
+    override val bassMultiplier = MutableStateFlow(prefs.bassMultiplier)
+    override val midMultiplier = MutableStateFlow(prefs.midMultiplier)
+    override val trebleMultiplier = MutableStateFlow(prefs.trebleMultiplier)
+    override val visualizerArchetype = MutableStateFlow(prefs.visualizerArchetype)
+    override val fftMode = MutableStateFlow(prefs.visualizerFftMode)
+    override val elementSize = MutableStateFlow(prefs.visualizerElementSize)
+    
+    val physicsMode = MutableStateFlow(runCatching { PhysicsMode.valueOf(prefs.physicsMode) }.getOrDefault(PhysicsMode.EQUILIBRADO))
+
+    init {
+        scope.launch {
+            launch { isAdvancedMode.collect { prefs.isAdvancedMode = it } }
+            launch { visualizerArchetype.collect { prefs.visualizerArchetype = it } }
+            launch { filterMode.collect { prefs.filterMode = it.toString() } }
+            launch { physicsMode.collect { prefs.physicsMode = it.toString() } }
+            launch { sensitivity.collect { prefs.sensitivity = it } }
+            launch { reactivity.collect { prefs.reactivity = it } }
+            launch { damping.collect { prefs.damping = it } }
+            launch { fftMode.collect { prefs.visualizerFftMode = it } }
+            launch { bassMultiplier.collect { prefs.bassMultiplier = it } }
+            launch { midMultiplier.collect { prefs.midMultiplier = it } }
+            launch { trebleMultiplier.collect { prefs.trebleMultiplier = it } }
+        }
+    }
     
     override var isEnabled: Boolean = false
 
@@ -29,7 +51,6 @@ class RealDesktopVisualizerManager : AppVisualizerManager {
     private var sampleIndex = 0
 
     private var captureJob: kotlinx.coroutines.Job? = null
-    private val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO)
     private var targetDataLine: javax.sound.sampled.TargetDataLine? = null
 
     override fun startMicMode(context: Any) {

@@ -34,6 +34,7 @@ class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var exoPlayer: ExoPlayer? = null
     private var presetReverb: PresetReverb? = null
+    private var loudnessEnhancer: android.media.audiofx.LoudnessEnhancer? = null
     private var currentSpeed: Float = 1.0f
     private var currentPitch: Float = 1.0f
 
@@ -109,8 +110,15 @@ class PlaybackService : MediaSessionService() {
                         preset = PresetReverb.PRESET_LARGEHALL
                         enabled = reverbEnabledFlow.value
                     }
+                    
+                    loudnessEnhancer?.release()
+                    loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(audioSessionId).apply {
+                        enabled = true
+                        setTargetGain(0)
+                    }
                 } catch (e: Exception) {
                     presetReverb = null
+                    loudnessEnhancer = null
                 }
             }
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
@@ -155,8 +163,12 @@ class PlaybackService : MediaSessionService() {
                     preset = PresetReverb.PRESET_LARGEHALL
                     enabled = reverbEnabledFlow.value
                 }
+                loudnessEnhancer = android.media.audiofx.LoudnessEnhancer(player.audioSessionId).apply {
+                    enabled = true
+                    setTargetGain(0)
+                }
             } catch (e: Exception) {
-                // Some devices may not support PresetReverb
+                // Some devices may not support PresetReverb or LoudnessEnhancer
             }
 
             // Restore saved speed/pitch
@@ -283,6 +295,17 @@ class PlaybackService : MediaSessionService() {
                     presetReverb?.enabled = enabled
                 } catch (e: Exception) { }
             }
+            "SET_VOLUME_AMPLIFICATION" -> {
+                val volume = intent.getFloatExtra("volume", 1.0f)
+                try {
+                    if (volume > 1.0f) {
+                        val gainMb = (Math.log10(volume.toDouble()) * 2000).toInt()
+                        loudnessEnhancer?.setTargetGain(gainMb)
+                    } else {
+                        loudnessEnhancer?.setTargetGain(0)
+                    }
+                } catch (e: Exception) { }
+            }
         }
         return super.onStartCommand(intent, flags, startId)
     }
@@ -325,6 +348,8 @@ class PlaybackService : MediaSessionService() {
         try {
             presetReverb?.release()
             presetReverb = null
+            loudnessEnhancer?.release()
+            loudnessEnhancer = null
         } catch (e: Exception) { }
         equalizerManager.release()
         audioSessionIdFlow.value = C.AUDIO_SESSION_ID_UNSET

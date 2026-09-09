@@ -12,6 +12,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -24,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.example.beatpulse.data.TrackEntity
 import kotlinx.coroutines.launch
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AudioTrimmerDialog(
     track: TrackEntity,
@@ -143,7 +146,7 @@ fun AudioTrimmerDialog(
                     }
                     
                     Text(
-                        text = com.example.beatpulse.utils.getLocalizedString("trim_audio_anchor").replace("%s", formatTime(anchorMs.toLong())),
+                        text = com.example.beatpulse.utils.getLocalizedString("trim_audio_anchor").replace("%1\$s", formatTime(anchorMs.toLong())).replace("%s", formatTime(anchorMs.toLong())),
                         fontWeight = FontWeight.Bold,
                         color = colorText
                     )
@@ -152,8 +155,8 @@ fun AudioTrimmerDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(com.example.beatpulse.utils.getLocalizedString("start_time").replace("%s", formatTime(startMs.toLong())), color = colorVibrant)
-                        Text(com.example.beatpulse.utils.getLocalizedString("end_time").replace("%s", formatTime(endMs.toLong())), color = colorVibrant)
+                        Text(com.example.beatpulse.utils.getLocalizedString("start_time").replace("%1\$s", formatTime(startMs.toLong())).replace("%s", formatTime(startMs.toLong())), color = colorVibrant)
+                        Text(com.example.beatpulse.utils.getLocalizedString("end_time").replace("%1\$s", formatTime(endMs.toLong())).replace("%s", formatTime(endMs.toLong())), color = colorVibrant)
                     }
 
                     TrimmerTimeline(
@@ -171,40 +174,45 @@ fun AudioTrimmerDialog(
                         modifier = Modifier.fillMaxWidth().height(100.dp).padding(vertical = 16.dp)
                     )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Button(
-                            onClick = { playFrom(startMs) },
-                            colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
-                            Spacer(Modifier.width(4.dp))
-                            Text(com.example.beatpulse.utils.getLocalizedString("trim_audio_start_btn"), color = Color.White)
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            IconButton(
+                                onClick = { playFrom(startMs) },
+                                modifier = Modifier.background(colorVibrant.copy(alpha=0.15f), shape=androidx.compose.foundation.shape.CircleShape).size(48.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Start", tint = colorVibrant, modifier = Modifier.size(24.dp))
+                            }
+                            Text(com.example.beatpulse.utils.getLocalizedString("trim_audio_start_btn"), fontSize = 10.sp, color = colorText.copy(alpha=0.7f), textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
                         }
-
-                        Button(
-                            onClick = { if (isPlaying) isPlaying = false else playFrom(anchorMs) },
-                            colors = ButtonDefaults.buttonColors(containerColor = if (isPlaying) Color.Red else colorVibrant)
-                        ) {
-                            Icon(
-                                imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
-                                contentDescription = null,
-                                tint = Color.White
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (isPlaying) com.example.beatpulse.utils.getLocalizedString("trim_audio_stop") else com.example.beatpulse.utils.getLocalizedString("trim_audio_play_anchor"), color = Color.White)
+                        
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            FloatingActionButton(
+                                onClick = { if (isPlaying) isPlaying = false else playFrom(anchorMs) },
+                                containerColor = if (isPlaying) MaterialTheme.colorScheme.error else colorVibrant,
+                                contentColor = colorSurface,
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            ) {
+                                Icon(
+                                    imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
+                                    contentDescription = "Anchor",
+                                    modifier = Modifier.size(32.dp)
+                                )
+                            }
+                            Text(if (isPlaying) com.example.beatpulse.utils.getLocalizedString("trim_audio_stop") else com.example.beatpulse.utils.getLocalizedString("trim_audio_play_anchor"), fontSize = 10.sp, color = colorText.copy(alpha=0.7f), textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
                         }
-
-                        Button(
-                            onClick = { playFrom((endMs - 10000f).coerceAtLeast(startMs)) },
-                            colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White)
-                            Spacer(Modifier.width(4.dp))
-                            Text(com.example.beatpulse.utils.getLocalizedString("trim_audio_minus_10s"), color = Color.White)
+                        
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            IconButton(
+                                onClick = { playFrom((endMs - 10000f).coerceAtLeast(startMs)) },
+                                modifier = Modifier.background(colorVibrant.copy(alpha=0.15f), shape=androidx.compose.foundation.shape.CircleShape).size(48.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "-10s", tint = colorVibrant, modifier = Modifier.size(24.dp))
+                            }
+                            Text(com.example.beatpulse.utils.getLocalizedString("trim_audio_minus_10s"), fontSize = 10.sp, color = colorText.copy(alpha=0.7f), textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = Modifier.padding(top = 4.dp))
                         }
                     }
 

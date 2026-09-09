@@ -110,6 +110,22 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
         get() = getBoolean("usePerBandMultiplier", false)
         set(value) = setBoolean("usePerBandMultiplier", value)
 
+    override var damping: Float
+        get() = getFloat("damping", 0.6f)
+        set(value) = setFloat("damping", value)
+
+    override var cleanUiMode: Boolean
+        get() = getBoolean("cleanUiMode", false)
+        set(value) = setBoolean("cleanUiMode", value)
+
+    override var dynamicColorsPlus: Boolean
+        get() = getBoolean("dynamicColorsPlus", false)
+        set(value) = setBoolean("dynamicColorsPlus", value)
+
+    override var dynamicColorsInterval: Int
+        get() = getInt("dynamicColorsInterval", 30)
+        set(value) = setInt("dynamicColorsInterval", value)
+
     private val _lastMainScreenPageFlow = MutableStateFlow(getInt("lastMainScreenPage", 0))
     override val lastMainScreenPageFlow: StateFlow<Int> = _lastMainScreenPageFlow
     override var lastMainScreenPage: Int
@@ -146,6 +162,12 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
     override var lastPlayedTrackPath: String?
         get() = cache["lastPlayedTrackPath"]
         set(value) = setString("lastPlayedTrackPath", value)
+    override var lastQueueIds: String
+        get() = getString("lastQueueIds", "")
+        set(value) = setString("lastQueueIds", value)
+    override var systemVolume: Float
+        get() = getFloat("systemVolume", 1.0f)
+        set(value) = setFloat("systemVolume", value)
     override var hasSeenTutorial: Boolean
         get() = getBoolean("hasSeenTutorial", false)
         set(value) = setBoolean("hasSeenTutorial", value)
@@ -216,6 +238,16 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
             setInt("thumbnailShape", value)
         }
 
+    private val _visualizerElementSizeFlow = MutableStateFlow(getFloat("visualizerElementSize", 1.0f))
+    override val visualizerElementSizeFlow: StateFlow<Float> = _visualizerElementSizeFlow
+
+    override var visualizerElementSize: Float
+        get() = _visualizerElementSizeFlow.value
+        set(value) {
+            _visualizerElementSizeFlow.value = value
+            setFloat("visualizerElementSize", value)
+        }
+
     private val _toastFlow = MutableSharedFlow<String>(extraBufferCapacity = 10)
     override val toastFlow: SharedFlow<String> = _toastFlow
     override fun showToast(message: String) {
@@ -270,6 +302,14 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
             _isPatreonUnlockedFlow.value = value
             setBoolean("isPatreonUnlocked", value)
         }
+
+    override var patreonFailedAttempts: Int
+        get() = getInt("patreonFailedAttempts", 0)
+        set(value) = setInt("patreonFailedAttempts", value)
+
+    override var patreonLockoutTime: Long
+        get() = getLong("patreonLockoutTime", 0L)
+        set(value) = setLong("patreonLockoutTime", value)
 
     override var showFps: Boolean
         get() = getBoolean("showFps", false)

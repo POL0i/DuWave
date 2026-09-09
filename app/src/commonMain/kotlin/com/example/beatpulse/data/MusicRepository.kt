@@ -132,11 +132,22 @@ class MusicRepository(private val db: AppDatabase, private val scanner: ILibrary
                 // For now, if folderPath is null (Android MediaStore scan), we delete missing. 
                 // If folderPath is provided (Desktop folder import), we don't delete others.
                 if (folderPath == null) {
-                    val localExistingIds = existingMap.values.filter { !it.dataPath.startsWith("youtube://") && !it.dataPath.startsWith("http") }.map { it.id }.toSet()
-                    val missingIds = localExistingIds - foundIds
-                    if (missingIds.isNotEmpty()) {
-                        missingIds.chunked(500).forEach { chunk ->
-                            dao.deleteTracksById(chunk)
+                    val isAndroid = java.lang.System.getProperty("java.vendor")?.contains("Android") == true
+                    if (isAndroid) {
+                        val localExistingIds = existingMap.values.filter { !it.dataPath.startsWith("youtube://") && !it.dataPath.startsWith("http") }.map { it.id }.toSet()
+                        val missingIds = localExistingIds - foundIds
+                        if (missingIds.isNotEmpty()) {
+                            missingIds.chunked(500).forEach { chunk ->
+                                dao.deleteTracksById(chunk)
+                            }
+                        }
+                    } else {
+                        val localExistingTracks = existingMap.values.filter { !it.dataPath.startsWith("youtube://") && !it.dataPath.startsWith("http") }
+                        val missingIds = localExistingTracks.filter { !java.io.File(it.dataPath).exists() }.map { it.id }.toSet()
+                        if (missingIds.isNotEmpty()) {
+                            missingIds.chunked(500).forEach { chunk ->
+                                dao.deleteTracksById(chunk)
+                            }
                         }
                     }
                 }

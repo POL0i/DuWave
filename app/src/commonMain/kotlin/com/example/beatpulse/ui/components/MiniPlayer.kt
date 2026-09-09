@@ -42,6 +42,7 @@ fun MiniPlayer(
     accentColor: Color,
     paletteColors: PaletteColors,
     bgStyle: Int,
+    thumbnailShapeIdx: Int,
     onClick: () -> Unit,
     onPlayPauseClick: () -> Unit
 ) {
@@ -107,14 +108,14 @@ fun MiniPlayer(
                     contentDescription = "Album Art",
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp)),
+                        .clip(com.example.beatpulse.ui.utils.getShapeForIndex(thumbnailShapeIdx)),
                     contentScale = ContentScale.Crop
                 )
             } else {
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(com.example.beatpulse.ui.utils.getShapeForIndex(thumbnailShapeIdx))
                         .background(Color.DarkGray)
                 )
             }

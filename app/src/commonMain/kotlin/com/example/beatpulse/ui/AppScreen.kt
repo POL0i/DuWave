@@ -73,6 +73,11 @@ fun AppScreen(
     val dynamicColorsInterval = playerViewModel.dynamicColorsInterval.collectAsState().value
     
     var activeDynamicColor by remember { mutableStateOf<Color?>(null) }
+    
+    LaunchedEffect(Unit) {
+        com.example.beatpulse.data.sync.EcosystemManager.startEcosystem()
+    }
+    
     LaunchedEffect(dynamicColorsPlus, dynamicColorsInterval, paletteColorsFlow) {
         if (!dynamicColorsPlus) {
             activeDynamicColor = null

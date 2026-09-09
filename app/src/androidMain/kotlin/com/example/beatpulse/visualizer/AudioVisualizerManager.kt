@@ -98,9 +98,26 @@ class AudioVisualizerManager(private val prefs: AppPreferences) : AppVisualizerM
     val physicsMode = MutableStateFlow(runCatching { PhysicsMode.valueOf(prefs.physicsMode) }.getOrDefault(PhysicsMode.EQUILIBRADO))
     override val sensitivity = MutableStateFlow(prefs.sensitivity)
     override val reactivity = MutableStateFlow(prefs.reactivity)
-    override val damping = MutableStateFlow(0.8f)
+    override val damping = MutableStateFlow(prefs.damping)
+
+    init {
+        managerScope.launch {
+            launch { isAdvancedMode.collect { prefs.isAdvancedMode = it } }
+            launch { visualizerArchetype.collect { prefs.visualizerArchetype = it } }
+            launch { filterMode.collect { prefs.filterMode = it.toString() } }
+            launch { physicsMode.collect { prefs.physicsMode = it.toString() } }
+            launch { sensitivity.collect { prefs.sensitivity = it } }
+            launch { reactivity.collect { prefs.reactivity = it } }
+            launch { damping.collect { prefs.damping = it } }
+            launch { fftMode.collect { prefs.visualizerFftMode = it } }
+            launch { bassMultiplier.collect { prefs.bassMultiplier = it } }
+            launch { midMultiplier.collect { prefs.midMultiplier = it } }
+            launch { trebleMultiplier.collect { prefs.trebleMultiplier = it } }
+        }
+    }
 
     override val fftMode = MutableStateFlow(prefs.visualizerFftMode)
+    override val elementSize = MutableStateFlow(prefs.visualizerElementSize)
 
     override val bassMultiplier = MutableStateFlow(prefs.bassMultiplier)
     override val midMultiplier = MutableStateFlow(prefs.midMultiplier)

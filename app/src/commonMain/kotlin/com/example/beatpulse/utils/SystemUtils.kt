@@ -17,6 +17,12 @@ expect object SystemUtils {
     val isMobilePlatform: Boolean
     
     fun dispatchSystemBack(): Boolean
+    
+    // Devuelve el volumen del sistema, normalizado entre 0.0f y 1.0f
+    fun getSystemVolumeLevel(): Float
+    
+    // Ajusta el volumen del sistema, normalizado entre 0.0f y 1.0f
+    fun setSystemVolumeLevel(volume: Float)
 }
 
 @androidx.compose.runtime.Composable

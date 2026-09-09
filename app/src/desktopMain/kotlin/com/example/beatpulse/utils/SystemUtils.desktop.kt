@@ -61,6 +61,20 @@ actual object SystemUtils {
         }
         return false
     }
+
+    // In desktop music players (like Spotify, VLC), standard behavior is to NOT control
+    // the global OS master volume, but rather an internal application volume.
+    // We maintain this internal state here to sync with the slider, while the actual 
+    // audio amplification/reduction is done via DesktopPlayerAdapter multiplying the PCM samples.
+    private var desktopAppVolume: Float = 1.0f
+
+    actual fun getSystemVolumeLevel(): Float {
+        return desktopAppVolume
+    }
+
+    actual fun setSystemVolumeLevel(volume: Float) {
+        desktopAppVolume = volume.coerceIn(0f, 1f)
+    }
 }
 
 @androidx.compose.runtime.Composable

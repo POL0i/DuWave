@@ -67,6 +67,8 @@ fun BottomNavigationBar(
             }
         }
     }
+    
+    val thumbnailShapeIdx by prefs.thumbnailShapeFlow.collectAsState()
 
     val totalOffset by animateFloatAsState(
         targetValue = animatedDrag + hintingOffset,
@@ -155,6 +157,7 @@ fun BottomNavigationBar(
                             accentColor = accentColor,
                             paletteColors = paletteColors,
                             bgStyle = bgStyle,
+                            thumbnailShapeIdx = thumbnailShapeIdx,
                             onClick = { onPageChange(2) },
                             onPlayPauseClick = onPlayPauseClick
                         )

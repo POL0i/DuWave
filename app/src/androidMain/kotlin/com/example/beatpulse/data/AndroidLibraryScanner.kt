@@ -54,11 +54,7 @@ class AndroidLibraryScanner(private val context: Context, private val dao: Track
                     continue
                 }
 
-                if (dataPath.isNotEmpty() && !dataPath.startsWith("http") && !dataPath.startsWith("youtube://")) {
-                    if (!File(dataPath).exists()) {
-                        continue
-                    }
-                }
+                // Trust MediaStore on Android instead of File.exists() due to Scoped Storage limitations
 
                 val id = it.getLong(idColumn)
                 var title = it.getString(titleColumn) ?: "Unknown Title"

@@ -7,6 +7,10 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.animation.animateContentSize
@@ -60,6 +64,7 @@ import com.example.beatpulse.utils.getLocalizedString
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
@@ -625,19 +630,30 @@ fun PlayerSupportDialog(
                     }
                 }
                 
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                Text(
-                    text = getLocalizedString("support_patreon"),
-                    color = colorVibrant,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.clickable {
+                Card(
+                    onClick = {
                         uriHandler.openUri("https://www.patreon.com/c/aldearius/membership")
-                    }.padding(vertical = 4.dp)
-                )
+                    },
+                    colors = CardDefaults.cardColors(containerColor = colorVibrant.copy(alpha = 0.15f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = androidx.compose.material.icons.Icons.Default.Star,
+                            contentDescription = null,
+                            tint = animatedColor,
+                            modifier = Modifier.size(32.dp)
+                        )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text("Patreon", fontWeight = FontWeight.Bold, color = animatedColor)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(getLocalizedString("support_patreon"), color = dynamicTextColor, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
                 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 
                 OutlinedTextField(
                     value = patreonCode,
@@ -662,12 +678,32 @@ fun PlayerSupportDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val expected = listOf(68, 85, 87, 65, 86, 69, 50, 48, 50, 54)
-                    val isValid = patreonCode.length == expected.size && patreonCode.map { it.code } == expected
-                    if (isValid) {
+                    val now = System.currentTimeMillis()
+                    val lockoutDuration = 15 * 60 * 1000L // 15 minutos
+                    
+                    if (prefs.patreonFailedAttempts >= 5 && now - prefs.patreonLockoutTime < lockoutDuration) {
+                        prefs.showToast("Demasiados intentos. Inténtalo en 15 minutos.")
+                        return@Button
+                    }
+                    
+                    if (now - prefs.patreonLockoutTime >= lockoutDuration) {
+                        prefs.patreonFailedAttempts = 0
+                    }
+
+                    // Hash esperado para "PatreonWave26"
+                    val expectedHash = "00989f959041896e737d732b9f722eec266b966fcdffcf7053d0a7802a2153ee"
+                    val inputHash = com.example.beatpulse.utils.sha256Hash(patreonCode.trim())
+                    
+                    if (inputHash == expectedHash) {
                         prefs.isPatreonUnlocked = true
+                        prefs.patreonFailedAttempts = 0
                         showSuccess = true
                     } else {
+                        prefs.patreonFailedAttempts += 1
+                        if (prefs.patreonFailedAttempts >= 5) {
+                            prefs.patreonLockoutTime = now
+                            prefs.showToast("Has sido bloqueado por 15 minutos.")
+                        }
                         codeError = true
                     }
                 },
@@ -703,7 +739,31 @@ fun PlayerSettingsSheet(
     styleNames: Map<VisualizerStyle, String>
 ) {
     if (!showSettingsMenu) return
+    
+    val dynamicTextColor = if (colorDominant.luminance() < 0.5f) Color.White else Color.Black
 
+    val colorVibrant = androidx.compose.runtime.remember(colorVibrant, colorDominant) {
+        val contrast = kotlin.math.abs(colorVibrant.luminance() - colorDominant.luminance())
+        if (contrast < 0.25f) {
+            if (colorDominant.luminance() < 0.5f) {
+                // Lighten
+                colorVibrant.copy(
+                    red = colorVibrant.red + (1f - colorVibrant.red) * 0.6f,
+                    green = colorVibrant.green + (1f - colorVibrant.green) * 0.6f,
+                    blue = colorVibrant.blue + (1f - colorVibrant.blue) * 0.6f
+                )
+            } else {
+                // Darken
+                colorVibrant.copy(
+                    red = colorVibrant.red * 0.4f,
+                    green = colorVibrant.green * 0.4f,
+                    blue = colorVibrant.blue * 0.4f
+                )
+            }
+        } else {
+            colorVibrant
+        }
+    }
     val thumbnailShapeIdx by prefs.thumbnailShapeFlow.collectAsState()
     val abRepeatModeEnabled by playerViewModel.abRepeatModeEnabled.collectAsState()
     val visualizerArchetype by visualizerManager.visualizerArchetype.collectAsState()
@@ -711,6 +771,7 @@ fun PlayerSettingsSheet(
     val reactivity by visualizerManager.reactivity.collectAsState()
     val damping by visualizerManager.damping.collectAsState()
     val bassMult by visualizerManager.bassMultiplier.collectAsState()
+    val elementSize by visualizerManager.elementSize.collectAsState()
     val midMult by visualizerManager.midMultiplier.collectAsState()
     val trebleMult by visualizerManager.trebleMultiplier.collectAsState()
     val sensitivity by visualizerManager.sensitivity.collectAsState()
@@ -773,41 +834,70 @@ fun PlayerSettingsSheet(
                     Column(modifier = Modifier.fillMaxWidth()) {
                         if (page == 0) {
                     // TAB 1: Básicas
+                    val volume by playerViewModel.systemVolume.collectAsState()
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            Text(getLocalizedString("volume"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        
+                        val shapeIdx = thumbnailShapeIdx
+                        val thumbnailShape = remember(shapeIdx) {
+                            com.example.beatpulse.ui.utils.getShapeForIndex(shapeIdx)
+                        }
+                        
+                        DynamicVolumeSlider(
+                            value = volume,
+                            onValueChange = { playerViewModel.setSystemVolume(it) },
+                            colorNormal = colorVibrant,
+                            colorBoost = Color.White,
+                            shape = thumbnailShape,
+                            modifier = Modifier.fillMaxWidth().height(32.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
                     val isShuffleEnabled by playerViewModel.shuffleModeEnabled.collectAsState()
                     val currentMode by playerViewModel.repeatMode.collectAsState()
                     
-                    Text(getLocalizedString("playback_options"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Text(getLocalizedString("playback_options"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                         // Aleatorio as an icon button instead of switch
                         androidx.compose.material3.IconButton(onClick = { playerViewModel.shuffleModeEnabled.value = !isShuffleEnabled }) {
-                            Icon(Icons.Default.Shuffle, contentDescription = "Aleatorio", tint = if (isShuffleEnabled) colorVibrant else Color.Gray)
+                            Icon(Icons.Default.Shuffle, contentDescription = "Aleatorio", tint = if (isShuffleEnabled) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                         }
                         
                         // Loop modes as icon buttons
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             // Apagado
                             androidx.compose.material3.IconButton(onClick = { playerViewModel.setRepeatMode(0) }) {
-                                Icon(Icons.Default.Close, contentDescription = "Apagado", tint = if (!abRepeatModeEnabled && currentMode == 0) colorVibrant else Color.Gray)
+                                Icon(Icons.Default.Close, contentDescription = "Apagado", tint = if (!abRepeatModeEnabled && currentMode == 0) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                             }
                             // Lista
                             androidx.compose.material3.IconButton(onClick = { playerViewModel.setRepeatMode(2) }) {
-                                Icon(Icons.Default.Repeat, contentDescription = "Lista", tint = if (!abRepeatModeEnabled && currentMode == 2) colorVibrant else Color.Gray)
+                                Icon(Icons.Default.Repeat, contentDescription = "Lista", tint = if (!abRepeatModeEnabled && currentMode == 2) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                             }
                             // Una
                             androidx.compose.material3.IconButton(onClick = { playerViewModel.setRepeatMode(1) }) {
-                                Icon(Icons.Default.RepeatOne, contentDescription = "Una", tint = if (!abRepeatModeEnabled && currentMode == 1) colorVibrant else Color.Gray)
+                                Icon(Icons.Default.RepeatOne, contentDescription = "Una", tint = if (!abRepeatModeEnabled && currentMode == 1) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                             }
                             // A-B
                             androidx.compose.material3.TextButton(onClick = { 
                                 (playerViewModel.abRepeatModeEnabled as? kotlinx.coroutines.flow.MutableStateFlow)?.value = !abRepeatModeEnabled 
                             }) {
-                                Text("A-B", color = if (abRepeatModeEnabled) colorVibrant else Color.Gray, fontWeight = FontWeight.Bold)
+                                Text("A-B", color = if (abRepeatModeEnabled) colorVibrant else dynamicTextColor.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text(getLocalizedString("visual_style"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    val sortedStyles = remember(favoriteVisualizerStyles) {
+                        VisualizerStyle.values().sortedByDescending { it.name in favoriteVisualizerStyles }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        Text(getLocalizedString("visual_style"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
+                    }
+                    
                     val infiniteTransition = rememberInfiniteTransition()
                     val phase by infiniteTransition.animateFloat(
                         initialValue = 0f, targetValue = 2f * kotlin.math.PI.toFloat(),
@@ -815,26 +905,13 @@ fun PlayerSettingsSheet(
                     )
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                        val sortedStyles = remember(favoriteVisualizerStyles) {
-                            VisualizerStyle.values().sortedByDescending { it.name in favoriteVisualizerStyles }
-                        }
-                        
-                        val pages = sortedStyles.chunked(8)
-                        val pagerState = androidx.compose.foundation.pager.rememberPagerState(pageCount = { pages.size })
-                        
-                            androidx.compose.foundation.pager.HorizontalPager(
-                                state = pagerState,
-                                modifier = Modifier.fillMaxWidth().height(220.dp)
-                            ) { pageIdx ->
-                                val pageStyles = pages[pageIdx]
-                                androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
-                                    columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(4),
-                                    modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    userScrollEnabled = false
-                                ) {
-                                    items(pageStyles, key = { it.name }) { style ->
+                            androidx.compose.foundation.lazy.grid.LazyHorizontalGrid(
+                                rows = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
+                                modifier = Modifier.fillMaxWidth().height(185.dp).padding(horizontal = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                items(sortedStyles, key = { it.name }) { style ->
                                         val isSelected = currentStyle == style
                                         val isFavorite = style.name in favoriteVisualizerStyles
                                         
@@ -852,7 +929,7 @@ fun PlayerSettingsSheet(
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             androidx.compose.foundation.layout.Box(
-                                                modifier = Modifier.fillMaxWidth().height(70.dp)
+                                                modifier = Modifier.width(76.dp).height(70.dp)
                                             ) {
                                                 // The clipped container for the preview
                                                 androidx.compose.foundation.layout.Box(
@@ -862,7 +939,7 @@ fun PlayerSettingsSheet(
                                                         .clip(RoundedCornerShape(8.dp))
                                                         .border(
                                                             width = if (isSelected) 2.dp else 1.dp,
-                                                            color = if (isSelected) colorVibrant else Color.Gray.copy(alpha = 0.5f),
+                                                            color = if (isSelected) colorVibrant else dynamicTextColor.copy(alpha = 0.6f).copy(alpha = 0.5f),
                                                             shape = RoundedCornerShape(8.dp)
                                                         )
                                                         .background(if (isSelected) colorVibrant.copy(alpha=0.15f) else Color.Transparent)
@@ -870,7 +947,7 @@ fun PlayerSettingsSheet(
                                                 ) {
                                                     // Draw the wave preview in center
                                                     androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                                        WavePreview(style = style, color = if (isSelected) colorVibrant else Color.Gray)
+                                                        WavePreview(style = style, color = if (isSelected) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                                                     }
                                                 }
                                                     
@@ -878,7 +955,7 @@ fun PlayerSettingsSheet(
                                                     Icon(
                                                         imageVector = Icons.Filled.Star,
                                                         contentDescription = "Favorite",
-                                                        tint = if (isFavorite) colorVibrant else Color.Gray.copy(alpha = 0.3f),
+                                                        tint = if (isFavorite) colorVibrant else dynamicTextColor.copy(alpha = 0.6f).copy(alpha = 0.3f),
                                                         modifier = Modifier
                                                             .align(Alignment.TopEnd)
                                                             .offset(x = 6.dp, y = (-6).dp)
@@ -897,7 +974,7 @@ fun PlayerSettingsSheet(
                                                 Spacer(modifier = Modifier.height(6.dp))
                                                 Text(
                                                     text = styleNames[style] ?: style.name,
-                                                    color = if (isSelected) colorVibrant else Color.Gray,
+                                                    color = if (isSelected) colorVibrant else dynamicTextColor.copy(alpha = 0.6f),
                                                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal),
                                                     maxLines = 1,
                                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
@@ -905,45 +982,24 @@ fun PlayerSettingsSheet(
                                             }
                                         }
                                     }
-                                }
                         Spacer(modifier = Modifier.height(12.dp))
-                        // Pager indicators
-                        val coroutineScope = rememberCoroutineScope()
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            repeat(pages.size) { iteration ->
-                                val color = if (pagerState.currentPage == iteration) colorVibrant else Color.Gray.copy(alpha = 0.5f)
-                                androidx.compose.foundation.layout.Box(
-                                    modifier = Modifier
-                                        .padding(4.dp)
-                                        .clip(androidx.compose.foundation.shape.CircleShape)
-                                        .background(color)
-                                        .size(12.dp) // made bigger for easier clicking
-                                        .clickable { coroutineScope.launch { pagerState.animateScrollToPage(iteration) } }
-                                )
-                            }
-                        }
                     }
-
-
                 } else if (page == 1) {
                     // TAB 2: Avanzados
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("Ondas Visuales (Archetype)", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Text("Ondas Visuales (Archetype)", color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         TextButton(onClick = { visualizerManager.visualizerArchetype.value = 0 }) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.Waves, contentDescription = null, tint = if (visualizerArchetype == 0) colorVibrant else Color.Gray)
-                                Text(getLocalizedString("three_overlapping_waves"), color = if (visualizerArchetype == 0) colorVibrant else Color.Gray, fontSize = 12.sp)
+                                Icon(Icons.Default.Waves, contentDescription = null, tint = if (visualizerArchetype == 0) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
+                                Text(getLocalizedString("three_overlapping_waves"), color = if (visualizerArchetype == 0) colorVibrant else dynamicTextColor.copy(alpha = 0.6f), fontSize = 12.sp)
                             }
                         }
                         TextButton(onClick = { visualizerManager.visualizerArchetype.value = 1 }) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Icon(Icons.Default.GraphicEq, contentDescription = null, tint = if (visualizerArchetype == 1) colorVibrant else Color.Gray)
-                                Text("1 Onda combinada", color = if (visualizerArchetype == 1) colorVibrant else Color.Gray, fontSize = 12.sp)
+                                Icon(Icons.Default.GraphicEq, contentDescription = null, tint = if (visualizerArchetype == 1) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
+                                Text("1 Onda combinada", color = if (visualizerArchetype == 1) colorVibrant else dynamicTextColor.copy(alpha = 0.6f), fontSize = 12.sp)
                             }
                         }
                     }
@@ -952,7 +1008,7 @@ fun PlayerSettingsSheet(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable {
                         visualizerManager.isAdvancedMode.value = !isAdvancedMode
                     }) {
-                        Text(if (isAdvancedMode) "Sensibilidad por frecuencias (Avanzado)" else getLocalizedString("general_sensitivity"), color = Color.Gray, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                        Text(if (isAdvancedMode) "Sensibilidad por frecuencias (Avanzado)" else getLocalizedString("general_sensitivity"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
                         androidx.compose.material3.Switch(
                             checked = isAdvancedMode,
                             onCheckedChange = { visualizerManager.isAdvancedMode.value = it },
@@ -1009,7 +1065,7 @@ fun PlayerSettingsSheet(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(getLocalizedString("fluidity"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                            Text(getLocalizedString("fluidity"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                             Slider(
                                 value = damping,
                                 onValueChange = { visualizerManager.damping.value = it },
@@ -1018,7 +1074,7 @@ fun PlayerSettingsSheet(
                             )
                         }
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(getLocalizedString("reactivity"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                            Text(getLocalizedString("reactivity"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                             Slider(
                                 value = reactivity,
                                 onValueChange = { visualizerManager.reactivity.value = it },
@@ -1028,11 +1084,24 @@ fun PlayerSettingsSheet(
                         }
                     }
                     
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text("Tamaño del Gráfico: ${String.format("%.2fx", elementSize)}", color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
+                        CustomThickSlider(
+                            value = elementSize,
+                            onValueChange = { visualizerManager.elementSize.value = it },
+                            valueRange = 0.5f..2.0f,
+                            activeColor = colorVibrant,
+                            inactiveColor = colorVibrant.copy(alpha = 0.3f),
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    
                     Spacer(modifier = Modifier.height(24.dp))
 
                 } else if (page == 2) {
                     // TAB 3: Visuales
-                    Text("Opciones Avanzadas de Portada", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Text("Opciones Avanzadas de Portada", color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
@@ -1044,7 +1113,7 @@ fun PlayerSettingsSheet(
                                 Icon(
                                     imageVector = if (cleanUiMode) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
                                     contentDescription = "Modo Limpio",
-                                    tint = if (cleanUiMode) colorVibrant else Color.Gray
+                                    tint = if (cleanUiMode) colorVibrant else dynamicTextColor.copy(alpha = 0.6f)
                                 )
                             }
                             Text(getLocalizedString("clean_ui"), color = Color.White, style = MaterialTheme.typography.bodySmall)
@@ -1058,7 +1127,7 @@ fun PlayerSettingsSheet(
                                 Icon(
                                     imageVector = if (coverDragEnabled) Icons.Filled.OpenWith else Icons.Filled.Lock,
                                     contentDescription = "Mover portada",
-                                    tint = if (coverDragEnabled) colorVibrant else Color.Gray
+                                    tint = if (coverDragEnabled) colorVibrant else dynamicTextColor.copy(alpha = 0.6f)
                                 )
                             }
                             Text(getLocalizedString("move"), color = Color.White, style = MaterialTheme.typography.bodySmall)
@@ -1072,7 +1141,7 @@ fun PlayerSettingsSheet(
                                 Icon(
                                     imageVector = Icons.Filled.AutoAwesome,
                                     contentDescription = "Dinamicidad Plus",
-                                    tint = if (dynamicColorsPlus) colorVibrant else Color.Gray
+                                    tint = if (dynamicColorsPlus) colorVibrant else dynamicTextColor.copy(alpha = 0.6f)
                                 )
                             }
                             Text(getLocalizedString("dynamic_plus"), color = Color.White, style = MaterialTheme.typography.bodySmall)
@@ -1081,7 +1150,7 @@ fun PlayerSettingsSheet(
                     
                     if (dynamicColorsPlus) {
                         Spacer(modifier = Modifier.height(16.dp))
-                        Text("Intervalo: $dynamicColorsInterval s", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                        Text("Intervalo: $dynamicColorsInterval s", color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                         Slider(
                             value = dynamicColorsInterval.toFloat(),
                             onValueChange = { playerViewModel.setDynamicColorsInterval(it.toInt()) },
@@ -1095,14 +1164,14 @@ fun PlayerSettingsSheet(
                     HorizontalDivider(color = Color.DarkGray)
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("Modo de Portada", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Text("Modo de Portada", color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             IconToggleButton(
                                 checked = coverVisibilityMode == "NORMAL",
                                 onCheckedChange = { playerViewModel.setCoverVisibilityMode("NORMAL") }
                             ) {
-                                Icon(Icons.Filled.Image, contentDescription = getLocalizedString("normal"), tint = if (coverVisibilityMode == "NORMAL") colorVibrant else Color.Gray)
+                                Icon(Icons.Filled.Image, contentDescription = getLocalizedString("normal"), tint = if (coverVisibilityMode == "NORMAL") colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                             }
                             Text(getLocalizedString("normal"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
@@ -1112,7 +1181,7 @@ fun PlayerSettingsSheet(
                                 checked = coverVisibilityMode == "CHROMA_KEY",
                                 onCheckedChange = { playerViewModel.setCoverVisibilityMode("CHROMA_KEY") }
                             ) {
-                                Icon(Icons.Filled.Colorize, contentDescription = "Chroma Key", tint = if (coverVisibilityMode == "CHROMA_KEY") colorVibrant else Color.Gray)
+                                Icon(Icons.Filled.Colorize, contentDescription = "Chroma Key", tint = if (coverVisibilityMode == "CHROMA_KEY") colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                             }
                             Text("Chroma", color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
@@ -1122,7 +1191,7 @@ fun PlayerSettingsSheet(
                                 checked = coverVisibilityMode == "HIDDEN",
                                 onCheckedChange = { playerViewModel.setCoverVisibilityMode("HIDDEN") }
                             ) {
-                                Icon(Icons.Filled.Clear, contentDescription = getLocalizedString("hidden"), tint = if (coverVisibilityMode == "HIDDEN") colorVibrant else Color.Gray)
+                                Icon(Icons.Filled.Clear, contentDescription = getLocalizedString("hidden"), tint = if (coverVisibilityMode == "HIDDEN") colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                             }
                             Text(getLocalizedString("hidden"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
@@ -1149,7 +1218,7 @@ fun PlayerSettingsSheet(
                     val showFps by playerViewModel.showFps.collectAsState()
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(0.5f)) {
-                            Text(getLocalizedString("size"), color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                            Text(getLocalizedString("size"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                             Slider(
                                 value = coverScale,
                                 onValueChange = { playerViewModel.setCoverScale(it) },
@@ -1262,6 +1331,176 @@ fun CircularKnob(
         Spacer(modifier = Modifier.height(8.dp))
         Text(label, color = Color.White, style = MaterialTheme.typography.labelSmall)
         Text(String.format("%.1f", value), color = color, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+fun DynamicVolumeSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    colorNormal: Color,
+    colorBoost: Color,
+    shape: androidx.compose.ui.graphics.Shape = androidx.compose.foundation.shape.CircleShape,
+    modifier: Modifier = Modifier
+) {
+    var isAdjusting by remember { mutableStateOf(false) }
+    var internalValue by remember { mutableStateOf(value) }
+    
+    LaunchedEffect(value) {
+        if (!isAdjusting) {
+            internalValue = value
+        }
+    }
+    
+    val isBoostMode = internalValue >= 0.99f
+    
+    // Animation of the "split" point between normal and boost
+    val sliderWeight by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (isBoostMode) 0.8f else 1.0f,
+        animationSpec = androidx.compose.animation.core.spring(dampingRatio = 0.8f, stiffness = 400f)
+    )
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        val percentageStr = "${(internalValue * 100).toInt()}%"
+        
+        Box(
+            modifier = Modifier
+                .weight(if (isBoostMode) sliderWeight else 1f, fill = false)
+                .fillMaxWidth(if (isBoostMode) 1f else 0.85f)
+                .height(48.dp)
+                .pointerInput(Unit) {
+                    detectDragGestures(
+                        onDragStart = { isAdjusting = true },
+                        onDragEnd = { isAdjusting = false },
+                        onDragCancel = { isAdjusting = false },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            val deltaPct = dragAmount.x / size.width
+                            val startVal = if (internalValue > 1.0f) 1.0f else internalValue
+                            internalValue = (startVal + deltaPct).coerceIn(0f, 1f)
+                            onValueChange(internalValue)
+                        }
+                    )
+                }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onPress = { offset ->
+                            val tapPct = offset.x / size.width
+                            internalValue = tapPct.coerceIn(0f, 1f)
+                            onValueChange(internalValue)
+                        }
+                    )
+                },
+            contentAlignment = Alignment.Center
+        ) {
+            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                val corner = androidx.compose.ui.geometry.CornerRadius(h/2, h/2)
+
+                drawRoundRect(
+                    color = Color.DarkGray.copy(alpha = 0.5f),
+                    size = size,
+                    cornerRadius = corner
+                )
+
+                val normalPct = internalValue.coerceIn(0f, 1f)
+                val normalWidth = w * normalPct
+                if (normalWidth > 0) {
+                    drawRoundRect(
+                        color = colorNormal,
+                        size = androidx.compose.ui.geometry.Size(normalWidth, h),
+                        cornerRadius = corner
+                    )
+                }
+            }
+        }
+        
+        if (!isBoostMode) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = percentageStr,
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.width(48.dp)
+            )
+        }
+        
+        if (sliderWeight < 0.99f) {
+            val boostPct = (internalValue - 1.0f).coerceIn(0f, 1f)
+            Box(
+                modifier = Modifier
+                    .weight(1f - sliderWeight)
+                    .height(64.dp)
+                    .padding(start = 12.dp)
+                    .pointerInput(isBoostMode) {
+                        if (!isBoostMode) return@pointerInput
+                        var lastAngle: Float? = null
+                        detectDragGestures(
+                            onDragStart = { lastAngle = null; isAdjusting = true },
+                            onDragEnd = { isAdjusting = false; lastAngle = null },
+                            onDragCancel = { isAdjusting = false; lastAngle = null },
+                            onDrag = { change, _ ->
+                                change.consume()
+                                val center = androidx.compose.ui.geometry.Offset(size.width / 2f, size.height / 2f)
+                                val touchPos = change.position
+                                val dx = touchPos.x - center.x
+                                val dy = touchPos.y - center.y
+                                val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
+                                val prevAngle = lastAngle
+                                if (prevAngle != null) {
+                                    var deltaAngle = currentAngle - prevAngle
+                                    if (deltaAngle > 180f) deltaAngle -= 360f
+                                    if (deltaAngle < -180f) deltaAngle += 360f
+                                    
+                                    val deltaPct = deltaAngle / 180f
+                                    internalValue = (internalValue + deltaPct).coerceIn(1f, 2f)
+                                    onValueChange(internalValue)
+                                }
+                                lastAngle = currentAngle
+                            }
+                        )
+                    }
+                    .pointerInput(isBoostMode) {
+                        if (!isBoostMode) return@pointerInput
+                        detectTapGestures(
+                            onPress = { offset ->
+                                val h = size.height
+                                val yPct = 1f - (offset.y / h)
+                                internalValue = (1f + yPct).coerceIn(1f, 2f)
+                                onValueChange(internalValue)
+                            }
+                        )
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize().padding(4.dp)) {
+                    val strokeWidth = 6.dp.toPx()
+                    drawArc(
+                        color = Color.DarkGray.copy(alpha = 0.5f),
+                        startAngle = 0f, sweepAngle = 360f, useCenter = false,
+                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth)
+                    )
+                    if (boostPct > 0f) {
+                        drawArc(
+                            color = colorBoost,
+                            startAngle = -90f, sweepAngle = boostPct * 360f, useCenter = false,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(width = strokeWidth, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                        )
+                    }
+                }
+                Text(
+                    text = percentageStr,
+                    color = colorBoost,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
     }
 }
 
@@ -1513,3 +1752,67 @@ fun WavePreview(style: VisualizerStyle, color: Color) {
         }
     }
 }
+
+@Composable
+fun CustomThickSlider(
+    value: Float,
+    onValueChange: (Float) -> Unit,
+    valueRange: ClosedFloatingPointRange<Float>,
+    modifier: Modifier = Modifier,
+    activeColor: Color,
+    inactiveColor: Color
+) {
+    var width by remember { mutableStateOf(1f) }
+    val fraction = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(24.dp)
+            .background(inactiveColor, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .onGloballyPositioned { width = it.size.width.toFloat() }
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures { change, _ ->
+                    val newFraction = (change.position.x / width).coerceIn(0f, 1f)
+                    val newValue = valueRange.start + (newFraction * (valueRange.endInclusive - valueRange.start))
+                    onValueChange(newValue)
+                }
+            }
+            .pointerInput(Unit) {
+                detectTapGestures { offset ->
+                    val newFraction = (offset.x / width).coerceIn(0f, 1f)
+                    val newValue = valueRange.start + (newFraction * (valueRange.endInclusive - valueRange.start))
+                    onValueChange(newValue)
+                }
+            }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(fraction)
+                .background(
+                    activeColor, 
+                    androidx.compose.foundation.shape.RoundedCornerShape(
+                        topStart = 12.dp, bottomStart = 12.dp, 
+                        topEnd = if (fraction > 0.95f) 12.dp else 0.dp, 
+                        bottomEnd = if (fraction > 0.95f) 12.dp else 0.dp
+                    )
+                )
+        )
+        
+        // Thumb
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset { 
+                    val thumbW = 16.dp.toPx()
+                    val xPos = ((width - thumbW) * fraction).toInt()
+                    androidx.compose.ui.unit.IntOffset(xPos, 0) 
+                }
+                .size(width = 16.dp, height = 24.dp)
+                .background(Color.White, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                .border(2.dp, activeColor, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+        )
+    }
+}
+

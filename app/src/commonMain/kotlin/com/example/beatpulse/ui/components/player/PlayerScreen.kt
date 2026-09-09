@@ -17,6 +17,7 @@ import androidx.compose.material.icons.filled.Feedback
 
 import androidx.compose.animation.AnimatedVisibility
 import com.example.beatpulse.utils.getLocalizedString
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateColor
@@ -118,7 +119,7 @@ enum class VisualizerStyle {
     WAVE, SLIME, BARS, DOTS, PARTICLES, RINGS, AURA, BANDS, TERRAIN, STAR, OSCILLOSCOPE, TRAP_NATION, SIDE_PERSPECTIVE_BANDS
 }
 
-enum class DragAction { NONE, DJ_SEEK, OPEN_QUEUE }
+enum class DragAction { NONE, DJ_SEEK, OPEN_QUEUE, DRAG_A, DRAG_B }
 
 class OscilloscopeState(
     var accumulatedTime: Float = 0f,
@@ -1238,9 +1239,9 @@ private fun PlayerTrackInfoHeader(
                     }
                 }
                 Row(modifier = Modifier.align(Alignment.CenterEnd)) {
-                    AnimatedContent(
+                    Crossfade(
                         targetState = if (isMicModeActive) 2 else if (showMicButton) 1 else 0,
-                        transitionSpec = { fadeIn(animationSpec = tween(500)) togetherWith fadeOut(animationSpec = tween(500)) }
+                        animationSpec = tween(500)
                     ) { state ->
                         when (state) {
                             0 -> IconButton(onClick = onAddToPlaylist, modifier = Modifier.padding(end = 8.dp).size(36.dp).clip(CircleShape).background(paletteColors.dominant.copy(alpha = 0.5f))) {
@@ -1351,7 +1352,30 @@ private fun ColumnScope.PlayerVisualizerArea(
                 if (coverDragEnabled) Modifier
                 else Modifier.pointerInput(abRepeatModeEnabled) {
                     detectDragGestures(
-                        onDragStart = { currentDragAction = DragAction.NONE; lastAngle = null; accumulatedAngle = 0f; dragSeekTimeMs = currentPosition },
+                        onDragStart = { offset -> 
+                            var action = DragAction.NONE
+                            if (abRepeatModeEnabled && duration > 0) {
+                                val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
+                                val radius = minOf(size.width, size.height).toFloat() * 0.4f
+                                val aAngle = (abPointA / duration.toFloat()) * 2f * kotlin.math.PI.toFloat() - kotlin.math.PI.toFloat() / 2f
+                                val aX = center.x + radius * kotlin.math.cos(aAngle)
+                                val aY = center.y + radius * kotlin.math.sin(aAngle)
+                                val distA = kotlin.math.hypot(offset.x - aX, offset.y - aY)
+
+                                val bAngle = (abPointB / duration.toFloat()) * 2f * kotlin.math.PI.toFloat() - kotlin.math.PI.toFloat() / 2f
+                                val bX = center.x + radius * kotlin.math.cos(bAngle)
+                                val bY = center.y + radius * kotlin.math.sin(bAngle)
+                                val distB = kotlin.math.hypot(offset.x - bX, offset.y - bY)
+
+                                if (distA < 80f) {
+                                    action = DragAction.DRAG_A
+                                } else if (distB < 80f) {
+                                    action = DragAction.DRAG_B
+                                }
+                            }
+                            currentDragAction = action
+                            lastAngle = null; accumulatedAngle = 0f; dragSeekTimeMs = currentPosition
+                        },
                         onDragEnd = {
                             if (currentDragAction == DragAction.DJ_SEEK) { dragSeekTimeMs?.let { playerViewModel.seekTo(it) } }
                             coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }
@@ -1366,7 +1390,16 @@ private fun ColumnScope.PlayerVisualizerArea(
                             if (dragAmount.y < -15f && abs(dragAmount.x) < 20f && touchPos.y > center.y) { currentDragAction = DragAction.OPEN_QUEUE; onShowQueue(); if (showPlaylistSwipeTutorial) onDismissPlaylistSwipeTutorial() }
                             else if (abs(dragAmount.x) > 5f || abs(dragAmount.y) > 5f) { currentDragAction = DragAction.DJ_SEEK; val dx = touchPos.x - center.x; val dy = touchPos.y - center.y; lastAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f }
                         }
-                        if (currentDragAction == DragAction.DJ_SEEK) {
+                        if (currentDragAction == DragAction.DRAG_A || currentDragAction == DragAction.DRAG_B) {
+                            val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
+                            val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
+                            val rawTime = ((currentAngle + 90f) % 360f / 360f) * duration
+                            if (currentDragAction == DragAction.DRAG_A) {
+                                (playerViewModel.abPointA as? kotlinx.coroutines.flow.MutableStateFlow)?.value = rawTime.toFloat()
+                            } else {
+                                (playerViewModel.abPointB as? kotlinx.coroutines.flow.MutableStateFlow)?.value = rawTime.toFloat()
+                            }
+                        } else if (currentDragAction == DragAction.DJ_SEEK) {
                             val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
                             val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
                             val prevAngle = lastAngle

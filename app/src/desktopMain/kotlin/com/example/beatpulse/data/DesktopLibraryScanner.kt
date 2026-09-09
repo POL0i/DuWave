@@ -10,17 +10,29 @@ class DesktopLibraryScanner(private val dao: TrackDao) : ILibraryScanner {
     override suspend fun scanMusic(folderPath: String?): List<TrackEntity> {
         val scannedTracks = mutableListOf<TrackEntity>()
         val home = System.getProperty("user.home")
-        var root = File(folderPath ?: (home + File.separator + "Music"))
-        if (!root.exists() && folderPath == null) {
-            val localizedMusic = File(home + File.separator + "Música")
-            if (localizedMusic.exists()) root = localizedMusic
+        
+        val rootsToScan = mutableListOf<File>()
+        
+        if (folderPath != null) {
+            val root = File(folderPath)
+            if (root.exists() && root.isDirectory) rootsToScan.add(root)
+        } else {
+            val dirs = listOf("Music", "Música", "Downloads", "Descargas", "Downloads/DuWave_Transfer", "Descargas/DuWave_Transfer")
+            for (d in dirs) {
+                val f = File(home, d)
+                if (f.exists() && f.isDirectory) {
+                    rootsToScan.add(f)
+                }
+            }
         }
-        if (!root.exists() || !root.isDirectory) return scannedTracks
+
+        if (rootsToScan.isEmpty()) return scannedTracks
 
         val supportedExtensions = setOf("mp3", "flac", "wav", "m4a", "ogg")
 
-        root.walkTopDown().forEach { file ->
-            if (file.isFile && supportedExtensions.contains(file.extension.lowercase())) {
+        for (root in rootsToScan) {
+            root.walkTopDown().forEach { file ->
+                if (file.isFile && supportedExtensions.contains(file.extension.lowercase())) {
                     var title = file.nameWithoutExtension
                     var artist = "Artista Desconocido"
                     var album = "Álbum Desconocido"
@@ -69,6 +81,7 @@ class DesktopLibraryScanner(private val dao: TrackDao) : ILibraryScanner {
                             dateAdded = System.currentTimeMillis()
                         )
                     )
+                }
             }
         }
 

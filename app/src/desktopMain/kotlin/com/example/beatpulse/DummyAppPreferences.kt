@@ -12,6 +12,8 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var visualizerStyle: String = "bars"
     override var visualizerArchetype: Int = 0
     override var visualizerFftMode: String = "fast"
+    override var systemVolume: Float = 1.0f
+    override var lastQueueIds: String = ""
     override var isAdvancedMode: Boolean = false
     override var visualizerBandsMode: Int = 0
     override var filterMode: String = "none"
@@ -23,6 +25,10 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var midMultiplier: Float = 1f
     override var trebleMultiplier: Float = 1f
     override var usePerBandMultiplier: Boolean = false
+    override var damping: Float = 0.6f
+    override var cleanUiMode: Boolean = false
+    override var dynamicColorsPlus: Boolean = false
+    override var dynamicColorsInterval: Int = 30
     private val _lastMainScreenPageFlow = MutableStateFlow(0)
     override val lastMainScreenPageFlow: StateFlow<Int> = _lastMainScreenPageFlow
     override var lastMainScreenPage: Int
@@ -64,6 +70,11 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var thumbnailShape: Int
         get() = _thumbnailShapeFlow.value
         set(value) { _thumbnailShapeFlow.value = value }
+    private val _visualizerElementSizeFlow = MutableStateFlow(1.0f)
+    override val visualizerElementSizeFlow: StateFlow<Float> = _visualizerElementSizeFlow
+    override var visualizerElementSize: Float
+        get() = _visualizerElementSizeFlow.value
+        set(value) { _visualizerElementSizeFlow.value = value }
     private val _toastFlow = MutableSharedFlow<String>(extraBufferCapacity = 10)
     override val toastFlow: SharedFlow<String> = _toastFlow
     override fun showToast(message: String) {
@@ -86,6 +97,8 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var isPatreonUnlocked: Boolean
         get() = _isPatreonUnlockedFlow.value
         set(value) { _isPatreonUnlockedFlow.value = value }
+    override var patreonFailedAttempts = 0
+    override var patreonLockoutTime = 0L
     override var showFps: Boolean = false
     override var showRemainingTime: Boolean = false
 

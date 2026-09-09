@@ -53,6 +53,27 @@ actual object SystemUtils {
         // so we don't need to manually dispatch it via Esc globally.
         return false
     }
+
+    actual fun getSystemVolumeLevel(): Float {
+        val context = BeatPulseApp.appContext ?: return 1.0f
+        val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
+        if (audioManager != null) {
+            val max = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()
+            val current = audioManager.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat()
+            return if (max > 0) current / max else 1.0f
+        }
+        return 1.0f
+    }
+
+    actual fun setSystemVolumeLevel(volume: Float) {
+        val context = BeatPulseApp.appContext ?: return
+        val audioManager = context.getSystemService(android.content.Context.AUDIO_SERVICE) as? android.media.AudioManager
+        if (audioManager != null) {
+            val max = audioManager.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+            val index = (volume.coerceIn(0f, 1f) * max).toInt()
+            audioManager.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, index, 0)
+        }
+    }
 }
 
 @androidx.compose.runtime.Composable

@@ -84,6 +84,7 @@ kotlin {
             implementation(libs.ktor.client.cio)
             implementation(libs.ktor.client.content.negotiation)
             implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(libs.ktor.network)
         }
         
         desktopMain.dependencies {
@@ -101,9 +102,15 @@ compose.desktop {
         mainClass = "com.example.beatpulse.MainKt"
         nativeDistributions {
             modules("java.sql")
-            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb)
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb, org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage)
             packageName = "DuWave"
             packageVersion = "2.0.1"
+            linux {
+                iconFile.set(project.file("src/androidMain/res/mipmap-xxxhdpi/ic_launcher.webp"))
+            }
+        }
+        buildTypes.release.proguard {
+            isEnabled.set(false)
         }
     }
 }
@@ -117,6 +124,16 @@ android {
         targetSdk = 35
         versionCode = 9
         versionName = "2.0.1"
+        resConfigs("en", "es")
+    }
+    
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a")
+            isUniversalApk = false
+        }
     }
 
     val keystoreFile = file("../release.keystore")
@@ -139,7 +156,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
-            isShrinkResources = false
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (keystoreFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
@@ -153,6 +170,16 @@ android {
     
     lint {
         abortOnError = false
+    }
+    
+    packaging {
+        resources {
+            excludes += setOf(
+                "**/*.dll",
+                "**/*.jnilib",
+                "**/*.dylib"
+            )
+        }
     }
     
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")

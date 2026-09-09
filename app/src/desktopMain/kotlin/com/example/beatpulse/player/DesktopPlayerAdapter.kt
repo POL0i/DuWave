@@ -173,6 +173,22 @@ class DesktopPlayerAdapter : AppPlayer {
                     
                     val activeBytes = if (bytesRead < buffer.size) buffer.copyOfRange(0, bytesRead) else buffer
                     equalizerManager?.processAudioBytes(activeBytes, decodedFormat.sampleRate)
+
+                    if (_volume > 1.0f) {
+                        val mult = _volume
+                        for (i in 0 until bytesRead step 2) {
+                            val lower = activeBytes[i].toInt() and 0xFF
+                            val upper = activeBytes[i+1].toInt()
+                            var sample = (upper shl 8) or lower
+                            // Sign extend 16-bit to 32-bit
+                            sample = (sample shl 16) shr 16
+                            sample = (sample * mult).toInt()
+                            if (sample > 32767) sample = 32767
+                            if (sample < -32768) sample = -32768
+                            activeBytes[i] = (sample and 0xFF).toByte()
+                            activeBytes[i+1] = ((sample shr 8) and 0xFF).toByte()
+                        }
+                    }
                     
                     line.write(activeBytes, 0, bytesRead)
                     audioDataCallback?.invoke(activeBytes)
@@ -252,7 +268,7 @@ class DesktopPlayerAdapter : AppPlayer {
     }
 
     override fun setVolume(volume: Float) {
-        _volume = max(0f, min(volume, 1f))
+        _volume = max(0f, volume)
         sourceDataLine?.let { applyVolume(it) }
     }
 
@@ -263,10 +279,9 @@ class DesktopPlayerAdapter : AppPlayer {
                 val minGain = gainControl.minimum
                 val maxGain = gainControl.maximum
                 
-                // Convert linear volume (0.0 to 1.0) to decibels
-                // dB = 20 * log10(linear)
-                val gainDb = if (_volume <= 0.01f) minGain else {
-                    20f * Math.log10(_volume.toDouble()).toFloat()
+                val hardwareVolume = min(_volume, 1f)
+                val gainDb = if (hardwareVolume <= 0.01f) minGain else {
+                    20f * Math.log10(hardwareVolume.toDouble()).toFloat()
                 }
                 
                 gainControl.value = max(minGain, min(gainDb, maxGain))

@@ -145,7 +145,11 @@ fun UnifiedLibraryScreen(
             }
         } else if (showEcosystemScreen) {
             SystemBackHandler { showEcosystemScreen = false }
-            EcosystemScreen(onNavigateBack = { showEcosystemScreen = false })
+            EcosystemScreen(
+                onNavigateBack = { showEcosystemScreen = false },
+                paletteColors = paletteColors,
+                dynamicTextColor = dynamicTextColor
+            )
         } else if (showStats) {
             SystemBackHandler { showStats = false }
             StatsScreen(
@@ -341,15 +345,17 @@ fun UnifiedLibraryScreen(
                         }
 
                         Spacer(modifier = Modifier.width(8.dp))
-                        IconButton(
-                            onClick = { showKeyboardSettings = true },
-                            modifier = Modifier.background(color = paletteColors.dominant.copy(alpha = 0.6f), shape = CircleShape)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Keyboard,
-                                contentDescription = "Atajos de Teclado",
-                                tint = paletteColors.vibrant
-                            )
+                        if (!com.example.beatpulse.utils.SystemUtils.isMobilePlatform) {
+                            IconButton(
+                                onClick = { showKeyboardSettings = true },
+                                modifier = Modifier.background(color = paletteColors.dominant.copy(alpha = 0.6f), shape = androidx.compose.foundation.shape.CircleShape)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Keyboard,
+                                    contentDescription = "Atajos de Teclado",
+                                    tint = paletteColors.vibrant
+                                )
+                            }
                         }
 
                         if (showKeyboardSettings) {
@@ -492,6 +498,7 @@ fun UnifiedLibraryScreen(
                             playlists = playlists,
                             paletteColors = paletteColors,
                             dynamicTextColor = dynamicTextColor,
+                            thumbnailShapeIdx = shapeIdx,
                             onPlaylistSelected = { selectedViewData = it },
                             onCreatePlaylist = { isCreatingPlaylist = true },
                             viewModel = viewModel
@@ -502,6 +509,7 @@ fun UnifiedLibraryScreen(
                             paletteColors = paletteColors,
                             dynamicTextColor = dynamicTextColor,
                             bgStyle = bgStyle,
+                            thumbnailShapeIdx = shapeIdx,
                             onCategorySelected = { selectedViewData = it }
                         )
                         2 -> CategorySubPage(
@@ -510,6 +518,7 @@ fun UnifiedLibraryScreen(
                             paletteColors = paletteColors,
                             dynamicTextColor = dynamicTextColor,
                             bgStyle = bgStyle,
+                            thumbnailShapeIdx = shapeIdx,
                             onCategorySelected = { selectedViewData = it }
                         )
                         3 -> CategorySubPage(
@@ -518,6 +527,7 @@ fun UnifiedLibraryScreen(
                             paletteColors = paletteColors,
                             dynamicTextColor = dynamicTextColor,
                             bgStyle = bgStyle,
+                            thumbnailShapeIdx = shapeIdx,
                             onCategorySelected = { selectedViewData = it }
                         )
                     }
@@ -630,7 +640,7 @@ fun UnifiedLibraryScreen(
                 OutlinedTextField(
                     value = searchQuery,
                     onValueChange = { searchQuery = it },
-                    placeholder = { Text(getLocalizedString("search_in_category").replace("%s", currentViewData.title), color = dynamicTextColor.copy(alpha=0.5f)) },
+                    placeholder = { Text(getLocalizedString("search_in_category").replace("%1\$s", currentViewData.title).replace("%s", currentViewData.title), color = dynamicTextColor.copy(alpha=0.5f)) },
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
                     singleLine = true,
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = dynamicTextColor.copy(alpha=0.5f)) },
@@ -745,6 +755,7 @@ fun UnifiedLibraryScreen(
 
                 trackToChangeCover?.let { track ->
                     com.example.beatpulse.ui.screens.ChangeCoverDialog(
+                        thumbnailShapeIdx = shapeIdx,
                         track = track,
                         viewModel = viewModel,
                         paletteColors = paletteColors,
@@ -837,6 +848,7 @@ fun ListsSubPage(
     playlists: List<com.example.beatpulse.data.PlaylistEntity>,
     paletteColors: PaletteColors,
     dynamicTextColor: Color,
+    thumbnailShapeIdx: Int,
     onPlaylistSelected: (PlaylistViewData) -> Unit,
     onCreatePlaylist: () -> Unit,
     viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
@@ -867,6 +879,7 @@ fun ListsSubPage(
                 icon = Icons.Default.MusicNote,
                 tint = paletteColors.vibrant,
                 textColor = dynamicTextColor,
+                thumbnailShapeIdx = thumbnailShapeIdx,
                 onClick = { onPlaylistSelected(PlaylistViewData(titleAllSongs, allTracks)) }
             )
         }
@@ -879,6 +892,7 @@ fun ListsSubPage(
                     icon = Icons.Default.History,
                     tint = paletteColors.vibrant,
                     textColor = dynamicTextColor,
+                    thumbnailShapeIdx = thumbnailShapeIdx,
                     onClick = { onPlaylistSelected(PlaylistViewData(titleRecent, recentTracks)) }
                 )
             }
@@ -892,6 +906,7 @@ fun ListsSubPage(
                     icon = Icons.Default.Favorite,
                     tint = paletteColors.vibrant,
                     textColor = dynamicTextColor,
+                    thumbnailShapeIdx = thumbnailShapeIdx,
                     onClick = { onPlaylistSelected(PlaylistViewData(titleFavorites, favoriteTracks)) }
                 )
             }
@@ -905,6 +920,7 @@ fun ListsSubPage(
                     icon = Icons.Default.Star,
                     tint = paletteColors.vibrant,
                     textColor = dynamicTextColor,
+                    thumbnailShapeIdx = thumbnailShapeIdx,
                     onClick = { onPlaylistSelected(PlaylistViewData(titleTop, topTracks)) }
                 )
             }
@@ -918,6 +934,7 @@ fun ListsSubPage(
                     icon = Icons.Default.NewReleases,
                     tint = paletteColors.vibrant,
                     textColor = dynamicTextColor,
+                    thumbnailShapeIdx = thumbnailShapeIdx,
                     onClick = { onPlaylistSelected(PlaylistViewData(titleAdded, recentlyAdded)) }
                 )
             }
@@ -941,6 +958,7 @@ fun ListsSubPage(
                 icon = Icons.AutoMirrored.Filled.QueueMusic,
                 tint = paletteColors.vibrant,
                 textColor = dynamicTextColor,
+                thumbnailShapeIdx = thumbnailShapeIdx,
                 onClick = { onPlaylistSelected(PlaylistViewData(pl.name, emptyList(), pl.playlistId)) }
             )
         }
@@ -967,6 +985,7 @@ fun CategorySubPage(
     paletteColors: PaletteColors,
     dynamicTextColor: Color,
     bgStyle: Int,
+    thumbnailShapeIdx: Int,
     onCategorySelected: (PlaylistViewData) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
@@ -999,6 +1018,7 @@ fun CategorySubPage(
                     icon = icon,
                     tint = paletteColors.vibrant,
                     textColor = dynamicTextColor,
+                    thumbnailShapeIdx = thumbnailShapeIdx,
                     onClick = { 
                         onCategorySelected(
                             PlaylistViewData(

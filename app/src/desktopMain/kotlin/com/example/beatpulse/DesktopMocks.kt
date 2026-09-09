@@ -112,4 +112,7 @@ class DesktopPlayerViewModel : IPlayerViewModel {
     override val availableAudioDevices: StateFlow<List<String>> = MutableStateFlow(emptyList())
     override val selectedAudioDevice: StateFlow<String?> = MutableStateFlow(null)
     override fun selectAudioDevice(name: String?) {}
+
+    override val systemVolume: StateFlow<Float> = MutableStateFlow(1.0f)
+    override fun setSystemVolume(volume: Float) {}
 }

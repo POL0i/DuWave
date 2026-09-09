@@ -128,6 +128,7 @@ fun LibraryScreen(
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
 ) {
     val prefs = viewModel.prefs
+    val shapeIdx by prefs.thumbnailShapeFlow.collectAsState(initial = 0)
     val onRescan = { viewModel.scanMediaStore() }
     var selectedTabIndex by remember { mutableIntStateOf(prefs.lastLibraryGeneralTab) }
     LaunchedEffect(selectedTabIndex) {
@@ -380,7 +381,6 @@ fun LibraryScreen(
                     Text(getLocalizedString("no_results_online"), color = dynamicTextColor)
                 }
             } else {
-                val shapeIdx by prefs.thumbnailShapeFlow.collectAsState(initial = 0)
                 val listState = rememberLazyListState(
                     initialFirstVisibleItemIndex = prefs.libraryScrollIndex,
                     initialFirstVisibleItemScrollOffset = prefs.libraryScrollOffset
@@ -495,6 +495,7 @@ fun LibraryScreen(
                                         { trackPendingDownload = track }
                                     } else null,
                                     onTrimTrack = if (selectedTabIndex == 0) { { trackPendingTrim = track } } else null,
+                                    onChangeCover = { trackToChangeCover = track },
                                     isPlaying = currentPlayingTrack?.id == track.id,
                                     isActuallyPlaying = currentPlayingTrack?.id == track.id && isPlaying,
                                     isServiceDown = isOnlineServiceDown
@@ -552,7 +553,7 @@ fun LibraryScreen(
                  androidx.compose.material3.MaterialTheme(
                      colorScheme = androidx.compose.material3.MaterialTheme.colorScheme.copy(
                          surface = paletteColors.dominant,
-                         onSurface = paletteColors.vibrant
+                         onSurface = dynamicTextColor
                      )
                  ) {
                      DropdownMenu(
@@ -769,6 +770,7 @@ fun LibraryScreen(
                 track = track,
                 viewModel = viewModel,
                 paletteColors = paletteColors,
+                thumbnailShapeIdx = shapeIdx,
                 onDismiss = { trackToChangeCover = null },
                 onCoverSelected = { newPath ->
                     viewModel.updateTrackCover(track, newPath)
@@ -929,12 +931,7 @@ fun TrackItem(
     }
     
     val shape = remember(thumbnailShapeIdx) {
-        when (thumbnailShapeIdx) {
-            1 -> RoundedCornerShape(0.dp)
-            2 -> RoundedCornerShape(10.dp)
-            3 -> RoundedCornerShape(24.dp)
-            else -> androidx.compose.foundation.shape.CircleShape
-        }
+        com.example.beatpulse.ui.utils.getShapeForIndex(thumbnailShapeIdx)
     }
 
     val isDesktop = !com.example.beatpulse.utils.SystemUtils.isMobilePlatform
@@ -1045,7 +1042,7 @@ fun TrackItem(
                 androidx.compose.material3.MaterialTheme(
                     colorScheme = androidx.compose.material3.MaterialTheme.colorScheme.copy(
                         surface = paletteColors.dominant,
-                        onSurface = paletteColors.vibrant
+                        onSurface = textColor
                     )
                 ) {
                     DropdownMenu(
@@ -1118,6 +1115,7 @@ fun ChangeCoverDialog(
     track: TrackEntity,
     viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
     paletteColors: com.example.beatpulse.theme.PaletteColors,
+    thumbnailShapeIdx: Int,
     onDismiss: () -> Unit,
     onCoverSelected: (String) -> Unit
 ) {
@@ -1152,7 +1150,7 @@ fun ChangeCoverDialog(
                             Box(
                                 modifier = Modifier
                                     .aspectRatio(1f)
-                                    .clip(RoundedCornerShape(8.dp))
+                                    .clip(com.example.beatpulse.ui.utils.getShapeForIndex(thumbnailShapeIdx))
                                     .clickable { onCoverSelected(path) }
                             ) {
                                 val bitmap = com.example.beatpulse.ui.components.rememberStreamAvatar(path)

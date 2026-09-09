@@ -60,6 +60,7 @@ fun PlayerVisualizerCanvas(
     animatedScale: Float,
     coverScale: Float,
     cleanUiMode: Boolean = false,
+    elementSize: Float = 1f,
     onPlayheadPosChanged: (Offset) -> Unit
 ) {
     val basePath = remember { Path() }
@@ -187,16 +188,16 @@ fun PlayerVisualizerCanvas(
                     for (i in 0 until numBars) {
                         val amplitude = amps[i]
                         val dist = 30f + (amplitude * 180f)
-                        val barLength = 8f + (amplitude * 60f)
+                        val barLength = (8f + (amplitude * 60f)) * elementSize
                         val dRight = 0f + i * distStep
                         val dLeft = pathLength - i * distStep
                         computePointAndNormal(dRight)
                         val pxR = outPx; val pyR = outPy; val nxR = outNx; val nyR = outNy
                         computePointAndNormal(dLeft)
                         val pxL = outPx; val pyL = outPy; val nxL = outNx; val nyL = outNy
-                        drawLine(color = colorVibrantLayer, start = Offset(pxR + nxR * dist, pyR + nyR * dist), end = Offset(pxR + nxR * (dist + barLength), pyR + nyR * (dist + barLength)), strokeWidth = 3f, cap = StrokeCap.Round)
+                        drawLine(color = colorVibrantLayer, start = Offset(pxR + nxR * dist, pyR + nyR * dist), end = Offset(pxR + nxR * (dist + barLength), pyR + nyR * (dist + barLength)), strokeWidth = 3f * elementSize, cap = StrokeCap.Round)
                         if (i != 0 && i != numBars - 1) {
-                            drawLine(color = colorVibrantLayer, start = Offset(pxL + nxL * dist, pyL + nyL * dist), end = Offset(pxL + nxL * (dist + barLength), pyL + nyL * (dist + barLength)), strokeWidth = 3f, cap = StrokeCap.Round)
+                            drawLine(color = colorVibrantLayer, start = Offset(pxL + nxL * dist, pyL + nyL * dist), end = Offset(pxL + nxL * (dist + barLength), pyL + nyL * (dist + barLength)), strokeWidth = 3f * elementSize, cap = StrokeCap.Round)
                         }
                     }
                 }
@@ -213,7 +214,7 @@ fun PlayerVisualizerCanvas(
                         if (i == 0) wavePathR.moveTo(px, py) else wavePathR.lineTo(px, py)
                     }
                     wavePathR.close()
-                    drawPath(wavePathR, color = colorVibrantLayer, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    drawPath(wavePathR, color = colorVibrantLayer, style = Stroke(width = 3f * elementSize, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
                 VisualizerStyle.DOTS -> {
                     for (i in 0 until numBars) {
@@ -223,8 +224,8 @@ fun PlayerVisualizerCanvas(
                         computePointAndNormal(dRight)
                         val pxR = outPx; val pyR = outPy; val nxR = outNx; val nyR = outNy
                         val dotCount = 1 + (amplitude * 8).toInt()
-                        val dotSpacing = 16f
-                        val dotRadius = 1.2f
+                        val dotSpacing = 16f * elementSize
+                        val dotRadius = 1.2f * elementSize
                         for (j in 0 until dotCount) {
                             val currentDist = 30f + (j * dotSpacing)
                             val alphaVal = opacity * (1f - (j.toFloat() / 8f)).coerceAtLeast(0.6f)
@@ -269,7 +270,7 @@ fun PlayerVisualizerCanvas(
                         wavePathR.close()
                         val slimeBrush = Brush.radialGradient(colors = listOf(layerColor, layerColor.copy(alpha = 0.5f)), center = center, radius = radius + 250f)
                         drawPath(path = wavePathR, brush = slimeBrush, alpha = opacity)
-                        drawPath(path = wavePathR, color = layerColor.copy(alpha = opacity), style = Stroke(width = 4f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                        drawPath(path = wavePathR, color = layerColor.copy(alpha = opacity), style = Stroke(width = 4f * elementSize, cap = StrokeCap.Round, join = StrokeJoin.Round))
                     }
                 }
                 VisualizerStyle.STAR -> {
@@ -316,7 +317,7 @@ fun PlayerVisualizerCanvas(
                     // Draw base star
                     drawPath(wavePathR, color = colorVibrantLayer, style = androidx.compose.ui.graphics.drawscope.Fill)
                     // Draw base contour
-                    drawPath(wavePathR, color = Color.White.copy(alpha = 0.3f * opacity), style = Stroke(width = 2f, join = StrokeJoin.Round))
+                    drawPath(wavePathR, color = Color.White.copy(alpha = 0.3f * opacity), style = Stroke(width = 2f * elementSize, join = StrokeJoin.Round))
                     
                     // Draw luminous line segments on active peaks instead of circles
                     for (i in 0 until totalPoints) {
@@ -334,7 +335,7 @@ fun PlayerVisualizerCanvas(
                             drawPath(
                                 path = luminousPath,
                                 color = Color.White.copy(alpha = alpha),
-                                style = Stroke(width = 3f + alpha * 10f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                                style = Stroke(width = (3f + alpha * 10f) * elementSize, cap = StrokeCap.Round, join = StrokeJoin.Round)
                             )
                         }
                     }
@@ -345,7 +346,7 @@ fun PlayerVisualizerCanvas(
                         val multiplicador = 1f + (i.toFloat() / numBars) * 1.5f
                         val boostedAmplitude = amplitude * multiplicador
                         val extrude = 20f + (boostedAmplitude * 300f)
-                        val sz = 1.5f + (boostedAmplitude * 4f)
+                        val sz = (1.5f + (boostedAmplitude * 4f)) * elementSize
                         val dRight = 0f + i * distStep
                         val dLeft = pathLength - i * distStep
                         val timeMs = currentPosition
@@ -354,7 +355,7 @@ fun PlayerVisualizerCanvas(
                         if (boostedAmplitude > 0.1f) {
                             val sparkOffset = ((timeMs + i * 40) % 800) / 800f
                             val sparkExtrude = extrude + (sparkOffset * 100f)
-                            val sparkSize = 1f + (1f - sparkOffset) * 2f
+                            val sparkSize = (1f + (1f - sparkOffset) * 2f) * elementSize
                             drawCircle(color = colorVibrantLayer.copy(alpha = opacity * (1f - sparkOffset)), radius = sparkSize, center = Offset(outPx + outNx * sparkExtrude, outPy + outNy * sparkExtrude))
                         }
                         if (i != 0 && i != numBars - 1) {

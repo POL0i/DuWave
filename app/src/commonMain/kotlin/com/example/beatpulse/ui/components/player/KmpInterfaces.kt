@@ -19,12 +19,30 @@ interface IPreferencesManager {
     var hasUsedSeek10sGesture: Boolean
     var hasSeenTutorial: Boolean
     val thumbnailShapeFlow: StateFlow<Int>
+    var visualizerElementSize: Float
+    val visualizerElementSizeFlow: StateFlow<Float>
     var coverOffsetX: Float
     var coverOffsetY: Float
     var coverScale: Float
     var isPatreonUnlocked: Boolean
     val isPatreonUnlockedFlow: StateFlow<Boolean>
+    var patreonFailedAttempts: Int
+    var patreonLockoutTime: Long
     var showFps: Boolean
+
+    // Player Memory
+    var isAdvancedMode: Boolean
+    var visualizerArchetype: Int
+    var sensitivity: Float
+    var bassMultiplier: Float
+    var midMultiplier: Float
+    var trebleMultiplier: Float
+    var reactivity: Float
+    var damping: Float
+    var cleanUiMode: Boolean
+    var dynamicColorsPlus: Boolean
+    var dynamicColorsInterval: Int
+    var repeatMode: Int
 
     // Keyboard Shortcuts
     var keyMapNextPage: String
@@ -64,6 +82,7 @@ interface IPreferencesManager {
     var favoriteVisualizerStyles: Set<String>
     
     val toastFlow: kotlinx.coroutines.flow.SharedFlow<String>
+    fun showToast(message: String)
 }
 
 interface IAudioVisualizerManager {
@@ -81,6 +100,7 @@ interface IAudioVisualizerManager {
     val trebleMultiplier: MutableStateFlow<Float>
     val visualizerArchetype: MutableStateFlow<Int>
     val fftMode: MutableStateFlow<String>
+    val elementSize: MutableStateFlow<Float>
 }
 
 interface IPlayerViewModel {
@@ -128,6 +148,7 @@ interface IPlayerViewModel {
     val effectsPreset: StateFlow<String>
     val currentPosition: StateFlow<Long>
     val duration: StateFlow<Long>
+    val systemVolume: StateFlow<Float>
 
     fun setRepeatMode(mode: Int)
 
@@ -142,6 +163,7 @@ interface IPlayerViewModel {
     fun togglePlayPause()
     fun play()
     fun pause()
+    fun setSystemVolume(volume: Float)
     fun playTrack(track: TrackEntity, queue: List<TrackEntity>)
     fun setReverb(enabled: Boolean)
     fun applyPreset(preset: String)
