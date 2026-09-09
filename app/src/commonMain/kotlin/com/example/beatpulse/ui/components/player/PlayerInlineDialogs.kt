@@ -426,32 +426,41 @@ fun PlayerStreamConfigDialog(
                 Text("Modo de Portada", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        val isNormal = coverVisibilityMode == "NORMAL"
                         IconToggleButton(
-                            checked = coverVisibilityMode == "NORMAL",
-                            onCheckedChange = { playerViewModel.setCoverVisibilityMode("NORMAL") }
+                            checked = isNormal,
+                            onCheckedChange = { playerViewModel.setCoverVisibilityMode("NORMAL") },
+                            modifier = Modifier.clip(CircleShape).then(if (isNormal) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
                         ) {
-                            Icon(Icons.Filled.Image, contentDescription = getLocalizedString("normal"), tint = if (coverVisibilityMode == "NORMAL") colorVibrant else Color.Gray)
+                            Icon(Icons.Filled.Image, contentDescription = getLocalizedString("normal"), tint = if (isNormal) colorVibrant else Color.Gray)
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(getLocalizedString("normal"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                     }
                     
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        val isChroma = coverVisibilityMode == "CHROMA_KEY"
                         IconToggleButton(
-                            checked = coverVisibilityMode == "CHROMA_KEY",
-                            onCheckedChange = { playerViewModel.setCoverVisibilityMode("CHROMA_KEY") }
+                            checked = isChroma,
+                            onCheckedChange = { playerViewModel.setCoverVisibilityMode("CHROMA_KEY") },
+                            modifier = Modifier.clip(CircleShape).then(if (isChroma) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
                         ) {
-                            Icon(Icons.Filled.Colorize, contentDescription = "Chroma Key", tint = if (coverVisibilityMode == "CHROMA_KEY") colorVibrant else Color.Gray)
+                            Icon(Icons.Filled.Colorize, contentDescription = "Chroma Key", tint = if (isChroma) colorVibrant else Color.Gray)
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text("Chroma", color = Color.White, style = MaterialTheme.typography.bodySmall)
                     }
 
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                        val isHidden = coverVisibilityMode == "HIDDEN"
                         IconToggleButton(
-                            checked = coverVisibilityMode == "HIDDEN",
-                            onCheckedChange = { playerViewModel.setCoverVisibilityMode("HIDDEN") }
+                            checked = isHidden,
+                            onCheckedChange = { playerViewModel.setCoverVisibilityMode("HIDDEN") },
+                            modifier = Modifier.clip(CircleShape).then(if (isHidden) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
                         ) {
-                            Icon(Icons.Filled.Clear, contentDescription = getLocalizedString("hidden"), tint = if (coverVisibilityMode == "HIDDEN") colorVibrant else Color.Gray)
+                            Icon(Icons.Filled.Clear, contentDescription = getLocalizedString("hidden"), tint = if (isHidden) colorVibrant else Color.Gray)
                         }
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(getLocalizedString("hidden"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -863,28 +872,50 @@ fun PlayerSettingsSheet(
                     Text(getLocalizedString("playback_options"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                         // Aleatorio as an icon button instead of switch
-                        androidx.compose.material3.IconButton(onClick = { playerViewModel.shuffleModeEnabled.value = !isShuffleEnabled }) {
+                        androidx.compose.material3.IconButton(
+                            onClick = { playerViewModel.shuffleModeEnabled.value = !isShuffleEnabled },
+                            modifier = Modifier.clip(CircleShape).then(if (isShuffleEnabled) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
+                        ) {
                             Icon(Icons.Default.Shuffle, contentDescription = "Aleatorio", tint = if (isShuffleEnabled) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                         }
                         
                         // Loop modes as icon buttons
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             // Apagado
-                            androidx.compose.material3.IconButton(onClick = { playerViewModel.setRepeatMode(0) }) {
-                                Icon(Icons.Default.Close, contentDescription = "Apagado", tint = if (!abRepeatModeEnabled && currentMode == 0) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
+                            val offActive = currentMode == 0
+                            androidx.compose.material3.IconButton(
+                                onClick = { playerViewModel.setRepeatMode(0) },
+                                modifier = Modifier.clip(CircleShape).then(if (offActive) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
+                            ) {
+                                Icon(Icons.Default.Close, contentDescription = "Apagado", tint = if (offActive) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                             }
                             // Lista
-                            androidx.compose.material3.IconButton(onClick = { playerViewModel.setRepeatMode(2) }) {
-                                Icon(Icons.Default.Repeat, contentDescription = "Lista", tint = if (!abRepeatModeEnabled && currentMode == 2) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
+                            val listActive = currentMode == 2
+                            androidx.compose.material3.IconButton(
+                                onClick = { playerViewModel.setRepeatMode(2) },
+                                modifier = Modifier.clip(CircleShape).then(if (listActive) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
+                            ) {
+                                Icon(Icons.Default.Repeat, contentDescription = "Lista", tint = if (listActive) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                             }
                             // Una
-                            androidx.compose.material3.IconButton(onClick = { playerViewModel.setRepeatMode(1) }) {
-                                Icon(Icons.Default.RepeatOne, contentDescription = "Una", tint = if (!abRepeatModeEnabled && currentMode == 1) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
+                            val oneActive = currentMode == 1
+                            androidx.compose.material3.IconButton(
+                                onClick = { playerViewModel.setRepeatMode(1) },
+                                modifier = Modifier.clip(CircleShape).then(if (oneActive) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
+                            ) {
+                                Icon(Icons.Default.RepeatOne, contentDescription = "Una", tint = if (oneActive) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                             }
+                            
+                            // Separador
+                            Box(modifier = Modifier.height(24.dp).width(1.dp).background(dynamicTextColor.copy(alpha = 0.3f)))
+                            
                             // A-B
-                            androidx.compose.material3.TextButton(onClick = { 
-                                (playerViewModel.abRepeatModeEnabled as? kotlinx.coroutines.flow.MutableStateFlow)?.value = !abRepeatModeEnabled 
-                            }) {
+                            androidx.compose.material3.TextButton(
+                                onClick = { 
+                                    (playerViewModel.abRepeatModeEnabled as? kotlinx.coroutines.flow.MutableStateFlow)?.value = !abRepeatModeEnabled 
+                                },
+                                modifier = Modifier.clip(CircleShape).then(if (abRepeatModeEnabled) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
+                            ) {
                                 Text("A-B", color = if (abRepeatModeEnabled) colorVibrant else dynamicTextColor.copy(alpha = 0.6f), fontWeight = FontWeight.Bold)
                             }
                         }
@@ -1090,6 +1121,7 @@ fun PlayerSettingsSheet(
                         CustomThickSlider(
                             value = elementSize,
                             onValueChange = { visualizerManager.elementSize.value = it },
+                            onAdjustingChange = { isAdjusting = it },
                             valueRange = 0.5f..2.0f,
                             activeColor = colorVibrant,
                             inactiveColor = colorVibrant.copy(alpha = 0.3f),
@@ -1108,7 +1140,8 @@ fun PlayerSettingsSheet(
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             IconToggleButton(
                                 checked = cleanUiMode,
-                                onCheckedChange = { playerViewModel.setCleanUiMode(it) }
+                                onCheckedChange = { playerViewModel.setCleanUiMode(it) },
+                                modifier = Modifier.clip(CircleShape).then(if (cleanUiMode) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
                             ) {
                                 Icon(
                                     imageVector = if (cleanUiMode) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
@@ -1116,13 +1149,15 @@ fun PlayerSettingsSheet(
                                     tint = if (cleanUiMode) colorVibrant else dynamicTextColor.copy(alpha = 0.6f)
                                 )
                             }
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(getLocalizedString("clean_ui"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             IconToggleButton(
                                 checked = coverDragEnabled,
-                                onCheckedChange = { playerViewModel.setCoverDragEnabled(it) }
+                                onCheckedChange = { playerViewModel.setCoverDragEnabled(it) },
+                                modifier = Modifier.clip(CircleShape).then(if (coverDragEnabled) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
                             ) {
                                 Icon(
                                     imageVector = if (coverDragEnabled) Icons.Filled.OpenWith else Icons.Filled.Lock,
@@ -1130,13 +1165,15 @@ fun PlayerSettingsSheet(
                                     tint = if (coverDragEnabled) colorVibrant else dynamicTextColor.copy(alpha = 0.6f)
                                 )
                             }
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(getLocalizedString("move"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
 
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             IconToggleButton(
                                 checked = dynamicColorsPlus,
-                                onCheckedChange = { playerViewModel.setDynamicColorsPlus(it) }
+                                onCheckedChange = { playerViewModel.setDynamicColorsPlus(it) },
+                                modifier = Modifier.clip(CircleShape).then(if (dynamicColorsPlus) Modifier.border(1.dp, colorVibrant, CircleShape).background(colorVibrant.copy(alpha = 0.15f)) else Modifier)
                             ) {
                                 Icon(
                                     imageVector = Icons.Filled.AutoAwesome,
@@ -1144,6 +1181,7 @@ fun PlayerSettingsSheet(
                                     tint = if (dynamicColorsPlus) colorVibrant else dynamicTextColor.copy(alpha = 0.6f)
                                 )
                             }
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(getLocalizedString("dynamic_plus"), color = Color.White, style = MaterialTheme.typography.bodySmall)
                         }
                     }
@@ -1760,7 +1798,8 @@ fun CustomThickSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     modifier: Modifier = Modifier,
     activeColor: Color,
-    inactiveColor: Color
+    inactiveColor: Color,
+    onAdjustingChange: ((Boolean) -> Unit)? = null
 ) {
     var width by remember { mutableStateOf(1f) }
     val fraction = ((value - valueRange.start) / (valueRange.endInclusive - valueRange.start)).coerceIn(0f, 1f)
@@ -1772,7 +1811,11 @@ fun CustomThickSlider(
             .background(inactiveColor, androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
             .onGloballyPositioned { width = it.size.width.toFloat() }
             .pointerInput(Unit) {
-                detectHorizontalDragGestures { change, _ ->
+                detectHorizontalDragGestures(
+                    onDragStart = { onAdjustingChange?.invoke(true) },
+                    onDragEnd = { onAdjustingChange?.invoke(false) },
+                    onDragCancel = { onAdjustingChange?.invoke(false) }
+                ) { change, _ ->
                     val newFraction = (change.position.x / width).coerceIn(0f, 1f)
                     val newValue = valueRange.start + (newFraction * (valueRange.endInclusive - valueRange.start))
                     onValueChange(newValue)

@@ -14,103 +14,71 @@ import org.jetbrains.skia.RuntimeEffect
 import org.jetbrains.skia.RuntimeShaderBuilder
 
 private const val SEA_THE_NIGHT_SKSL = """
-uniform float2 u_resolution;
+uniform vec2 u_resolution;
 uniform float u_time;
-uniform float4 u_dominant;
-uniform float4 u_vibrant;
+uniform vec4 u_dominant;
+uniform vec4 u_vibrant;
 uniform float u_energy;
 
-#define DISPLAY_GAMMA 1.9
-#define GOLDEN_ANGLE 2.39996323
-#define MAX_BLUR_SIZE 8.0
-#define RAD_SCALE 2.0 
-#define uFar 12.0
-#define FOCUS_SCALE 35.0
-
-float hash( float2 p ) {
-    return fract(sin(dot(p,float2(127.1,311.7)))*43758.5453123);
-}
-float noise( in float2 p ) {
-    float2 i = floor( p );
-    float2 f = fract( p );
-    float2 u = f*f*(3.0-2.0*f);
-    return mix( mix( hash( i + float2(0.0,0.0) ), hash( i + float2(1.0,0.0) ), u.x),
-                mix( hash( i + float2(0.0,1.0) ), hash( i + float2(1.0,1.0) ), u.x), u.y);
-}
-float fbm(float2 p) {
-    float f = 0.0;
-    f += 0.5000*noise( p ); p = p*2.02;
-    f += 0.2500*noise( p ); p = p*2.03;
-    f += 0.1250*noise( p );
-    return f;
+float myMod(float x, float y) {
+    return x - y * floor(x / y);
 }
 
-float4 renderSea(float2 uv) {
-    float2 p = uv * 2.0 - 1.0;
-    p.x *= u_resolution.x / u_resolution.y;
-    
-    float3 col = mix(u_dominant.rgb*0.2, u_vibrant.rgb*0.4, uv.y);
-    float depth = 1.0;
-
-    if (p.y < -0.1) {
-        float d = -1.0 / (p.y + 0.1);
-        float2 seaUv = p * d;
-        seaUv.y -= u_time * 0.5;
-        
-        float waves = fbm(seaUv * 3.0 + u_time * 0.2);
-        waves += fbm(seaUv * 6.0 - u_time * 0.4) * 0.5;
-        
-        float3 waterCol = mix(u_dominant.rgb * 0.5, u_vibrant.rgb, waves + u_energy);
-        col = mix(waterCol, col, exp(-d * 0.1)); 
-        depth = clamp(d / uFar, 0.0, 1.0);
-    } else {
-        float n = hash(p * 200.0 + u_time*0.01);
-        if (n > 0.995) col += float3(min(1.0, n * 10.0));
-    }
-    return float4(col, depth);
+float Func(float pX) {
+	return 0.6*(0.5*sin(0.1*pX) + 0.5*sin(0.553*pX) + 0.7*sin(1.2*pX));
 }
 
-float getBlurSize(float depth, float focusPoint, float focusScale) {
-	float coc = clamp((1.0 / focusPoint - 1.0 / depth)*focusScale, -1.0, 1.0);
-    return abs(coc) * MAX_BLUR_SIZE;
+float FuncR(float pX) {
+	return 0.5 + 0.25*(1.0 + sin(myMod(40.0*pX, 6.28318530718)));
 }
 
-float3 depthOfField(float2 texCoord, float focusPoint, float focusScale) {
-    float4 Input = renderSea(texCoord);
-    float centerDepth = Input.a * uFar;
-    float centerSize = getBlurSize(centerDepth, focusPoint, focusScale);
-    float3 color = Input.rgb;
-    float tot = 1.0;
-    
-    float2 texelSize = 1.0 / u_resolution.xy;
-    float radius = RAD_SCALE;
-    float ang = 0.0;
-    for (int i = 0; i < 40; i++) {
-        if (radius >= MAX_BLUR_SIZE) break;
-        
-        float2 tc = texCoord + float2(cos(ang), sin(ang)) * texelSize * radius;
-        float4 sampleInput = renderSea(tc);
-        float3 sampleColor = sampleInput.rgb;
-        float sampleDepth = sampleInput.a * uFar;
-        float sampleSize = getBlurSize(sampleDepth, focusPoint, focusScale);
-        if (sampleDepth > centerDepth) {
-        	sampleSize = clamp(sampleSize, 0.0, centerSize*2.0);
-        }
-        float m = smoothstep(radius-0.5, radius+0.5, sampleSize);
-        color += mix(color/tot, sampleColor, m);
-        tot += 1.0;
-        radius += RAD_SCALE/radius;
-        ang += GOLDEN_ANGLE;
-    }
-    return color /= tot;
+float Layer(vec2 pQ, float pT) {
+	vec2 Qt = 3.5*pQ;
+	pT *= 0.5;
+	Qt.x += pT;
+
+	float Xi = floor(Qt.x);
+	float Xf = Qt.x - Xi - 0.5;
+
+	vec2 C;
+	float Yi;
+	float D = 1.0 - step(Qt.y, Func(Qt.x));
+
+	Yi = Func(Xi + 0.5);
+	C = vec2(Xf, Qt.y - Yi );
+	D = min(D, length(C) - FuncR(Xi+ pT/80.0));
+
+	Yi = Func(Xi+1.0 + 0.5);
+	C = vec2(Xf-1.0, Qt.y - Yi );
+	D = min(D, length(C) - FuncR(Xi+1.0+ pT/80.0));
+
+	Yi = Func(Xi-1.0 + 0.5);
+	C = vec2(Xf+1.0, Qt.y - Yi );
+	D = min(D, length(C) - FuncR(Xi-1.0+ pT/80.0));
+
+	return min(1.0, D);
 }
 
-half4 main(float2 fragCoord) {
-    float2 uv = fragCoord.xy / u_resolution.xy;
-    float focusPoint = 58.0 - sin(u_time * 0.3) * 20.0;
-    float3 color = depthOfField(uv, focusPoint, FOCUS_SCALE);
-    color = float3(1.7, 1.8, 1.6) * color / (float3(1.0) + color);
-	return half4(half3(pow(color, float3(1.0 / DISPLAY_GAMMA))), 1.0);
+vec4 main(vec2 fragCoord) {
+	vec2 UV = 2.0*(fragCoord.xy - u_resolution.xy/2.0) / min(u_resolution.x, u_resolution.y);
+	vec3 Color = mix(u_dominant.rgb * 0.2, u_vibrant.rgb * 0.4, clamp(UV.y, 0.0, 1.0));
+
+	for(int i = 0; i <= 5; i++) {
+        float J = float(i) * 0.2;
+		float Lt = u_time*(0.5 + 2.0*J)*(1.0 + 0.1*sin(226.0*J)) + 17.0*J;
+		vec2 Lp = vec2(0.0, 0.3+1.5*(J - 0.5));
+		float L = Layer(UV + Lp, Lt);
+
+		float Blur = 1.0 + 0.5*sin(0.1*u_time);
+		Blur *= Blur;
+		Blur *= 0.2;
+		float V = mix( 0.0, 1.0, 1.0 - smoothstep( 0.0, 0.01 +0.2*Blur, L ) );
+		vec3 Lc = mix( u_vibrant.rgb, vec3(1.0), J);
+
+		Color = mix(Color, Lc, V);
+	}
+    Color += u_energy * 0.3 * u_vibrant.rgb;
+	return vec4(Color, 1.0);
 }
 """
 

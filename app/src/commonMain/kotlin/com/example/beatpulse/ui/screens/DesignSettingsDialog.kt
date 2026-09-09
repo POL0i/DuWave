@@ -137,7 +137,7 @@ fun DesignSettingsDialog(
                 if (isPatreonUnlocked) {
                     styles.add(9 to getLocalizedString("patreon_wall"))
                     styles.add(10 to "Fuente Oscura")
-                    styles.add(11 to "Terraria")
+                    styles.add(11 to "Nubes")
                     styles.add(12 to "Zen Clear")
                     styles.add(13 to "Mareas de Arena")
                     styles.add(15 to ((getLocalizedString("style_retro_crt").takeIf { it != "style_retro_crt" } ?: "Retro CRT") + "\nby Kabuto"))

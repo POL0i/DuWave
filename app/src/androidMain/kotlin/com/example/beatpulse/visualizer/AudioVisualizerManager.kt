@@ -113,6 +113,7 @@ class AudioVisualizerManager(private val prefs: AppPreferences) : AppVisualizerM
             launch { bassMultiplier.collect { prefs.bassMultiplier = it } }
             launch { midMultiplier.collect { prefs.midMultiplier = it } }
             launch { trebleMultiplier.collect { prefs.trebleMultiplier = it } }
+            launch { elementSize.collect { prefs.visualizerElementSize = it } }
         }
     }
 

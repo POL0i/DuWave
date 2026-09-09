@@ -71,6 +71,8 @@ fun RetroWallBackground(
     
     // Pre-allocated paths for 4 color variants
     val paths = remember { Array(4) { Path() } }
+    val cachedScanlinePath = remember { Path() }
+    var cachedRadialBrush by remember { mutableStateOf<Brush?>(null) }
     var pathsInitialized by remember { mutableStateOf(false) }
     var lastCanvasSize by remember { mutableStateOf(Size.Zero) }
 
@@ -103,6 +105,7 @@ fun RetroWallBackground(
                 
                 if (size != lastCanvasSize) {
                     paths.forEach { it.reset() }
+                    cachedScanlinePath.reset()
                     
                     val rowsVisible = (size.height / brickHeight).toInt() + 4
                     val cols = (size.width / brickWidth).toInt() + 4
@@ -120,6 +123,19 @@ fun RetroWallBackground(
                             paths[colorIdx].addRect(androidx.compose.ui.geometry.Rect(x + 2f, y + 2f, x + brickWidth - 2f, y + brickHeight - 2f))
                         }
                     }
+                    
+                    val scanlineHeight = 6f
+                    val numScanlines = (size.height / scanlineHeight).toInt()
+                    for (i in 0..numScanlines step 2) {
+                        cachedScanlinePath.addRect(androidx.compose.ui.geometry.Rect(0f, i * scanlineHeight, size.width, i * scanlineHeight + scanlineHeight))
+                    }
+                    
+                    cachedRadialBrush = Brush.radialGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                        center = center,
+                        radius = size.width * 0.75f
+                    )
+                    
                     lastCanvasSize = size
                     pathsInitialized = true
                 }
@@ -138,22 +154,14 @@ fun RetroWallBackground(
                 }
                 
                 // CRT Effects overlay
-                val scanlineHeight = 6f
-                val numScanlines = (size.height / scanlineHeight).toInt()
-                val scanlinePath = Path()
-                for (i in 0..numScanlines step 2) {
-                    scanlinePath.addRect(androidx.compose.ui.geometry.Rect(0f, i * scanlineHeight, size.width, i * scanlineHeight + scanlineHeight))
-                }
-                drawPath(scanlinePath, Color.Black.copy(alpha = 0.15f))
+                drawPath(cachedScanlinePath, Color.Black.copy(alpha = 0.15f))
                 
-                drawRect(
-                    brush = Brush.radialGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
-                        center = center,
-                        radius = size.width * 0.75f
-                    ),
-                    size = size
-                )
+                cachedRadialBrush?.let { brush ->
+                    drawRect(
+                        brush = brush,
+                        size = size
+                    )
+                }
                 
                 val borderThickness = size.width * 0.05f
                 val crtCorner = cornerRadius.toPx() * 1.5f

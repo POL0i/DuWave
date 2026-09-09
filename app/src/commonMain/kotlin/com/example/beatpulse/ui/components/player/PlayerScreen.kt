@@ -245,7 +245,8 @@ private fun PlayerScreenContent(
     isFocused: Boolean = true,
     modifier: Modifier = Modifier
 ) {
-        val currentTrack = state.currentTrack
+    com.example.beatpulse.utils.SystemStatusBarVisibility(visible = false)
+    val currentTrack = state.currentTrack
     val currentQueue = state.currentQueue
     val bottomPadding = state.bottomPadding
     val prefs = state.prefs
@@ -748,22 +749,6 @@ private fun PlayerScreenContent(
         }
     }
 
-    // Floating Settings Button
-    if (!cleanUiMode) {
-        Box(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            IconButton(
-                onClick = { showSettingsMenu = true },
-                modifier = Modifier.align(Alignment.TopEnd).padding(top = 24.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Ajustes de reproducción",
-                    tint = colorVibrant.copy(alpha = settingsAlpha),
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-        }
-    }
 
     val styleNames = mapOf(
         VisualizerStyle.WAVE to getLocalizedString("waves"),
@@ -1353,6 +1338,8 @@ private fun ColumnScope.PlayerVisualizerArea(
     val midOpacity = (midAvg / maxAnim).coerceIn(0.2f, 1.0f)
     val highOpacity = (trebleAvg / maxAnim).coerceIn(0.2f, 1.0f)
 
+    val elementSize by visualizerManager.elementSize.collectAsState()
+
     // Use rememberUpdatedState so pointerInput always reads fresh values
     val updatedAbPointA by rememberUpdatedState(abPointA)
     val updatedAbPointB by rememberUpdatedState(abPointB)
@@ -1414,7 +1401,14 @@ private fun ColumnScope.PlayerVisualizerArea(
                                 }
                             }
                             currentDragAction = action
-                            lastAngle = null; accumulatedAngle = 0f
+                            accumulatedAngle = 0f
+                            if (action != DragAction.NONE) {
+                                val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
+                                val dx = offset.x - center.x; val dy = offset.y - center.y
+                                lastAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
+                            } else {
+                                lastAngle = null
+                            }
                         },
                         onDragEnd = {
                             if (currentDragAction == DragAction.DJ_SEEK) { dragSeekTimeMs?.let { playerViewModel.seekTo(it) } }
@@ -1440,19 +1434,22 @@ private fun ColumnScope.PlayerVisualizerArea(
                         if (currentDragAction == DragAction.DRAG_A || currentDragAction == DragAction.DRAG_B) {
                             val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
                             val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
-                            var rawProgress = ((currentAngle - 90f + 360f) % 360f) / 360f
-                            // Prevent wrap-around: if progress jumps across the 0/1 boundary, clamp it
-                            val delta = rawProgress - lastDragProgress
-                            if (delta > 0.5f) rawProgress = 0f      // wrapped from near-0 to near-1 → clamp to 0
-                            else if (delta < -0.5f) rawProgress = 1f // wrapped from near-1 to near-0 → clamp to 1
-                            lastDragProgress = rawProgress
-                            if (currentDragAction == DragAction.DRAG_A) {
-                                val constrainedProgress = rawProgress.coerceIn(0f, updatedAbPointB)
-                                (playerViewModel.abPointA as? kotlinx.coroutines.flow.MutableStateFlow)?.value = constrainedProgress
-                            } else {
-                                val constrainedProgress = rawProgress.coerceIn(updatedAbPointA, 1f)
-                                (playerViewModel.abPointB as? kotlinx.coroutines.flow.MutableStateFlow)?.value = constrainedProgress
+                            val prevAngle = lastAngle
+                            if (prevAngle != null) {
+                                var deltaAngle = currentAngle - prevAngle
+                                if (deltaAngle > 180f) deltaAngle -= 360f
+                                if (deltaAngle < -180f) deltaAngle += 360f
+                                
+                                val deltaProgress = deltaAngle / 360f
+                                if (currentDragAction == DragAction.DRAG_A) {
+                                    val newProgress = (updatedAbPointA + deltaProgress).coerceIn(0f, updatedAbPointB)
+                                    (playerViewModel.abPointA as? kotlinx.coroutines.flow.MutableStateFlow)?.value = newProgress
+                                } else {
+                                    val newProgress = (updatedAbPointB + deltaProgress).coerceIn(updatedAbPointA, 1f)
+                                    (playerViewModel.abPointB as? kotlinx.coroutines.flow.MutableStateFlow)?.value = newProgress
+                                }
                             }
+                            lastAngle = currentAngle
                         } else if (currentDragAction == DragAction.DJ_SEEK) {
                             val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
                             val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
@@ -1531,6 +1528,7 @@ private fun ColumnScope.PlayerVisualizerArea(
             animatedScale = animatedScaleAnim.value,
             coverScale = coverScale,
             cleanUiMode = cleanUiMode,
+            elementSize = elementSize,
             onPlayheadPosChanged = { playheadPos = it },
             onMarkerAPosChanged = { markerPosA = it },
             onMarkerBPosChanged = { markerPosB = it }

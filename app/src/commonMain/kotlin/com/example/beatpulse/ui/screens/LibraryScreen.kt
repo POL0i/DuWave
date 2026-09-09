@@ -741,6 +741,7 @@ fun LibraryScreen(
             )
         }
         trackPendingDownload?.let { track ->
+            val toastDownloadingMsg = getLocalizedString("toast_downloading", track.title)
             AlertDialog(
                 onDismissRequest = { trackPendingDownload = null },
                 title = { Text(getLocalizedString("confirm_download"), color = dynamicTextColor) },
@@ -749,7 +750,7 @@ fun LibraryScreen(
                     TextButton(onClick = {
                         trackPendingDownload = null
                         viewModel.downloadOnlineTrack(track)
-                        prefs.showToast(getLocalizedString("toast_downloading", track.title))
+                        prefs.showToast(toastDownloadingMsg)
                     }) {
                         Text(getLocalizedString("download"), color = colorVibrant)
                     }

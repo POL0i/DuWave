@@ -141,15 +141,22 @@ class PlaybackService : MediaSessionService() {
             ) {
                 if (reason == androidx.media3.common.Player.DISCONTINUITY_REASON_SEEK) {
                     val player = exoPlayer ?: return
-                    val currentVolume = player.volume
-                    player.volume = 0f
-                    (visualizerManager as? AudioVisualizerManager)?.apply {
-                        fftSink.ignoreFor(300)
-                        stop(decay = false)
-                    }
-                    serviceScope.launch {
-                        kotlinx.coroutines.delay(300)
-                        player.volume = currentVolume
+                    if (player.volume > 0.01f) {
+                        val currentVolume = player.volume
+                        player.volume = 0f
+                        (visualizerManager as? AudioVisualizerManager)?.apply {
+                            fftSink.ignoreFor(300)
+                            stop(decay = false)
+                        }
+                        serviceScope.launch {
+                            kotlinx.coroutines.delay(300)
+                            player.volume = currentVolume
+                        }
+                    } else {
+                        (visualizerManager as? AudioVisualizerManager)?.apply {
+                            fftSink.ignoreFor(300)
+                            stop(decay = false)
+                        }
                     }
                 }
             }
