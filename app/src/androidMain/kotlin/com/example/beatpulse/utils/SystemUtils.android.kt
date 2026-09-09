@@ -151,10 +151,26 @@ actual fun SystemStatusBarVisibility(visible: Boolean) {
 }
 
 @androidx.compose.runtime.Composable
-actual fun getLocalizedString(key: String): String {
-    val context = androidx.compose.ui.platform.LocalContext.current
+actual fun getLocalizedString(key: String, vararg formatArgs: Any): String {
+    val baseContext = androidx.compose.ui.platform.LocalContext.current
+    val sharedPrefs = baseContext.getSharedPreferences("beatpulse_prefs", android.content.Context.MODE_PRIVATE)
+    val lang = sharedPrefs.getString("appLanguage", "es") ?: "es"
+    val locale = java.util.Locale(lang)
+    val config = android.content.res.Configuration(baseContext.resources.configuration)
+    config.setLocale(locale)
+    val context = baseContext.createConfigurationContext(config)
+
     val resId = context.resources.getIdentifier(key, "string", context.packageName)
-    return if (resId != 0) context.getString(resId) else key
+    return if (resId != 0) {
+        if (formatArgs.isNotEmpty()) {
+            val mappedArgs = formatArgs.map { it }.toTypedArray()
+            context.getString(resId, *mappedArgs)
+        } else {
+            context.getString(resId)
+        }
+    } else {
+        key
+    }
 }
 
 actual suspend fun isAudioTrimmerReady(): Boolean = true

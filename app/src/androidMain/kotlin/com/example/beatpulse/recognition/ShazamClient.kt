@@ -34,7 +34,12 @@ data class ShazamResponseJson(
 ) {
     data class Track(
         @SerializedName("title") val title: String? = null,
-        @SerializedName("subtitle") val subtitle: String? = null
+        @SerializedName("subtitle") val subtitle: String? = null,
+        @SerializedName("share") val share: Share? = null
+    )
+    
+    data class Share(
+        @SerializedName("subject") val subject: String? = null
     )
 }
 
@@ -100,8 +105,19 @@ class ShazamClient {
                 val responseBody = gson.fromJson(responseReader, ShazamResponseJson::class.java)
                 responseReader.close()
                 
-                if (responseBody.track?.title != null && responseBody.track.subtitle != null) {
-                    Result.success(Pair(responseBody.track.title, responseBody.track.subtitle))
+                if (responseBody?.track?.title != null) {
+                    val trackTitle = responseBody.track.title
+                    var trackArtist = responseBody.track.subtitle
+                    if (trackArtist.isNullOrEmpty() && responseBody.track.share?.subject != null) {
+                        // "share.subject" usually looks like "Song Title - Artist"
+                        val subject = responseBody.track.share.subject
+                        if (subject.contains(" - ")) {
+                            trackArtist = subject.substringAfter(" - ")
+                        } else {
+                            trackArtist = subject
+                        }
+                    }
+                    Result.success(Pair(trackTitle, trackArtist ?: ""))
                 } else {
                     Result.failure(Exception("No match found"))
                 }

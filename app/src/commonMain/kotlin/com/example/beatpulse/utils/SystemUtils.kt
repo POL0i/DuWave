@@ -45,7 +45,7 @@ expect fun SystemStatusBarVisibility(visible: Boolean)
 expect fun SystemBackHandler(onBack: () -> Unit)
 
 @androidx.compose.runtime.Composable
-expect fun getLocalizedString(key: String): String
+expect fun getLocalizedString(key: String, vararg formatArgs: Any): String
 
 expect suspend fun isAudioTrimmerReady(): Boolean
 expect suspend fun downloadAudioTrimmerDependencies(onProgress: (Float) -> Unit)

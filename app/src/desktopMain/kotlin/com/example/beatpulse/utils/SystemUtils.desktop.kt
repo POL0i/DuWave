@@ -125,14 +125,23 @@ val currentAppLanguageState = androidx.compose.runtime.mutableStateOf(
 )
 
 @androidx.compose.runtime.Composable
-actual fun getLocalizedString(key: String): String {
+actual fun getLocalizedString(key: String, vararg formatArgs: Any): String {
     val lang by currentAppLanguageState
     val map = when (lang) {
         "en" -> desktopStringsEn
         "pt" -> desktopStringsPt
         else -> desktopStringsEs
     }
-    return map[key] ?: key
+    val str = map[key] ?: key
+    return if (formatArgs.isNotEmpty()) {
+        try {
+            java.lang.String.format(str, *formatArgs)
+        } catch (e: Exception) {
+            str
+        }
+    } else {
+        str
+    }
 }
 
 

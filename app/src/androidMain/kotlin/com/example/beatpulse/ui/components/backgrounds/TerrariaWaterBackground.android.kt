@@ -45,11 +45,11 @@ float fbm(float2 p) {
     return f;
 }
 
-vec4 renderSea(float2 uv) {
+float4 renderSea(float2 uv) {
     float2 p = uv * 2.0 - 1.0;
     p.x *= u_resolution.x / u_resolution.y;
     
-    vec3 col = mix(u_dominant.rgb*0.2, u_vibrant.rgb*0.4, uv.y);
+    float3 col = mix(u_dominant.rgb*0.2, u_vibrant.rgb*0.4, uv.y);
     float depth = 1.0;
 
     if (p.y < -0.1) {
@@ -60,14 +60,14 @@ vec4 renderSea(float2 uv) {
         float waves = fbm(seaUv * 3.0 + u_time * 0.2);
         waves += fbm(seaUv * 6.0 - u_time * 0.4) * 0.5;
         
-        vec3 waterCol = mix(u_dominant.rgb * 0.5, u_vibrant.rgb, waves + u_energy);
+        float3 waterCol = mix(u_dominant.rgb * 0.5, u_vibrant.rgb, waves + u_energy);
         col = mix(waterCol, col, exp(-d * 0.1)); 
         depth = clamp(d / uFar, 0.0, 1.0);
     } else {
         float n = hash(p * 200.0 + u_time*0.01);
-        if (n > 0.995) col += vec3(min(1.0, n * 10.0));
+        if (n > 0.995) col += float3(min(1.0, n * 10.0));
     }
-    return vec4(col, depth);
+    return float4(col, depth);
 }
 
 float getBlurSize(float depth, float focusPoint, float focusScale) {
@@ -75,19 +75,22 @@ float getBlurSize(float depth, float focusPoint, float focusScale) {
     return abs(coc) * MAX_BLUR_SIZE;
 }
 
-vec3 depthOfField(vec2 texCoord, float focusPoint, float focusScale) {
-    vec4 Input = renderSea(texCoord);
+float3 depthOfField(float2 texCoord, float focusPoint, float focusScale) {
+    float4 Input = renderSea(texCoord);
     float centerDepth = Input.a * uFar;
     float centerSize = getBlurSize(centerDepth, focusPoint, focusScale);
-    vec3 color = Input.rgb;
+    float3 color = Input.rgb;
     float tot = 1.0;
     
-    vec2 texelSize = 1.0 / u_resolution.xy;
+    float2 texelSize = 1.0 / u_resolution.xy;
     float radius = RAD_SCALE;
-    for (float ang = 0.0; radius < MAX_BLUR_SIZE; ang += GOLDEN_ANGLE) {
-        vec2 tc = texCoord + vec2(cos(ang), sin(ang)) * texelSize * radius;
-        vec4 sampleInput = renderSea(tc);
-        vec3 sampleColor = sampleInput.rgb;
+    float ang = 0.0;
+    for (int i = 0; i < 40; i++) {
+        if (radius >= MAX_BLUR_SIZE) break;
+        
+        float2 tc = texCoord + float2(cos(ang), sin(ang)) * texelSize * radius;
+        float4 sampleInput = renderSea(tc);
+        float3 sampleColor = sampleInput.rgb;
         float sampleDepth = sampleInput.a * uFar;
         float sampleSize = getBlurSize(sampleDepth, focusPoint, focusScale);
         if (sampleDepth > centerDepth) {
@@ -97,6 +100,7 @@ vec3 depthOfField(vec2 texCoord, float focusPoint, float focusScale) {
         color += mix(color/tot, sampleColor, m);
         tot += 1.0;
         radius += RAD_SCALE/radius;
+        ang += GOLDEN_ANGLE;
     }
     return color /= tot;
 }
@@ -104,9 +108,9 @@ vec3 depthOfField(vec2 texCoord, float focusPoint, float focusScale) {
 half4 main(float2 fragCoord) {
     float2 uv = fragCoord.xy / u_resolution.xy;
     float focusPoint = 58.0 - sin(u_time * 0.3) * 20.0;
-    vec3 color = depthOfField(uv, focusPoint, FOCUS_SCALE);
-    color = vec3(1.7, 1.8, 1.6) * color / (1.0 + color);
-	return half4(half3(pow(color, vec3(1.0 / DISPLAY_GAMMA))), 1.0);
+    float3 color = depthOfField(uv, focusPoint, FOCUS_SCALE);
+    color = float3(1.7, 1.8, 1.6) * color / (float3(1.0) + color);
+	return half4(half3(pow(color, float3(1.0 / DISPLAY_GAMMA))), 1.0);
 }
 """
 

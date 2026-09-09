@@ -700,7 +700,7 @@ fun LibraryScreen(
             AlertDialog(
                 onDismissRequest = { trackPendingConfirmation = null },
                 title = { Text(getLocalizedString("delete_track_title"), color = dynamicTextColor) },
-                text = { Text((getLocalizedString("delete_track_desc") + " " + track.title), color = dynamicTextColor) },
+                text = { Text(getLocalizedString("delete_track_desc", track.title), color = dynamicTextColor) },
                 confirmButton = {
                     TextButton(onClick = {
                         val t = track
@@ -740,18 +740,16 @@ fun LibraryScreen(
                 }
             )
         }
-
-        val toastDlStr = getLocalizedString("toast_downloading")
         trackPendingDownload?.let { track ->
             AlertDialog(
                 onDismissRequest = { trackPendingDownload = null },
                 title = { Text(getLocalizedString("confirm_download"), color = dynamicTextColor) },
-                text = { Text(getLocalizedString("confirm_download_desc") + " " + track.title, color = dynamicTextColor) },
+                text = { Text(getLocalizedString("confirm_download_desc", track.title), color = dynamicTextColor) },
                 confirmButton = {
                     TextButton(onClick = {
                         trackPendingDownload = null
                         viewModel.downloadOnlineTrack(track)
-                        prefs.showToast(toastDlStr + " " + track.title)
+                        prefs.showToast(getLocalizedString("toast_downloading", track.title))
                     }) {
                         Text(getLocalizedString("download"), color = colorVibrant)
                     }

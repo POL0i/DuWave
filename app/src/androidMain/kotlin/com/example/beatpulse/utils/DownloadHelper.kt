@@ -63,10 +63,17 @@ object DownloadHelper {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val channelId = "duwave_downloads"
             
+            val prefs = PreferencesManager.getInstance(context)
+            val lang = prefs.appLanguage
+            val locale = java.util.Locale(lang)
+            val config = android.content.res.Configuration(context.resources.configuration)
+            config.setLocale(locale)
+            val localizedContext = context.createConfigurationContext(config)
+
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
                     channelId,
-                    "Descargas de DuWave",
+                    localizedContext.getString(localizedContext.resources.getIdentifier("notification_channel_downloads", "string", localizedContext.packageName)),
                     NotificationManager.IMPORTANCE_LOW
                 )
                 notificationManager.createNotificationChannel(channel)
@@ -75,7 +82,6 @@ object DownloadHelper {
             val notificationId = System.currentTimeMillis().toInt()
             downloadStates[notificationId] = 0
             
-            val prefs = PreferencesManager.getInstance(context)
             val color = when (prefs.backgroundStyle) {
                 1 -> 0xFFFF003C.toInt() // Cyberpunk
                 2 -> 0xFFFF9800.toInt() // Anime
@@ -90,7 +96,7 @@ object DownloadHelper {
 
             val builder = NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(android.R.drawable.stat_sys_download)
-                .setContentTitle("Descargando: $title")
+                .setContentTitle(localizedContext.getString(com.example.beatpulse.R.string.notification_downloading, title))
                 .setContentText(artist)
                 .setColor(color)
                 .setColorized(true)
@@ -100,11 +106,11 @@ object DownloadHelper {
             // Añadir acciones iniciales (Pausar y Cancelar)
             val pauseIntent = android.content.Intent("com.example.beatpulse.PAUSE_DOWNLOAD").apply { putExtra("id", notificationId) }
             val pausePending = android.app.PendingIntent.getBroadcast(context, notificationId, pauseIntent, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
-            builder.addAction(android.R.drawable.ic_media_pause, "Pausar", pausePending)
+            builder.addAction(android.R.drawable.ic_media_pause, localizedContext.getString(com.example.beatpulse.R.string.action_pause), pausePending)
             
             val cancelIntent = android.content.Intent("com.example.beatpulse.CANCEL_DOWNLOAD").apply { putExtra("id", notificationId) }
             val cancelPending = android.app.PendingIntent.getBroadcast(context, notificationId, cancelIntent, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
-            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancelar", cancelPending)
+            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, localizedContext.getString(com.example.beatpulse.R.string.action_cancel), cancelPending)
 
             notificationManager.notify(notificationId, builder.build())
 
@@ -151,14 +157,14 @@ object DownloadHelper {
                                     val currentTime = System.currentTimeMillis()
                                     if (currentTime - lastUpdateTime > 1000) {
                                         lastUpdateTime = currentTime
-                                        builder.setContentText("$artist • Pausado")
+                                        builder.setContentText(localizedContext.getString(com.example.beatpulse.R.string.notification_paused_artist, artist))
                                         builder.clearActions()
                                         
                                         val resumeIntent = android.content.Intent("com.example.beatpulse.RESUME_DOWNLOAD").apply { putExtra("id", notificationId) }
                                         val resumePending = android.app.PendingIntent.getBroadcast(context, notificationId, resumeIntent, android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE)
-                                        builder.addAction(android.R.drawable.ic_media_play, "Reanudar", resumePending)
+                                        builder.addAction(android.R.drawable.ic_media_play, localizedContext.getString(com.example.beatpulse.R.string.action_resume), resumePending)
                                         
-                                        builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancelar", cancelPending)
+                                        builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, localizedContext.getString(com.example.beatpulse.R.string.action_cancel), cancelPending)
                                         
                                         notificationManager.notify(notificationId, builder.build())
                                     }
@@ -176,19 +182,19 @@ object DownloadHelper {
                                 if (currentTime - lastUpdateTime > 500) {
                                     lastUpdateTime = currentTime
                                     builder.clearActions()
-                                    builder.addAction(android.R.drawable.ic_media_pause, "Pausar", pausePending)
-                                    builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Cancelar", cancelPending)
+                                    builder.addAction(android.R.drawable.ic_media_pause, localizedContext.getString(com.example.beatpulse.R.string.action_pause), pausePending)
+                                    builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, localizedContext.getString(com.example.beatpulse.R.string.action_cancel), cancelPending)
                                     
                                     if (contentLength > 0) {
                                         val progress = ((totalBytesRead * 100) / contentLength).toInt()
                                         val mbRead = String.format(java.util.Locale.US, "%.1f", totalBytesRead / 1024f / 1024f)
                                         val mbTotal = String.format(java.util.Locale.US, "%.1f", contentLength / 1024f / 1024f)
                                         builder.setProgress(100, progress, false)
-                                               .setContentText("$artist • $mbRead MB / $mbTotal MB")
+                                               .setContentText(localizedContext.getString(com.example.beatpulse.R.string.notification_progress, artist, mbRead, mbTotal))
                                     } else {
                                         val mbRead = String.format(java.util.Locale.US, "%.1f", totalBytesRead / 1024f / 1024f)
                                         builder.setProgress(100, 0, true)
-                                               .setContentText("$artist • $mbRead MB descargados")
+                                               .setContentText(localizedContext.getString(com.example.beatpulse.R.string.notification_progress_indeterminate, artist, mbRead))
                                     }
                                     notificationManager.notify(notificationId, builder.build())
                                 }
@@ -204,7 +210,7 @@ object DownloadHelper {
                 }
                 
                 builder.clearActions()
-                builder.setContentTitle(context.getString(com.example.beatpulse.R.string.download_completed))
+                builder.setContentTitle(localizedContext.getString(com.example.beatpulse.R.string.download_completed))
                     .setContentText(title)
                     .setSmallIcon(android.R.drawable.stat_sys_download_done)
                     .setProgress(0, 0, false)
@@ -213,7 +219,7 @@ object DownloadHelper {
                 notificationManager.notify(notificationId, builder.build())
                 
                 withContext(Dispatchers.Main) {
-                    prefs.showToast(context.getString(com.example.beatpulse.R.string.download_completed_desc, title))
+                    prefs.showToast(localizedContext.getString(com.example.beatpulse.R.string.download_completed_desc, title))
                 }
                 
                 // Forzar escaneo para que se agregue inmediatamente a la librería
@@ -227,13 +233,13 @@ object DownloadHelper {
                 // Cleanup partial file if canceled
                 if (e.message == "Descarga cancelada" && uri != null) {
                     resolver.delete(uri, null, null)
-                    builder.setContentTitle("Descarga cancelada")
+                    builder.setContentTitle(localizedContext.getString(com.example.beatpulse.R.string.notification_download_canceled))
                         .setContentText(title)
                         .setSmallIcon(android.R.drawable.stat_sys_warning)
                         .setProgress(0, 0, false)
                         .setOngoing(false)
                 } else {
-                    builder.setContentTitle("Error en la descarga")
+                    builder.setContentTitle(localizedContext.getString(com.example.beatpulse.R.string.notification_download_error))
                         .setContentText(title)
                         .setSmallIcon(android.R.drawable.stat_sys_warning)
                         .setProgress(0, 0, false)

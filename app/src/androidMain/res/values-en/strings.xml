@@ -314,4 +314,13 @@
     <string name="trim_audio_trim_btn">Trim</string>
     <string name="trim_error_generic">Error trimming audio.</string>
     <string name="reset_defaults">Reset to defaults</string>
+    <string name="notification_downloading">Downloading: %1$s</string>
+    <string name="notification_paused_artist">%1$s • Paused</string>
+    <string name="notification_progress">%1$s • %2$s MB / %3$s MB</string>
+    <string name="notification_progress_indeterminate">%1$s • %2$s MB downloaded</string>
+    <string name="notification_download_canceled">Download canceled</string>
+    <string name="notification_download_error">Download error</string>
+    <string name="action_pause">Pause</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_resume">Resume</string>
 </resources>

@@ -806,7 +806,7 @@ fun UnifiedLibraryScreen(
                     AlertDialog(
                         onDismissRequest = { trackPendingConfirmation = null },
                         title = { Text(getLocalizedString("delete_track_title"), color = dynamicTextColor) },
-                        text = { Text((getLocalizedString("delete_track_desc") + " " + track.title), color = dynamicTextColor) },
+                        text = { Text(getLocalizedString("delete_track_desc", track.title), color = dynamicTextColor) },
                         confirmButton = {
                             TextButton(onClick = {
                                 val t = track
