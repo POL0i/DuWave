@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.unit.dp
 import com.example.beatpulse.theme.PaletteColors
 import kotlin.random.Random
@@ -61,7 +62,9 @@ fun PlayerVisualizerCanvas(
     coverScale: Float,
     cleanUiMode: Boolean = false,
     elementSize: Float = 1f,
-    onPlayheadPosChanged: (Offset) -> Unit
+    onPlayheadPosChanged: (Offset) -> Unit,
+    onMarkerAPosChanged: ((Offset) -> Unit)? = null,
+    onMarkerBPosChanged: ((Offset) -> Unit)? = null
 ) {
     val basePath = remember { Path() }
     val wavePathR = remember { Path() }
@@ -649,12 +652,32 @@ fun PlayerVisualizerCanvas(
         val activePosition = dragSeekTimeMs ?: currentPosition
         val progressFraction = if (duration > 0) activePosition.toFloat() / duration else 0f
         if (!cleanUiMode) drawPath(path = basePath, color = colorDominant.copy(alpha = 0.3f), style = Stroke(width = 4f))
-        progressMeasure.setPath(basePath, forceClosed = false)
-        val pLen = progressMeasure.length
-        progressPath.reset()
-        val targetLength = pLen * progressFraction
-        if (targetLength > 0f) {
-            val startD = when(thumbnailShapeIdx) { 0 -> pLen * 0.75f; in 1..3 -> pLen * 0.125f; else -> 0f }
+        if (thumbnailShapeIdx == 0 && progressFraction > 0f) {
+            val sweepAngle = progressFraction * 360f
+            if (!cleanUiMode) {
+                drawArc(
+                    brush = sweepGradient,
+                    startAngle = 90f,
+                    sweepAngle = sweepAngle,
+                    useCenter = false,
+                    style = Stroke(width = 6f, cap = StrokeCap.Round),
+                    topLeft = Offset(center.x - rPx, center.y - rPx),
+                    size = androidx.compose.ui.geometry.Size(rPx * 2f, rPx * 2f)
+                )
+            }
+            val angle = (progressFraction * 2 * Math.PI) + Math.PI / 2
+            val thumbPos = Offset(
+                center.x + rPx * kotlin.math.cos(angle).toFloat(),
+                center.y + rPx * kotlin.math.sin(angle).toFloat()
+            )
+            onPlayheadPosChanged(thumbPos)
+            if (!cleanUiMode) drawCircle(color = Color.White, radius = 8f, center = thumbPos)
+        } else if (progressFraction > 0f) {
+            progressMeasure.setPath(basePath, forceClosed = false)
+            val pLen = progressMeasure.length
+            progressPath.reset()
+            val targetLength = pLen * progressFraction
+            val startD = when(thumbnailShapeIdx) { in 1..3 -> pLen * 0.125f; else -> 0f }
             val endD = startD + targetLength
             if (endD <= pLen) {
                 progressMeasure.getSegment(startD, endD, progressPath, true)
@@ -665,7 +688,7 @@ fun PlayerVisualizerCanvas(
             if (!cleanUiMode) drawPath(path = progressPath, brush = sweepGradient, style = Stroke(width = 6f, cap = StrokeCap.Round))
             val thumbDist = endD % pLen
             var thumbPos = progressMeasure.getPosition(thumbDist)
-            if (thumbnailShapeIdx != 0 && (thumbPos == Offset.Unspecified || thumbPos == Offset.Zero)) {
+            if (thumbPos == Offset.Unspecified || thumbPos == Offset.Zero) {
                 val pos = progressMeasure.getPosition(thumbDist)
                 if (pos != Offset.Unspecified) {
                     thumbPos = pos
@@ -673,7 +696,18 @@ fun PlayerVisualizerCanvas(
             }
             if (thumbPos != Offset.Unspecified && thumbPos != Offset.Zero) {
                 onPlayheadPosChanged(thumbPos)
-                if (!cleanUiMode) drawCircle(color = Color.White, radius = 8f, center = thumbPos)
+                if (!cleanUiMode) {
+                    if (thumbnailShapeIdx == 0) {
+                        drawCircle(color = Color.White, radius = 8f, center = thumbPos)
+                    } else {
+                        withTransform({
+                            translate(left = thumbPos.x - center.x, top = thumbPos.y - center.y)
+                            scale(scaleX = 8f / rPx, scaleY = 8f / rPx, pivot = center)
+                        }) {
+                            drawPath(path = basePath, color = Color.White)
+                        }
+                    }
+                }
             }
         }
 
@@ -683,27 +717,56 @@ fun PlayerVisualizerCanvas(
                 val pl = progressMeasure.length
                 if (pl <= 0f) center
                 else {
-                    val sd = when(thumbnailShapeIdx) { 0 -> pl * 0.75f; in 1..3 -> pl * 0.125f; else -> 0f }
-                    val dMod = (sd + progress * pl) % pl
-                    val pos = progressMeasure.getPosition(dMod)
-                    if (pos != Offset.Unspecified) pos else center
+                    if (thumbnailShapeIdx == 0) {
+                        val angle = (progress * 2 * Math.PI) + Math.PI / 2
+                        Offset(
+                            center.x + rPx * kotlin.math.cos(angle).toFloat(),
+                            center.y + rPx * kotlin.math.sin(angle).toFloat()
+                        )
+                    } else {
+                        val sd = when(thumbnailShapeIdx) { in 1..3 -> pl * 0.125f; else -> 0f }
+                        val dMod = (sd + progress * pl) % pl
+                        val pos = progressMeasure.getPosition(dMod)
+                        if (pos != Offset.Unspecified) pos else center
+                    }
                 }
             }
             val posA = getPosFromProgress(abPointA)
             val posB = getPosFromProgress(abPointB)
+            onMarkerAPosChanged?.invoke(Offset(posA.x - center.x, posA.y - center.y))
+            onMarkerBPosChanged?.invoke(Offset(posB.x - center.x, posB.y - center.y))
             val markerSizeA = if (activeDraggingHandle == "A") 16.dp.toPx() else 8.dp.toPx()
             val markerSizeB = if (activeDraggingHandle == "B") 16.dp.toPx() else 8.dp.toPx()
             if (thumbnailShapeIdx == 0) {
-                drawCircle(color = colorVibrant, radius = markerSizeA, center = posA)
-                drawCircle(color = colorVibrant.copy(alpha = 0.3f), radius = markerSizeA * 2, center = posA)
-                drawCircle(color = colorMuted, radius = markerSizeB, center = posB)
-                drawCircle(color = colorMuted.copy(alpha = 0.3f), radius = markerSizeB * 2, center = posB)
+                drawCircle(color = colorMuted, radius = markerSizeA, center = posA)
+                drawCircle(color = colorMuted.copy(alpha = 0.3f), radius = markerSizeA * 2, center = posA)
+                drawCircle(color = colorVibrant, radius = markerSizeB, center = posB)
+                drawCircle(color = colorVibrant.copy(alpha = 0.3f), radius = markerSizeB * 2, center = posB)
             } else {
-                val cornerRadius = if (thumbnailShapeIdx == 2) 4.dp.toPx() else if (thumbnailShapeIdx == 3) 8.dp.toPx() else 0f
-                drawRoundRect(color = colorVibrant, topLeft = Offset(posA.x - markerSizeA, posA.y - markerSizeA), size = Size(markerSizeA * 2, markerSizeA * 2), cornerRadius = CornerRadius(cornerRadius, cornerRadius))
-                drawRoundRect(color = colorVibrant.copy(alpha = 0.3f), topLeft = Offset(posA.x - markerSizeA * 2, posA.y - markerSizeA * 2), size = Size(markerSizeA * 4, markerSizeA * 4), cornerRadius = CornerRadius(cornerRadius * 2, cornerRadius * 2))
-                drawRoundRect(color = colorMuted, topLeft = Offset(posB.x - markerSizeB, posB.y - markerSizeB), size = Size(markerSizeB * 2, markerSizeB * 2), cornerRadius = CornerRadius(cornerRadius, cornerRadius))
-                drawRoundRect(color = colorMuted.copy(alpha = 0.3f), topLeft = Offset(posB.x - markerSizeB * 2, posB.y - markerSizeB * 2), size = Size(markerSizeB * 4, markerSizeB * 4), cornerRadius = CornerRadius(cornerRadius * 2, cornerRadius * 2))
+                withTransform({
+                    translate(left = posA.x - center.x, top = posA.y - center.y)
+                    scale(scaleX = markerSizeA / rPx, scaleY = markerSizeA / rPx, pivot = center)
+                }) {
+                    drawPath(path = basePath, color = colorMuted)
+                }
+                withTransform({
+                    translate(left = posA.x - center.x, top = posA.y - center.y)
+                    scale(scaleX = (markerSizeA * 2) / rPx, scaleY = (markerSizeA * 2) / rPx, pivot = center)
+                }) {
+                    drawPath(path = basePath, color = colorMuted.copy(alpha = 0.3f))
+                }
+                withTransform({
+                    translate(left = posB.x - center.x, top = posB.y - center.y)
+                    scale(scaleX = markerSizeB / rPx, scaleY = markerSizeB / rPx, pivot = center)
+                }) {
+                    drawPath(path = basePath, color = colorVibrant)
+                }
+                withTransform({
+                    translate(left = posB.x - center.x, top = posB.y - center.y)
+                    scale(scaleX = (markerSizeB * 2) / rPx, scaleY = (markerSizeB * 2) / rPx, pivot = center)
+                }) {
+                    drawPath(path = basePath, color = colorVibrant.copy(alpha = 0.3f))
+                }
             }
         }
     }
