@@ -324,6 +324,8 @@
     <string name="trim_audio_trim_btn">Recortar</string>
     <string name="trim_error_generic">Error al recortar el audio.</string>
     <string name="reset_defaults">Restablecer a valores por defecto</string>
+    <!-- Notificaciones de descarga -->
+    <string name="notification_channel_downloads">Descargas</string>
     <string name="notification_downloading">Descargando: %1$s</string>
     <string name="notification_paused_artist">%1$s • Pausado</string>
     <string name="notification_progress">%1$s • %2$s MB / %3$s MB</string>

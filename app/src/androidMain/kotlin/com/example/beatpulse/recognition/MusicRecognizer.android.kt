@@ -4,7 +4,7 @@ import android.annotation.SuppressLint
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import com.mrsep.musicrecognizer.core.recognition.shazam.SongRecSignature
+// Removed SongRecSignature import
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -89,16 +89,12 @@ actual class MusicRecognizer actual constructor() {
                 return@withContext Result.failure(Exception("Grabación interrumpida"))
             }
 
-            // 1. Generate Signature
-            val signature = try {
-                val finalAudioData = if (samplesRead < audioData.size) audioData.copyOf(samplesRead) else audioData
-                SongRecSignature.fromPcm16Mono16kHz(finalAudioData)
-            } catch (e: Exception) {
-                return@withContext Result.failure(Exception("Error generando huella acústica: ${e.message}"))
-            }
+            // 1. Prepare Audio (Convert PCM to WAV bytes)
+            val finalAudioData = if (samplesRead < audioData.size) audioData.copyOf(samplesRead) else audioData
+            val wavBytes = shortArrayToWavBytes(finalAudioData, sampleRate)
 
-            // 2. Query API
-            val apiResult = shazamClient.recognize(signature, (samplesRead * 1000L) / sampleRate)
+            // 2. Query New Backend API (with server rotation)
+            val apiResult = shazamClient.recognize(wavBytes)
             apiResult.map { RecognizedTrack(it.first, it.second) }
             
         } catch (e: SecurityException) {
@@ -108,5 +104,33 @@ actual class MusicRecognizer actual constructor() {
         } finally {
             audioRecord?.release()
         }
+    }
+
+    private fun shortArrayToWavBytes(audioData: ShortArray, sampleRate: Int): ByteArray {
+        val dataSize = audioData.size * 2
+        val totalSize = 36 + dataSize
+        
+        val byteBuffer = java.nio.ByteBuffer.allocate(44 + dataSize)
+        byteBuffer.order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        
+        byteBuffer.put("RIFF".toByteArray(Charsets.US_ASCII))
+        byteBuffer.putInt(totalSize)
+        byteBuffer.put("WAVE".toByteArray(Charsets.US_ASCII))
+        byteBuffer.put("fmt ".toByteArray(Charsets.US_ASCII))
+        byteBuffer.putInt(16) // Subchunk1Size
+        byteBuffer.putShort(1.toShort()) // AudioFormat (PCM)
+        byteBuffer.putShort(1.toShort()) // NumChannels
+        byteBuffer.putInt(sampleRate) // SampleRate
+        byteBuffer.putInt(sampleRate * 2) // ByteRate
+        byteBuffer.putShort(2.toShort()) // BlockAlign
+        byteBuffer.putShort(16.toShort()) // BitsPerSample
+        byteBuffer.put("data".toByteArray(Charsets.US_ASCII))
+        byteBuffer.putInt(dataSize)
+        
+        for (s in audioData) {
+            byteBuffer.putShort(s)
+        }
+        
+        return byteBuffer.array()
     }
 }
