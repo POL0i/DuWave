@@ -100,7 +100,7 @@ fun RetroWallBackground(
                 )
 
                 // Optimize grid building by caching it. Rebuild only if size changes
-                val brickWidth = size.width / (if (isPlayerScreen) 20 else 30)
+                val brickWidth = size.width / (if (isPlayerScreen) 8 else 12)
                 val brickHeight = brickWidth / 2.2f
                 
                 if (size != lastCanvasSize) {
@@ -124,7 +124,7 @@ fun RetroWallBackground(
                         }
                     }
                     
-                    val scanlineHeight = 6f
+                    val scanlineHeight = 18f
                     val numScanlines = (size.height / scanlineHeight).toInt()
                     for (i in 0..numScanlines step 2) {
                         cachedScanlinePath.addRect(androidx.compose.ui.geometry.Rect(0f, i * scanlineHeight, size.width, i * scanlineHeight + scanlineHeight))

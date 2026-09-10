@@ -26,6 +26,7 @@ import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.data.MusicRepository
 import com.example.beatpulse.theme.PaletteColors
 import org.koin.core.context.GlobalContext
+import com.example.beatpulse.utils.getLocalizedString
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -50,7 +51,7 @@ fun EcosystemScreen(
 
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
-            title = { Text("Transferencia de canciones", color = dynamicTextColor) },
+            title = { Text(getLocalizedString("song_transfer"), color = dynamicTextColor) },
             navigationIcon = {
                 IconButton(onClick = onNavigateBack) {
                     Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = paletteColors.vibrant)
@@ -75,7 +76,7 @@ fun EcosystemScreen(
                     colors = CardDefaults.cardColors(containerColor = paletteColors.dominant.copy(alpha = 0.5f))
                 ) {
                     Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Tu código de emparejamiento", style = MaterialTheme.typography.titleMedium, color = dynamicTextColor)
+                        Text(getLocalizedString("pairing_code"), style = MaterialTheme.typography.titleMedium, color = dynamicTextColor)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = EcosystemManager.discovery.currentPin,
@@ -83,7 +84,7 @@ fun EcosystemScreen(
                             color = paletteColors.vibrant
                         )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("Ingresa este código en otro dispositivo", style = MaterialTheme.typography.bodyMedium, color = dynamicTextColor.copy(alpha = 0.7f))
+                        Text(getLocalizedString("enter_code_other_device"), style = MaterialTheme.typography.bodyMedium, color = dynamicTextColor.copy(alpha = 0.7f))
                     }
                 }
                 
@@ -93,12 +94,12 @@ fun EcosystemScreen(
                     colors = CardDefaults.cardColors(containerColor = paletteColors.dominant.copy(alpha = 0.5f))
                 ) {
                     Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Conectar a dispositivo", style = MaterialTheme.typography.titleMedium, color = dynamicTextColor)
+                        Text(getLocalizedString("connect_device"), style = MaterialTheme.typography.titleMedium, color = dynamicTextColor)
                         Spacer(modifier = Modifier.height(16.dp))
                         OutlinedTextField(
                             value = inputPin,
                             onValueChange = { if (it.length <= 4 && it.all { char -> char.isDigit() }) inputPin = it },
-                            label = { Text("Código de 4 dígitos", color = dynamicTextColor) },
+                            label = { Text(getLocalizedString("four_digit_code"), color = dynamicTextColor) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             colors = OutlinedTextFieldDefaults.colors(

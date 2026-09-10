@@ -34,6 +34,10 @@ import androidx.compose.material.icons.filled.RepeatOne
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.List
@@ -280,7 +284,20 @@ fun PlayerEditorDialog(
     var editArtist by remember { mutableStateOf(currentTrack.customArtist ?: currentTrack.artist) }
     var editAlbum by remember { mutableStateOf(currentTrack.customAlbum ?: currentTrack.album) }
     var editCoverPath by remember { mutableStateOf(currentTrack.customCoverPath) }
+    var showCoverPicker by remember { androidx.compose.runtime.mutableStateOf(false) }
 
+    if (showCoverPicker) {
+        com.example.beatpulse.utils.SystemImagePicker(
+            onFileSelected = { path ->
+                showCoverPicker = false
+                if (path != null) {
+                    editCoverPath = path
+                }
+            },
+            colorDominant = colorDominant,
+            colorVibrant = colorVibrant
+        )
+    }
     
     AlertDialog(
         onDismissRequest = onDismissRequest,
@@ -310,17 +327,14 @@ fun PlayerEditorDialog(
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { 
-                        val path = com.example.beatpulse.utils.SystemUtils.pickImageFile()
-                        if (path != null) {
-                            editCoverPath = path
-                        }
+                        showCoverPicker = true
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
                 ) {
                     Text(getLocalizedString("choose_cover"))
                 }
                 if (editCoverPath != null) {
-                    Text("Portada personalizada seleccionada", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                    Text(getLocalizedString("custom_cover_selected"), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
@@ -505,13 +519,13 @@ fun PlayerStreamConfigDialog(
                     border = androidx.compose.foundation.BorderStroke(1.dp, colorVibrant),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Seleccionar Imagen de Portada Personalizada", color = Color.White)
+                    Text(getLocalizedString("select_custom_cover"), color = Color.White)
                 }
 
                 HorizontalDivider(color = Color.DarkGray)
 
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Text("Tamaño de la Portada: ${String.format("%.2fx", coverScale)}", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
+                    Text("${getLocalizedString("cover_size")}: ${String.format("%.2fx", coverScale)}", color = Color.Gray, style = MaterialTheme.typography.labelMedium)
                     Slider(
                         value = coverScale,
                         onValueChange = { playerViewModel.setCoverScale(it) },
@@ -566,7 +580,7 @@ fun PlayerStreamConfigDialog(
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.8f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Salir del Modo Streamer/Micrófono", color = Color.White)
+                    Text(getLocalizedString("exit_streamer_mode"), color = Color.White)
                 }
 
             }
@@ -634,7 +648,7 @@ fun PlayerSupportDialog(
                         Column {
                             Text("Sugerir Idea", fontWeight = FontWeight.Bold, color = animatedColor)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text("Envía comentarios o sugerencias para nuevas funciones", color = dynamicTextColor, style = MaterialTheme.typography.bodyMedium)
+                            Text(getLocalizedString("send_feedback"), color = dynamicTextColor, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
@@ -942,9 +956,33 @@ fun PlayerSettingsSheet(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) {
-                                items(sortedStyles, key = { it.name }) { style ->
+                                    items(sortedStyles, key = { it.name }) { style ->
                                         val isSelected = currentStyle == style
                                         val isFavorite = style.name in favoriteVisualizerStyles
+                                        val isLocked = (style == com.example.beatpulse.ui.components.player.VisualizerStyle.STAR || style == com.example.beatpulse.ui.components.player.VisualizerStyle.TERRAIN || style == com.example.beatpulse.ui.components.player.VisualizerStyle.SIDE_PERSPECTIVE_BANDS) && !prefs.isPatreonUnlocked
+                                        
+                                        var showPatreonUnlockDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                                        if (showPatreonUnlockDialog) {
+                                            AlertDialog(
+                                                onDismissRequest = { showPatreonUnlockDialog = false },
+                                                title = { Text(getLocalizedString("patreon_exclusive_style").takeIf { it != "patreon_exclusive_style" } ?: "Estilo único para Patreons", color = colorVibrant) },
+                                                text = { Text(getLocalizedString("support_patreon_desc").takeIf { it != "support_patreon_desc" } ?: "Apóyanos en Patreon para desbloquear.", color = dynamicTextColor) },
+                                                confirmButton = {
+                                                    TextButton(onClick = {
+                                                        showPatreonUnlockDialog = false
+                                                        com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_PATREON)
+                                                    }) {
+                                                        Text(getLocalizedString("unlock_patreon").takeIf { it != "unlock_patreon" } ?: "Desbloquear", color = colorVibrant)
+                                                    }
+                                                },
+                                                dismissButton = {
+                                                    TextButton(onClick = { showPatreonUnlockDialog = false }) {
+                                                        Text(getLocalizedString("cancel").takeIf { it != "cancel" } ?: "Cancelar", color = dynamicTextColor.copy(alpha=0.6f))
+                                                    }
+                                                },
+                                                containerColor = colorDominant
+                                            )
+                                        }
                                         
                                         val starScale by androidx.compose.animation.core.animateFloatAsState(
                                             targetValue = if (isFavorite) 1.2f else 1.0f,
@@ -953,6 +991,11 @@ fun PlayerSettingsSheet(
                                                 stiffness = androidx.compose.animation.core.Spring.StiffnessLow
                                             ),
                                             label = "starScale"
+                                        )
+                                        
+                                        val animatedGradientBrush = androidx.compose.ui.graphics.Brush.sweepGradient(
+                                            colors = listOf(colorDominant, colorVibrant, colorMuted, colorDominant),
+                                            center = androidx.compose.ui.geometry.Offset(12f, 12f)
                                         )
 
                                         Column(
@@ -974,19 +1017,36 @@ fun PlayerSettingsSheet(
                                                             shape = RoundedCornerShape(8.dp)
                                                         )
                                                         .background(if (isSelected) colorVibrant.copy(alpha=0.15f) else Color.Transparent)
-                                                        .clickable { onStyleChange(style, styleNames[style] ?: style.name) }
+                                                        .clickable { 
+                                                            if (isLocked) {
+                                                                showPatreonUnlockDialog = true
+                                                            } else {
+                                                                onStyleChange(style, styleNames[style] ?: style.name)
+                                                            }
+                                                        }
                                                 ) {
                                                     // Draw the wave preview in center
                                                     androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                                                         WavePreview(style = style, color = if (isSelected) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
                                                     }
+                                                    
+                                                    if (isLocked) {
+                                                        androidx.compose.foundation.layout.Box(
+                                                            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Filled.Lock,
+                                                                contentDescription = "Patreon Locked",
+                                                                tint = Color.White,
+                                                                modifier = Modifier.size(20.dp)
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                                     
                                                     // The animated star placed outside the clip bounds
-                                                    Icon(
-                                                        imageVector = Icons.Filled.Star,
-                                                        contentDescription = "Favorite",
-                                                        tint = if (isFavorite) colorVibrant else dynamicTextColor.copy(alpha = 0.6f).copy(alpha = 0.3f),
+                                                    androidx.compose.foundation.Canvas(
                                                         modifier = Modifier
                                                             .align(Alignment.TopEnd)
                                                             .offset(x = 6.dp, y = (-6).dp)
@@ -1000,7 +1060,22 @@ fun PlayerSettingsSheet(
                                                                 if (isFavorite) newSet.remove(style.name) else newSet.add(style.name)
                                                                 prefs.favoriteVisualizerStyles = newSet
                                                             }
-                                                    )
+                                                    ) {
+                                                        drawContext.canvas.save()
+                                                        val pxCenterX = center.x
+                                                        val pxCenterY = center.y
+                                                        drawContext.canvas.translate(pxCenterX, pxCenterY)
+                                                        drawContext.canvas.rotate(phase * 180f / 3.14159f)
+                                                        drawContext.canvas.translate(-pxCenterX, -pxCenterY)
+                                                        
+                                                        val path = androidx.compose.ui.graphics.vector.PathParser().parsePathString("M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z").toPath()
+                                                        if (isFavorite) {
+                                                            drawPath(path = path, brush = animatedGradientBrush)
+                                                        } else {
+                                                            drawPath(path = path, color = dynamicTextColor.copy(alpha = 0.3f))
+                                                        }
+                                                        drawContext.canvas.restore()
+                                                    }
                                                 }
                                                 Spacer(modifier = Modifier.height(6.dp))
                                                 Text(
@@ -1019,7 +1094,7 @@ fun PlayerSettingsSheet(
                     // TAB 2: Avanzados
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("Ondas Visuales (Archetype)", color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
+                    Text(getLocalizedString("visual_waves_archetype"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                         TextButton(onClick = { visualizerManager.visualizerArchetype.value = 0 }) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1030,7 +1105,7 @@ fun PlayerSettingsSheet(
                         TextButton(onClick = { visualizerManager.visualizerArchetype.value = 1 }) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.GraphicEq, contentDescription = null, tint = if (visualizerArchetype == 1) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
-                                Text("1 Onda combinada", color = if (visualizerArchetype == 1) colorVibrant else dynamicTextColor.copy(alpha = 0.6f), fontSize = 12.sp)
+                                Text(getLocalizedString("one_combined_wave"), color = if (visualizerArchetype == 1) colorVibrant else dynamicTextColor.copy(alpha = 0.6f), fontSize = 12.sp)
                             }
                         }
                     }
@@ -1039,7 +1114,7 @@ fun PlayerSettingsSheet(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable {
                         visualizerManager.isAdvancedMode.value = !isAdvancedMode
                     }) {
-                        Text(if (isAdvancedMode) "Sensibilidad por frecuencias (Avanzado)" else getLocalizedString("general_sensitivity"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                        Text(if (isAdvancedMode) getLocalizedString("advanced_frequency_sensitivity") else getLocalizedString("general_sensitivity"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
                         androidx.compose.material3.Switch(
                             checked = isAdvancedMode,
                             onCheckedChange = { visualizerManager.isAdvancedMode.value = it },
@@ -1065,7 +1140,7 @@ fun PlayerSettingsSheet(
                                 onValueChange = { visualizerManager.midMultiplier.value = it },
                                 onAdjustingChange = { isAdjusting = it },
                                 valueRange = 0.5f..3.0f,
-                                label = "Medios",
+                                label = getLocalizedString("mids"),
                                 color = colorVibrant,
                                 modifier = Modifier.weight(1f)
                             )
@@ -1074,7 +1149,7 @@ fun PlayerSettingsSheet(
                                 onValueChange = { visualizerManager.trebleMultiplier.value = it },
                                 onAdjustingChange = { isAdjusting = it },
                                 valueRange = 0.5f..3.0f,
-                                label = "Agudos",
+                                label = getLocalizedString("trebles"),
                                 color = colorMuted,
                                 modifier = Modifier.weight(1f)
                             )
@@ -1117,7 +1192,7 @@ fun PlayerSettingsSheet(
                     
                     Spacer(modifier = Modifier.height(16.dp))
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Text("Tamaño del Gráfico: ${String.format("%.2fx", elementSize)}", color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
+                        Text("${getLocalizedString("graph_size")}: ${String.format("%.2fx", elementSize)}", color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                         CustomThickSlider(
                             value = elementSize,
                             onValueChange = { visualizerManager.elementSize.value = it },
@@ -1133,7 +1208,7 @@ fun PlayerSettingsSheet(
 
                 } else if (page == 2) {
                     // TAB 3: Visuales
-                    Text("Opciones Avanzadas de Portada", color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
+                    Text(getLocalizedString("advanced_cover_options"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
@@ -1202,7 +1277,7 @@ fun PlayerSettingsSheet(
                     HorizontalDivider(color = Color.DarkGray)
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Text("Modo de Portada", color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
+                    Text(getLocalizedString("cover_mode"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             IconToggleButton(

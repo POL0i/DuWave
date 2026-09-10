@@ -89,6 +89,12 @@ fun AudioTrimmerDialog(
     )
 
     fun playFrom(timeMs: Float) {
+        try {
+            val playerViewModel = org.koin.java.KoinJavaComponent.getKoin().get<com.example.beatpulse.ui.viewmodels.IPlayerViewModel>()
+            if (playerViewModel.isPlaying.value) {
+                playerViewModel.togglePlayPause()
+            }
+        } catch(e: Exception) {}
         anchorMs = timeMs
         playSessionId++
         isPlaying = true

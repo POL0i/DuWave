@@ -223,9 +223,8 @@ object DownloadHelper {
                 }
                 
                 // Forzar escaneo para que se agregue inmediatamente a la librería
-                val scanner = org.koin.java.KoinJavaComponent.getKoin().get<com.example.beatpulse.data.ILibraryScanner>()
-                scanner.scanMusic()
-                
+                val repo = org.koin.java.KoinJavaComponent.getKoin().get<com.example.beatpulse.data.MusicRepository>()
+                kotlinx.coroutines.GlobalScope.launch(Dispatchers.IO) { repo.scanLocalLibrary() }
             } catch (e: Exception) {
                 e.printStackTrace()
                 builder.clearActions()

@@ -12,9 +12,9 @@ class ShazamClient {
     
     // Lista de servidores de rotación para asegurar el uptime al 100%
     private val servers = listOf(
-        "http://127.0.0.1:8000/recognize",
-        "http://localhost:8000/recognize",
+        "https://duwave-shazam.onrender.com/recognize",
         "http://10.0.2.2:8000/recognize",
+        "http://127.0.0.1:8000/recognize",
         "https://duwave-shazam-1.onrender.com/recognize",
         "https://duwave-shazam-2.hf.space/recognize"
     )

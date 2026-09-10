@@ -418,7 +418,7 @@ fun LibraryScreen(
                             LazyColumn(modifier = Modifier.fillMaxSize(), state = listState) {
                                 item {
                                     Text(
-                                        text = if (remainingMs > 0) getLocalizedString("next_update_in_h_m") + " " + remainingHours + "h " + remainingMinutes + "m" else getLocalizedString("updating_soon"),
+                                        text = if (remainingMs > 0) getLocalizedString("next_update_in_h_m", remainingHours.toInt(), remainingMinutes.toInt()) else getLocalizedString("updating_soon"),
                                         color = dynamicTextColor.copy(alpha = 0.6f),
                                         fontSize = 12.sp,
                                         modifier = Modifier.padding(16.dp, 16.dp, 16.dp, 0.dp)

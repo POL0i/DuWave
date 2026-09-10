@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import com.example.beatpulse.utils.getLocalizedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
@@ -322,7 +323,7 @@ fun UnifiedLibraryScreen(
                                         }
                                     )
                                     DropdownMenuItem(
-                                        text = { Text("Transferir música (Red Local/Online)") },
+                                        text = { Text(getLocalizedString("local_network_online")) },
                                         onClick = {
                                             showSettingsMenu = false
                                             showEcosystemScreen = true

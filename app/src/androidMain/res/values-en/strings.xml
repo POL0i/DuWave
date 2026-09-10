@@ -301,6 +301,32 @@
     <string name="patreon_code">Patreon Code</string>
     <string name="redeem_code">Redeem Code</string>
     <string name="patreon_wall">Patreon Wall</string>
+    <string name="visual_waves_archetype">Visual waves (Archetype)</string>
+    <string name="advanced_frequency_sensitivity">Frequency sensitivity (Advanced)</string>
+    <string name="mids">Mids</string>
+    <string name="trebles">Treble</string>
+    <string name="graph_size">Graph size</string>
+    <string name="song_transfer">Song Transfer</string>
+    <string name="pairing_code">Your pairing code</string>
+    <string name="enter_code_other_device">Enter this code on another device</string>
+    <string name="connect_device">Connect to device</string>
+    <string name="four_digit_code">4-digit code</string>
+    <string name="visualizer_shape">Visualizer Shape</string>
+    <string name="design_settings">Design Settings</string>
+    <string name="clouds_filter">Clouds</string>
+    <string name="local_network_online">Local Network Online (Transfer music)</string>
+
+    <!-- Shapes and Locks -->
+    <string name="thumb_shape_circle">Circle</string>
+    <string name="thumb_shape_square">Square</string>
+    <string name="thumb_shape_rounded">Rounded</string>
+    <string name="thumb_shape_squircle">Squircle</string>
+    <string name="thumb_shape_cathedral">Cathedral</string>
+    <string name="thumb_shape_rhombus">Rhombus</string>
+    <string name="thumb_shape_hexagon">Hexagon</string>
+    <string name="patreon_exclusive_style">Exclusive style for Patreons</string>
+    <string name="unlock_patreon">Unlock</string>
+
     <string name="checking_dependencies">Checking dependencies...</string>
     <string name="ffmpeg_required_desc">To trim audio on computer, you need to download FFmpeg (a secure open-source library).</string>
     <string name="downloading_ffmpeg">Downloading and installing FFmpeg...</string>

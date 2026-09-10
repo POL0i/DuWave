@@ -88,13 +88,13 @@ actual fun SystemImagePicker(
     colorVibrant: androidx.compose.ui.graphics.Color
 ) {
     val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+        contract = androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
     ) { uri: android.net.Uri? ->
         onFileSelected(uri?.toString())
     }
     
     androidx.compose.runtime.LaunchedEffect(Unit) {
-        launcher.launch("image/*")
+        launcher.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 }
 

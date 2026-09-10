@@ -24,6 +24,10 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.material3.Surface
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
@@ -137,7 +141,7 @@ fun DesignSettingsDialog(
                 if (isPatreonUnlocked) {
                     styles.add(9 to getLocalizedString("patreon_wall"))
                     styles.add(10 to "Fuente Oscura")
-                    styles.add(11 to "Nubes")
+                    styles.add(11 to (getLocalizedString("clouds_filter").takeIf { it.isNotBlank() } ?: "Nubes"))
                     styles.add(12 to "Zen Clear")
                     styles.add(13 to "Mareas de Arena")
                     styles.add(15 to ((getLocalizedString("style_retro_crt").takeIf { it != "style_retro_crt" } ?: "Retro CRT") + "\nby Kabuto"))
@@ -146,147 +150,152 @@ fun DesignSettingsDialog(
                 
                 val favoriteStyles by prefs.favoriteBackgroundStylesFlow.collectAsState()
                 val sortedStyles = styles.sortedByDescending { it.first in favoriteStyles }
-                val chunkedStyles = sortedStyles.chunked(4)
-                val pagerState = rememberPagerState(pageCount = { chunkedStyles.size })
                 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(480.dp) // Más largo, ensures all shapes and styles fit well
-                        .onKeyEvent { event ->
-                            if (event.type == KeyEventType.KeyDown && event.isAltPressed) {
-                                if (event.key == Key.DirectionRight) {
-                                    val next = (pagerState.currentPage + 1) % pagerState.pageCount
-                                    coroutineScope.launch { pagerState.animateScrollToPage(next) }
-                                    return@onKeyEvent true
-                                } else if (event.key == Key.DirectionLeft) {
-                                    val prev = if (pagerState.currentPage - 1 < 0) pagerState.pageCount - 1 else pagerState.currentPage - 1
-                                    coroutineScope.launch { pagerState.animateScrollToPage(prev) }
-                                    return@onKeyEvent true
-                                }
-                            }
-                            false
-                        },
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Left Column: Thumbnail Shapes
-                    Column(
-                        modifier = Modifier
-                            .width(48.dp)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState()),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    // Top Row: Thumbnail Shapes
+                    Text(
+                        getLocalizedString("visualizer_shape"),
+                        color = dynamicTextColor,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    val shapeIndices = listOf(0, 1, 2, 3, 4, 5, 6)
+                    val shapeKeys = listOf("thumb_shape_circle", "thumb_shape_square", "thumb_shape_rounded", "thumb_shape_squircle", "thumb_shape_cathedral", "thumb_shape_rhombus", "thumb_shape_hexagon")
+                    val shapeDefaults = listOf("Círculo", "Cuadrado", "Esquinas", "Suave", "Catedral", "Rombo", "Hexágono")
+                    
+                    var showPatreonUnlockDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                    
+                    if (showPatreonUnlockDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showPatreonUnlockDialog = false },
+                            title = { Text(getLocalizedString("patreon_exclusive_style").takeIf { it != "patreon_exclusive_style" } ?: "Estilo único para Patreons", color = paletteColors.vibrant) },
+                            text = { Text(getLocalizedString("support_patreon_desc").takeIf { it != "support_patreon_desc" } ?: "Apóyanos en Patreon para desbloquear.", color = dynamicTextColor) },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showPatreonUnlockDialog = false
+                                    onDismiss()
+                                    com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_PATREON)
+                                }) {
+                                    Text(getLocalizedString("unlock_patreon").takeIf { it != "unlock_patreon" } ?: "Desbloquear", color = paletteColors.vibrant)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showPatreonUnlockDialog = false }) {
+                                    Text(getLocalizedString("cancel").takeIf { it != "cancel" } ?: "Cancelar", color = dynamicTextColor.copy(alpha=0.6f))
+                                }
+                            },
+                            containerColor = paletteColors.dominant
+                        )
+                    }
+
+                    val isPatreonUnlocked by prefs.isPatreonUnlockedFlow.collectAsState()
+                    
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val shapeIndices = listOf(0, 1, 2, 3, 4, 5, 6)
-                        
-                        shapeIndices.forEach { idx ->
+
+                        items(shapeIndices.size) { index ->
+                            val idx = shapeIndices[index]
                             val isSelected = currentShapeIdx == idx
                             val shapeForThumb = com.example.beatpulse.ui.utils.getShapeForIndex(idx)
+                            val isLocked = (idx == 5 || idx == 6) && !isPatreonUnlocked
                             
-                            Box(
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(shapeForThumb)
-                                    .background(if (isSelected) paletteColors.vibrant.copy(alpha = 0.5f) else Color.Transparent)
-                                    .clickable { prefs.thumbnailShape = idx }
-                                    .border(
-                                        width = 2.dp,
-                                        color = if (isSelected) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.3f),
-                                        shape = shapeForThumb
-                                    )
+                            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(64.dp)) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(shapeForThumb)
+                                        .background(if (isSelected) paletteColors.vibrant.copy(alpha = 0.5f) else Color.Transparent)
+                                        .clickable { 
+                                            if (isLocked) {
+                                                showPatreonUnlockDialog = true
+                                            } else {
+                                                prefs.thumbnailShape = idx 
+                                            }
+                                        }
+                                        .border(
+                                            width = 2.dp,
+                                            color = if (isSelected) paletteColors.vibrant else dynamicTextColor,
+                                            shape = shapeForThumb
+                                        )
+                                ) {
+                                    if (isLocked) {
+                                        Box(
+                                            modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Filled.Lock,
+                                                contentDescription = "Patreon Locked",
+                                                tint = Color.White,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = getLocalizedString(shapeKeys[index]).takeIf { it != shapeKeys[index] } ?: shapeDefaults[index],
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) paletteColors.vibrant else dynamicTextColor.copy(alpha=0.8f),
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                    
+                    // Bottom Row: Visual Styles
+                    Text(
+                        getLocalizedString("visual_style").takeIf { it.isNotBlank() && it != "visual_style" } ?: "Estilo Visual",
+                        color = dynamicTextColor,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    LazyRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(sortedStyles.size, key = { sortedStyles[it].first }) { index ->
+                            val item = sortedStyles[index]
+                            val idx = item.first
+                            val name = item.second
+                            val isSelected = currentBgStyle == idx
+                            val isFavorite = idx in favoriteStyles
+                            
+                            StyleGridItem(
+                                idx = idx,
+                                name = name,
+                                isSelected = isSelected,
+                                isFavorite = isFavorite,
+                                onToggleFavorite = {
+                                    val newFavorites = favoriteStyles.toMutableSet()
+                                    if (isFavorite) newFavorites.remove(idx) else newFavorites.add(idx)
+                                    prefs.favoriteBackgroundStyles = newFavorites
+                                },
+                                paletteColors = paletteColors,
+                                dynamicTextColor = dynamicTextColor,
+                                prefs = prefs,
+                                modifier = Modifier.width(160.dp)
                             )
                         }
                     }
                     
-                    // Right Column: Visual Styles
-                    Column(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                    // Close Button
+                    Box(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.CenterEnd) {
                         Text(
-                            getLocalizedString("visual_style").takeIf { it.isNotBlank() && it != "visual_style" } ?: getLocalizedString("visual_style"),
+                            text = getLocalizedString("close").takeIf { it != "close" } ?: "Cerrar",
                             color = dynamicTextColor,
-                            style = MaterialTheme.typography.titleMedium
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier.fillMaxWidth().weight(1f)
-                        ) { page ->
-                            LazyVerticalGrid(
-                                columns = GridCells.Adaptive(minSize = 180.dp),
-                                modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                items(chunkedStyles[page], key = { it.first }) { item ->
-                                    val idx = item.first
-                                    val name = item.second
-                                    val isSelected = currentBgStyle == idx
-                                    val isFavorite = idx in favoriteStyles
-                                    
-                                    StyleGridItem(
-                                        idx = idx,
-                                        name = name,
-                                        isSelected = isSelected,
-                                        isFavorite = isFavorite,
-                                        onToggleFavorite = {
-                                            val newFavorites = favoriteStyles.toMutableSet()
-                                            if (isFavorite) newFavorites.remove(idx) else newFavorites.add(idx)
-                                            prefs.favoriteBackgroundStyles = newFavorites
-                                        },
-                                        paletteColors = paletteColors,
-                                        dynamicTextColor = dynamicTextColor,
-                                        prefs = prefs,
-                                        modifier = Modifier.animateItem()
-                                    )
-                                }
-                            }
-                        }
-                        
-                        // Dots and Close button aligned at the bottom
-                        Row(
+                            fontWeight = FontWeight.Bold,
                             modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 16.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Empty box for left spacing to match the close button width
-                            Box(modifier = Modifier.weight(1f))
-                            
-                            // Dots
-                            Row(
-                                modifier = Modifier.weight(2f),
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                repeat(chunkedStyles.size) { iteration ->
-                                    val color = if (pagerState.currentPage == iteration) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.3f)
-                                    Box(
-                                        modifier = Modifier
-                                            .padding(horizontal = 6.dp)
-                                            .clip(CircleShape)
-                                            .background(color)
-                                            .size(10.dp)
-                                            .clickable {
-                                                coroutineScope.launch { pagerState.animateScrollToPage(iteration) }
-                                            }
-                                    )
-                                }
-                            }
-                            
-                            // Close Button
-                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
-                                Text(
-                                    text = getLocalizedString("close").takeIf { it != "close" } ?: getLocalizedString("close"),
-                                    color = dynamicTextColor,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .background(dynamicTextColor.copy(alpha = 0.15f))
-                                        .clickable { onDismiss() }
-                                        .padding(horizontal = 24.dp, vertical = 12.dp)
-                                )
-                            }
-                        }
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(dynamicTextColor.copy(alpha = 0.15f))
+                                .clickable { onDismiss() }
+                                .padding(horizontal = 24.dp, vertical = 12.dp)
+                        )
                     }
                 }
             }
@@ -313,6 +322,22 @@ fun StyleGridItem(
             stiffness = androidx.compose.animation.core.Spring.StiffnessLow
         ),
         label = "starScale"
+    )
+    
+    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+            animation = androidx.compose.animation.core.tween(3000, easing = androidx.compose.animation.core.LinearEasing),
+            repeatMode = androidx.compose.animation.core.RepeatMode.Restart
+        ),
+        label = "gradientRotation"
+    )
+    
+    val animatedGradientBrush = androidx.compose.ui.graphics.Brush.sweepGradient(
+        colors = listOf(paletteColors.dominant, paletteColors.vibrant, paletteColors.muted, paletteColors.dominant),
+        center = androidx.compose.ui.geometry.Offset(12f, 12f)
     )
 
     Column(
@@ -364,10 +389,7 @@ fun StyleGridItem(
             }
             
             // The animated star placed outside the clip bounds
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = "Favorite",
-                tint = if (isFavorite) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.3f),
+            androidx.compose.foundation.Canvas(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .offset(x = 6.dp, y = (-6).dp)
@@ -377,7 +399,29 @@ fun StyleGridItem(
                     }
                     .size(24.dp)
                     .clickable { onToggleFavorite() }
-            )
+            ) {
+                drawContext.canvas.save()
+                val pxCenterX = center.x
+                val pxCenterY = center.y
+                drawContext.canvas.translate(pxCenterX, pxCenterY)
+                drawContext.canvas.rotate(rotation)
+                drawContext.canvas.translate(-pxCenterX, -pxCenterY)
+                
+                val path = androidx.compose.ui.graphics.vector.PathParser().parsePathString("M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z").toPath()
+                if (isFavorite) {
+                    drawPath(
+                        path = path,
+                        brush = animatedGradientBrush
+                    )
+                } else {
+                    drawPath(
+                        path = path,
+                        color = dynamicTextColor.copy(alpha = 0.3f)
+                    )
+                }
+                
+                drawContext.canvas.restore()
+            }
         }
         Spacer(modifier = Modifier.height(4.dp))
         Text(

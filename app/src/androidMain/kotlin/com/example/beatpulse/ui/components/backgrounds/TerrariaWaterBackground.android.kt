@@ -63,8 +63,8 @@ vec4 main(vec2 fragCoord) {
 	vec2 UV = 2.0*(fragCoord.xy - u_resolution.xy/2.0) / min(u_resolution.x, u_resolution.y);
 	vec3 Color = mix(u_dominant.rgb * 0.2, u_vibrant.rgb * 0.4, clamp(UV.y, 0.0, 1.0));
 
-	for(int i = 0; i <= 5; i++) {
-        float J = float(i) * 0.2;
+	for(int i = 0; i < 3; i++) {
+        float J = float(i) * 0.33; // 0.0 to ~1.0
 		float Lt = u_time*(0.5 + 2.0*J)*(1.0 + 0.1*sin(226.0*J)) + 17.0*J;
 		vec2 Lp = vec2(0.0, 0.3+1.5*(J - 0.5));
 		float L = Layer(UV + Lp, Lt);
@@ -92,22 +92,19 @@ actual fun TerrariaWaterBackground(
     val bassAmplitudes by visualizerManager.bassAmplitudes.collectAsState()
     val bassAvg = remember(bassAmplitudes) { if (bassAmplitudes.isNotEmpty()) bassAmplitudes.average().toFloat().let { if (it.isNaN()) 0f else it } else 0f }
     
-    val time = rememberInfiniteTransition().animateFloat(
+    val timeState = rememberInfiniteTransition().animateFloat(
         initialValue = 0f,
         targetValue = 1000f,
         animationSpec = infiniteRepeatable(
             animation = tween(100000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         )
-    ).value
+    )
 
-    val smoothedEnergy by animateFloatAsState(
+    val smoothedEnergyState = animateFloatAsState(
         targetValue = bassAvg,
         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
     )
-
-    val effectiveTime = if (isPlayerScreen) time * 0.6f else time * 0.25f
-    val effectiveEnergy = if (isPlayerScreen) smoothedEnergy * 0.3f else 0f
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -126,6 +123,9 @@ actual fun TerrariaWaterBackground(
 
             if (shaderBrush != null && runtimeShader != null) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
+                    val effectiveTime = if (isPlayerScreen) timeState.value * 0.6f else timeState.value * 0.25f
+                    val effectiveEnergy = if (isPlayerScreen) smoothedEnergyState.value * 0.3f else 0f
+                    
                     runtimeShader.setFloatUniform("u_resolution", size.width, size.height)
                     runtimeShader.setFloatUniform("u_time", effectiveTime)
                     runtimeShader.setFloatUniform("u_energy", effectiveEnergy)
