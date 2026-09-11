@@ -34,7 +34,8 @@ fun AudioTrimmerDialog(
     onTrimSuccess: (String) -> Unit,
     colorVibrant: Color = MaterialTheme.colorScheme.primary,
     colorSurface: Color = MaterialTheme.colorScheme.surface,
-    colorText: Color = MaterialTheme.colorScheme.onSurface
+    colorText: Color = MaterialTheme.colorScheme.onSurface,
+    onPausePlayback: () -> Unit = {}
 ) {
     com.example.beatpulse.utils.SystemBackHandler { onDismiss() }
     val coroutineScope = rememberCoroutineScope()
@@ -89,12 +90,7 @@ fun AudioTrimmerDialog(
     )
 
     fun playFrom(timeMs: Float) {
-        try {
-            val playerViewModel = org.koin.java.KoinJavaComponent.getKoin().get<com.example.beatpulse.ui.viewmodels.IPlayerViewModel>()
-            if (playerViewModel.isPlaying.value) {
-                playerViewModel.togglePlayPause()
-            }
-        } catch(e: Exception) {}
+        onPausePlayback()
         anchorMs = timeMs
         playSessionId++
         isPlaying = true

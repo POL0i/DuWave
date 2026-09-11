@@ -45,9 +45,8 @@ half4 main(float2 fragCoord) {
     float s_th = sin(th);
     mat2 rotMatrix = mat2(c, s_th, -s_th, c);
 
-    // Reducimos las iteraciones de 50 a 35, lo que da un estilo visual idéntico
-    // pero con ~30% más de rendimiento.
-    for (int i = 0; i < 35; ++i) {
+    // Restauramos iteraciones a 30 para mantener el estilo visual detallado
+    for (int i = 0; i < 30; ++i) {
         p.x += a * abs(p.y) - 0.3;
         p *= rotMatrix;
     }
@@ -73,9 +72,13 @@ actual fun ProceduralCRTCdc3rxBackground(
     content: @Composable () -> Unit
 ) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+        val isActiveApp = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+
         var time by remember { mutableStateOf(0f) }
         
-        LaunchedEffect(isPlayerScreen) {
+        LaunchedEffect(isPlayerScreen, isActiveApp) {
+            if (!isActiveApp) return@LaunchedEffect
             var lastFrameTime = -1L
             while (true) {
                 withInfiniteAnimationFrameMillis { frameTime ->
@@ -97,10 +100,14 @@ actual fun ProceduralCRTCdc3rxBackground(
             }
         }
 
-        val shaderBrush = remember(runtimeEffect, time, dominantColor, vibrantColor, dynamicEnergy) {
-            runtimeEffect?.let { shader ->
-                object : ShaderBrush() {
-                    override fun createShader(size: androidx.compose.ui.geometry.Size): android.graphics.Shader {
+        val shaderBrush = remember(runtimeEffect) {
+            runtimeEffect?.let { ShaderBrush(it) }
+        }
+
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (shaderBrush != null) {
+                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
+                    runtimeEffect?.let { shader ->
                         shader.setFloatUniform("u_time", time)
                         shader.setFloatUniform("u_resolution", size.width, size.height)
                         shader.setFloatUniform("u_energy", dynamicEnergy.coerceIn(0f, 1f))
@@ -110,16 +117,7 @@ actual fun ProceduralCRTCdc3rxBackground(
                         
                         shader.setFloatUniform("u_dominant", targetDom.red, targetDom.green, targetDom.blue, targetDom.alpha)
                         shader.setFloatUniform("u_vibrant", targetVib.red, targetVib.green, targetVib.blue, targetVib.alpha)
-                        
-                        return shader
                     }
-                }
-            }
-        }
-
-        Box(modifier = Modifier.fillMaxSize()) {
-            if (shaderBrush != null) {
-                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
                     drawRect(brush = shaderBrush)
                 }
             } else {

@@ -19,6 +19,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import com.example.beatpulse.utils.getLocalizedString
+import androidx.compose.material.icons.filled.PowerSettingsNew
+import androidx.compose.material.icons.filled.Wifi
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.scale
+import androidx.compose.animation.togetherWith
 
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.ui.input.pointer.pointerInput
@@ -125,7 +130,8 @@ fun LibraryScreen(
     paletteColors: com.example.beatpulse.theme.PaletteColors,
     currentPlayingTrack: TrackEntity?,
     isPlaying: Boolean,
-    onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
+    onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit,
+    onPausePlayback: () -> Unit = {}
 ) {
     val prefs = viewModel.prefs
     val shapeIdx by prefs.thumbnailShapeFlow.collectAsState(initial = 0)
@@ -176,7 +182,7 @@ fun LibraryScreen(
     var trackToDelete by remember { mutableStateOf<TrackEntity?>(null) }
     var trackPendingTrim by remember { mutableStateOf<TrackEntity?>(null) }
 
-    var isListeningForMusic by remember { mutableStateOf(false) }
+    var shazamPhase by remember { mutableStateOf(0) }
     var listeningProgress by remember { mutableFloatStateOf(0f) }
     var listeningAmplitude by remember { mutableFloatStateOf(0f) }
     val musicRecognizer = remember { MusicRecognizer() }
@@ -612,21 +618,27 @@ fun LibraryScreen(
                              scope.launch {
                                  recognitionResult = null
                                  recognitionError = null
-                                 isListeningForMusic = true
+                                 onPausePlayback()
+                                 shazamPhase = 1
                                  listeningProgress = 0f
                                  
+                                 kotlinx.coroutines.delay(1500)
                                  val isAvailable = musicRecognizer.checkAvailability()
                                  if (!isAvailable) {
-                                     isListeningForMusic = false
+                                     shazamPhase = 0
                                      recognitionError = shazamApiUnavailableStr
                                      return@launch
                                  }
                                  
+                                 shazamPhase = 2
+                                 kotlinx.coroutines.delay(1500)
+                                 
+                                 shazamPhase = 3
                                  val result = musicRecognizer.recognizeMusic { progress, amplitude ->
                                      listeningProgress = progress
                                      listeningAmplitude = amplitude
                                  }
-                                 isListeningForMusic = false
+                                 shazamPhase = 0
                                  
                                  result.fold(
                                      onSuccess = { track ->
@@ -737,7 +749,8 @@ fun LibraryScreen(
                 colorText = dynamicTextColor,
                 onTrimSuccess = { newPath ->
                     viewModel.copyMetadataForTrimmedTrack(track, newPath)
-                }
+                },
+                onPausePlayback = onPausePlayback
             )
         }
         trackPendingDownload?.let { track ->
@@ -779,17 +792,66 @@ fun LibraryScreen(
         }
 
         // Listening dialog
-        if (isListeningForMusic) {
+        // Listening dialog
+        if (shazamPhase > 0) {
             AlertDialog(
                 onDismissRequest = { /* Modal, espera a que termine */ },
-                title = { Text(getLocalizedString("shazam_listening_title"), color = dynamicTextColor) },
+                title = { 
+                    val titleText = when (shazamPhase) {
+                        1 -> "Verificando Servidor"
+                        2 -> "Iniciando Servidor"
+                        else -> getLocalizedString("shazam_listening_title")
+                    }
+                    Text(titleText, color = dynamicTextColor) 
+                },
                 text = {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(64.dp), tint = colorVibrant)
+                        androidx.compose.animation.AnimatedContent(
+                            targetState = shazamPhase,
+                            transitionSpec = { androidx.compose.animation.fadeIn() togetherWith androidx.compose.animation.fadeOut() },
+                            label = "shazamPhaseIcon"
+                        ) { phase ->
+                            when (phase) {
+                                1 -> {
+                                    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "wifi")
+                                    val alpha by infiniteTransition.animateFloat(
+                                        initialValue = 0.3f, targetValue = 1f,
+                                        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                            animation = androidx.compose.animation.core.tween(500),
+                                            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                                        ), label = "wifiAlpha"
+                                    )
+                                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(64.dp).alpha(alpha), tint = colorVibrant)
+                                }
+                                2 -> {
+                                    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "power")
+                                    val scale by infiniteTransition.animateFloat(
+                                        initialValue = 0.8f, targetValue = 1.1f,
+                                        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
+                                            animation = androidx.compose.animation.core.tween(400),
+                                            repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                                        ), label = "powerScale"
+                                    )
+                                    Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(64.dp).scale(scale), tint = colorVibrant)
+                                }
+                                else -> {
+                                    Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(64.dp), tint = colorVibrant)
+                                }
+                            }
+                        }
                         Spacer(Modifier.height(16.dp))
-                        Text(getLocalizedString("shazam_listening_desc"), color = dynamicTextColor, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                        val descText = when (shazamPhase) {
+                            1 -> "Comprobando conexión con el servicio..."
+                            2 -> "Despertando el motor de reconocimiento..."
+                            else -> getLocalizedString("shazam_listening_desc")
+                        }
+                        Text(descText, color = dynamicTextColor, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                         Spacer(Modifier.height(16.dp))
-                        MicVisualizer(progress = listeningProgress, amplitude = listeningAmplitude, color = colorVibrant)
+                        if (shazamPhase == 3) {
+                            MicVisualizer(progress = listeningProgress, amplitude = listeningAmplitude, color = colorVibrant)
+                        } else {
+                            androidx.compose.material3.LinearProgressIndicator(color = colorVibrant, trackColor = paletteColors.dominant.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth().height(4.dp))
+                        }
                     }
                 },
                 confirmButton = { },
@@ -849,19 +911,27 @@ fun LibraryScreen(
                         scope.launch {
                             recognitionResult = null
                             recognitionError = null
-                            isListeningForMusic = true
+                            onPausePlayback()
+                            shazamPhase = 1
                             listeningProgress = 0f
+                            
+                            kotlinx.coroutines.delay(1500)
                             val isAvailable = musicRecognizer.checkAvailability()
                             if (!isAvailable) {
-                                isListeningForMusic = false
+                                shazamPhase = 0
                                 recognitionError = shazamApiUnavailableStr
                                 return@launch
                             }
+                            
+                            shazamPhase = 2
+                            kotlinx.coroutines.delay(1500)
+                            
+                            shazamPhase = 3
                             val result = musicRecognizer.recognizeMusic { progress, amplitude ->
                                 listeningProgress = progress
                                 listeningAmplitude = amplitude
                             }
-                            isListeningForMusic = false
+                            shazamPhase = 0
                             result.fold(
                                 onSuccess = { track ->
                                     recognitionResult = track

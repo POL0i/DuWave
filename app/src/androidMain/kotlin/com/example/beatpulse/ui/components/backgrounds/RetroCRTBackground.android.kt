@@ -124,30 +124,26 @@ actual fun RetroCRTBackground(
     isPlayerScreen: Boolean,
     content: @Composable () -> Unit
 ) {
-    val time = rememberInfiniteTransition().animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(100000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        )
-    ).value
+    val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val isActiveApp = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
 
-    val smoothedEnergy by animateFloatAsState(
+    var time by remember { mutableStateOf(0f) }
+    LaunchedEffect(isPlayerScreen, isActiveApp) {
+        if (!isActiveApp) return@LaunchedEffect
+        var lastTime = withFrameNanos { it }
+        while (true) {
+            withFrameNanos { frameTime ->
+                val dt = (frameTime - lastTime) / 1_000_000_000f
+                lastTime = frameTime
+                time += if (isPlayerScreen) dt else dt * 0.25f
+            }
+        }
+    }
+
+    val smoothedEnergyState = animateFloatAsState(
         targetValue = dynamicEnergy,
         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
     )
-
-    // Two speed modes: library (ultra-slow ambient) vs player (gentle energy reaction)
-    val effectiveTime: Float
-    val effectiveEnergy: Float
-    if (isPlayerScreen) {
-        effectiveTime = time * 0.6f
-        effectiveEnergy = smoothedEnergy * 0.3f
-    } else {
-        effectiveTime = time * 0.25f
-        effectiveEnergy = 0f
-    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -166,6 +162,10 @@ actual fun RetroCRTBackground(
 
             if (shaderBrush != null && runtimeShader != null) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
+                    val smoothedEnergy = smoothedEnergyState.value
+                    val effectiveTime = time
+                    val effectiveEnergy = if (isPlayerScreen) smoothedEnergy * 0.3f else 0f
+                    
                     runtimeShader.setFloatUniform("u_resolution", size.width, size.height)
                     runtimeShader.setFloatUniform("u_time", effectiveTime)
                     runtimeShader.setFloatUniform("u_energy", effectiveEnergy)

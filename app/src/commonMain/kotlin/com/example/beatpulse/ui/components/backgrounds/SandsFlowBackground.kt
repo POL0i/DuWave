@@ -24,22 +24,19 @@ fun SandsFlowBackground(
     val bassAvgRaw = remember(bassAmplitudes) { if (bassAmplitudes.isNotEmpty()) bassAmplitudes.average().toFloat().let { if (it.isNaN()) 0f else it } else 0f }
     val trebleAvgRaw = remember(trebleAmplitudes) { if (trebleAmplitudes.isNotEmpty()) trebleAmplitudes.average().toFloat().let { if (it.isNaN()) 0f else it } else 0f }
     
-    val bassAvg by animateFloatAsState(targetValue = bassAvgRaw, animationSpec = tween(durationMillis = 150, easing = LinearEasing), label = "bassSmooth")
-    val trebleAvg by animateFloatAsState(targetValue = trebleAvgRaw, animationSpec = tween(durationMillis = 150, easing = LinearEasing), label = "trebleSmooth")
+    val bassAvgState = animateFloatAsState(targetValue = bassAvgRaw, animationSpec = tween(durationMillis = 150, easing = LinearEasing), label = "bassSmooth")
+    val trebleAvgState = animateFloatAsState(targetValue = trebleAvgRaw, animationSpec = tween(durationMillis = 150, easing = LinearEasing), label = "trebleSmooth")
 
-    var accumulatedTime by remember { mutableStateOf(0f) }
-    
-    // We need to read the latest bass inside the frame loop without capturing the old value
-    val latestBass by rememberUpdatedState(bassAvg)
+    val accumulatedTimeState = remember { mutableStateOf(0f) }
 
     LaunchedEffect(isPlayerScreen) {
         if (isPlayerScreen) {
             var lastTime = withFrameNanos { it }
             while (isActive) {
                 val currentTime = withFrameNanos { it }
-                val dt = (currentTime - lastTime) / 1_000_000_000f
-                // Base speed + bass acceleration
-                accumulatedTime += dt * (1f + latestBass * 1.0f)
+                val dt = ((currentTime - lastTime) / 1_000_000_000f).coerceAtMost(0.1f)
+                val currentBass = bassAvgState.value
+                accumulatedTimeState.value += dt * (1f + currentBass * 1.0f)
                 lastTime = currentTime
             }
         }
@@ -48,9 +45,9 @@ fun SandsFlowBackground(
     Box(modifier = Modifier.fillMaxSize()) {
         SandsFlowShader(
             modifier = Modifier.fillMaxSize(),
-            time = accumulatedTime,
-            bass = bassAvg,
-            treble = trebleAvg,
+            time = accumulatedTimeState,
+            bass = bassAvgState,
+            treble = trebleAvgState,
             dominantColor = paletteColors.dominant,
             vibrantColor = paletteColors.vibrant,
             mutedColor = paletteColors.muted

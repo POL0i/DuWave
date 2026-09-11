@@ -255,32 +255,61 @@ fun DesignSettingsDialog(
                         color = dynamicTextColor,
                         style = MaterialTheme.typography.titleMedium
                     )
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        items(sortedStyles.size, key = { sortedStyles[it].first }) { index ->
-                            val item = sortedStyles[index]
-                            val idx = item.first
-                            val name = item.second
-                            val isSelected = currentBgStyle == idx
-                            val isFavorite = idx in favoriteStyles
+                    val pagerState = androidx.compose.foundation.pager.rememberPagerState { (sortedStyles.size + 2) / 3 }
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        androidx.compose.foundation.pager.HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { page ->
+                            val startIdx = page * 3
+                            val endIdx = kotlin.math.min(startIdx + 3, sortedStyles.size)
+                            val pageItems = sortedStyles.subList(startIdx, endIdx)
                             
-                            StyleGridItem(
-                                idx = idx,
-                                name = name,
-                                isSelected = isSelected,
-                                isFavorite = isFavorite,
-                                onToggleFavorite = {
-                                    val newFavorites = favoriteStyles.toMutableSet()
-                                    if (isFavorite) newFavorites.remove(idx) else newFavorites.add(idx)
-                                    prefs.favoriteBackgroundStyles = newFavorites
-                                },
-                                paletteColors = paletteColors,
-                                dynamicTextColor = dynamicTextColor,
-                                prefs = prefs,
-                                modifier = Modifier.width(160.dp)
-                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly
+                            ) {
+                                for (i in 0..2) {
+                                    if (i < pageItems.size) {
+                                        val item = pageItems[i]
+                                        val idx = item.first
+                                        val name = item.second
+                                        val isSelected = currentBgStyle == idx
+                                        val isFavorite = idx in favoriteStyles
+                                        
+                                        StyleGridItem(
+                                            idx = idx,
+                                            name = name,
+                                            isSelected = isSelected,
+                                            isFavorite = isFavorite,
+                                            onToggleFavorite = {
+                                                val newFavorites = favoriteStyles.toMutableSet()
+                                                if (isFavorite) newFavorites.remove(idx) else newFavorites.add(idx)
+                                                prefs.favoriteBackgroundStyles = newFavorites
+                                            },
+                                            paletteColors = paletteColors,
+                                            dynamicTextColor = dynamicTextColor,
+                                            prefs = prefs,
+                                            modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                                        )
+                                    } else {
+                                        Spacer(modifier = Modifier.weight(1f).padding(horizontal = 4.dp))
+                                    }
+                                }
+                            }
+                        }
+                        
+                        Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.Center) {
+                            repeat(pagerState.pageCount) { iteration ->
+                                val indicatorColor = if (pagerState.currentPage == iteration) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.2f)
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 2.dp)
+                                        .clip(CircleShape)
+                                        .background(indicatorColor)
+                                        .size(5.dp) // Puntos comprimidos
+                                )
+                            }
                         }
                     }
                     
@@ -322,17 +351,6 @@ fun StyleGridItem(
             stiffness = androidx.compose.animation.core.Spring.StiffnessLow
         ),
         label = "starScale"
-    )
-    
-    val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
-    val rotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = androidx.compose.animation.core.infiniteRepeatable(
-            animation = androidx.compose.animation.core.tween(3000, easing = androidx.compose.animation.core.LinearEasing),
-            repeatMode = androidx.compose.animation.core.RepeatMode.Restart
-        ),
-        label = "gradientRotation"
     )
     
     val animatedGradientBrush = androidx.compose.ui.graphics.Brush.sweepGradient(
@@ -403,9 +421,6 @@ fun StyleGridItem(
                 drawContext.canvas.save()
                 val pxCenterX = center.x
                 val pxCenterY = center.y
-                drawContext.canvas.translate(pxCenterX, pxCenterY)
-                drawContext.canvas.rotate(rotation)
-                drawContext.canvas.translate(-pxCenterX, -pxCenterY)
                 
                 val path = androidx.compose.ui.graphics.vector.PathParser().parsePathString("M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z").toPath()
                 if (isFavorite) {

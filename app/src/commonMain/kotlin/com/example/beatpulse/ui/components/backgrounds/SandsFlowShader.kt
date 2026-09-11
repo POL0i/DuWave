@@ -1,6 +1,7 @@
 package com.example.beatpulse.ui.components.backgrounds
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 
@@ -83,9 +84,9 @@ const val SANDS_FLOW_SKSL = """
 @Composable
 expect fun SandsFlowShader(
     modifier: Modifier,
-    time: Float,
-    bass: Float,
-    treble: Float,
+    time: State<Float>,
+    bass: State<Float>,
+    treble: State<Float>,
     dominantColor: Color,
     vibrantColor: Color,
     mutedColor: Color

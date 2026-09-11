@@ -186,6 +186,21 @@ class PlayerViewModel(
                 kotlinx.coroutines.delay(50)
             }
         }
+        
+        // Poll system volume to sync with hardware button changes
+        viewModelScope.launch {
+            while(true) {
+                val sysVol = com.example.beatpulse.utils.SystemUtils.getSystemVolumeLevel()
+                val currentVol = _systemVolume.value
+                // If not boosted and system volume changed by > 1%, update our state
+                if (currentVol <= 1.0f && kotlin.math.abs(sysVol - currentVol) > 0.01f) {
+                    _systemVolume.value = sysVol
+                    _playerState.value?.volume = sysVol
+                }
+                kotlinx.coroutines.delay(500)
+            }
+        }
+        
         val wifiStreamQuality = MutableStateFlow(100)
         val wifiStreamCustomWidth = MutableStateFlow(1920)
         val wifiStreamCustomHeight = MutableStateFlow(1080)

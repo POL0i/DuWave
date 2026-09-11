@@ -404,7 +404,8 @@ fun AppScreen(
                             onTrackClick = { track, queue ->
                                 playerViewModel.playTrack(track, queue)
                                 currentPage = 2
-                            }
+                            },
+                            onPausePlayback = { if (playerViewModel.isPlaying.value) playerViewModel.pause() }
                         )
                     }
                     1 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize().clipToBounds()) {
@@ -416,7 +417,8 @@ fun AppScreen(
                             onTrackClick = { track, queue ->
                                 playerViewModel.playTrack(track, queue)
                                 currentPage = 2
-                            }
+                            },
+                            onPausePlayback = { if (playerViewModel.isPlaying.value) playerViewModel.pause() }
                         )
                     }
                     2 -> Box(modifier = Modifier.fillMaxSize().clipToBounds()) {

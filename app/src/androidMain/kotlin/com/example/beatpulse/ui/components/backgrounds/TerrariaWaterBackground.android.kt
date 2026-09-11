@@ -62,9 +62,10 @@ float Layer(vec2 pQ, float pT) {
 vec4 main(vec2 fragCoord) {
 	vec2 UV = 2.0*(fragCoord.xy - u_resolution.xy/2.0) / min(u_resolution.x, u_resolution.y);
 	vec3 Color = mix(u_dominant.rgb * 0.2, u_vibrant.rgb * 0.4, clamp(UV.y, 0.0, 1.0));
-
-	for(int i = 0; i < 3; i++) {
-        float J = float(i) * 0.33; // 0.0 to ~1.0
+	
+    // Reduce loop from 3 to 2 for performance, it looks similar
+	for(int i = 0; i < 2; i++) {
+        float J = float(i) * 0.5; // 0.0 to 0.5
 		float Lt = u_time*(0.5 + 2.0*J)*(1.0 + 0.1*sin(226.0*J)) + 17.0*J;
 		vec2 Lp = vec2(0.0, 0.3+1.5*(J - 0.5));
 		float L = Layer(UV + Lp, Lt);
@@ -89,22 +90,21 @@ actual fun TerrariaWaterBackground(
     isPlayerScreen: Boolean,
     content: @Composable () -> Unit
 ) {
-    val bassAmplitudes by visualizerManager.bassAmplitudes.collectAsState()
-    val bassAvg = remember(bassAmplitudes) { if (bassAmplitudes.isNotEmpty()) bassAmplitudes.average().toFloat().let { if (it.isNaN()) 0f else it } else 0f }
+    val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val isActiveApp = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
     
-    val timeState = rememberInfiniteTransition().animateFloat(
-        initialValue = 0f,
-        targetValue = 1000f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(100000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        )
-    )
+    var time by remember { mutableStateOf(0f) }
+    LaunchedEffect(isActiveApp, isPlayerScreen) {
+        if (!isActiveApp) return@LaunchedEffect
+        val startTime = withFrameNanos { it } - (time * 1_000_000_000f).toLong()
+        while (true) {
+            val frameTime = withFrameNanos { it }
+            val t = (frameTime - startTime) / 1_000_000_000f
+            time = if (isPlayerScreen) t else t * 0.4f
+        }
+    }
 
-    val smoothedEnergyState = animateFloatAsState(
-        targetValue = bassAvg,
-        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
-    )
+    val bassAmplitudesState = visualizerManager.bassAmplitudes.collectAsState()
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -123,8 +123,12 @@ actual fun TerrariaWaterBackground(
 
             if (shaderBrush != null && runtimeShader != null) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val effectiveTime = if (isPlayerScreen) timeState.value * 0.6f else timeState.value * 0.25f
-                    val effectiveEnergy = if (isPlayerScreen) smoothedEnergyState.value * 0.3f else 0f
+                    val effectiveTime = if (isPlayerScreen) time * 0.6f else time * 0.25f
+                    
+                    val bassAmplitudes = bassAmplitudesState.value
+                    var bassAvg = 0f
+                    if (bassAmplitudes.isNotEmpty()) bassAvg = bassAmplitudes.average().toFloat().let { if (it.isNaN()) 0f else it }
+                    val effectiveEnergy = if (isPlayerScreen) bassAvg * 0.3f else 0f
                     
                     runtimeShader.setFloatUniform("u_resolution", size.width, size.height)
                     runtimeShader.setFloatUniform("u_time", effectiveTime)

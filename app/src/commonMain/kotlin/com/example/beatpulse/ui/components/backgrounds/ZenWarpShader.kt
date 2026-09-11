@@ -1,6 +1,7 @@
 package com.example.beatpulse.ui.components.backgrounds
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 
@@ -47,14 +48,14 @@ const val ZEN_WARP_SKSL = """
         float t = u_time * 0.12;
         float audioReact = u_bass * 0.4;
 
-        // Capa 1: deformación suave y lenta
+        // Capa 1: deformación suave y lenta (optimizado con trigonometría en lugar de ruido)
         vec2 warp1 = vec2(
-            fbm(p * 2.5 + vec2(t, t * 0.7)),
-            fbm(p * 2.5 + vec2(t * 0.6, -t))
+            sin(p.y * 3.0 + t) * 0.5 + cos(p.x * 2.0 + t * 0.7) * 0.5,
+            cos(p.x * 3.0 - t * 0.8) * 0.5 + sin(p.y * 2.5 + t * 0.6) * 0.5
         );
         
-        // Capa 2: efecto orgánico con 1 fbm + offset senoidal (mismo look, menos costo)
-        float w2base = fbm(p * 3.0 + warp1 * 1.5 + vec2(t * 0.8, t * 0.5));
+        // Capa 2: efecto orgánico con 1 fbm + offset senoidal (Optimizado a noise simple)
+        float w2base = noise(p * 3.0 + warp1 * 1.5 + vec2(t * 0.8, t * 0.5));
         vec2 warp2 = vec2(
             w2base,
             w2base * 0.8 + sin(p.x * 4.0 + warp1.y * 3.0 + t) * 0.2
@@ -92,9 +93,9 @@ const val ZEN_WARP_SKSL = """
 @Composable
 expect fun ZenWarpShader(
     modifier: Modifier,
-    time: Float,
-    bass: Float,
-    treble: Float,
+    time: State<Float>,
+    bass: State<Float>,
+    treble: State<Float>,
     dominantColor: Color,
     vibrantColor: Color,
     mutedColor: Color

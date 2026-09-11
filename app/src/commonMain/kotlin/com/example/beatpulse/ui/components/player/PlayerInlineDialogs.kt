@@ -943,64 +943,70 @@ fun PlayerSettingsSheet(
                         Text(getLocalizedString("visual_style"), color = dynamicTextColor.copy(alpha = 0.6f), style = MaterialTheme.typography.labelMedium)
                     }
                     
-                    val infiniteTransition = rememberInfiniteTransition()
-                    val phase by infiniteTransition.animateFloat(
-                        initialValue = 0f, targetValue = 2f * kotlin.math.PI.toFloat(),
-                        animationSpec = infiniteRepeatable(tween(2000, easing = LinearEasing), RepeatMode.Restart)
-                    )
+                    // Eliminamos la animación infinita de rotación que causaba recomposiciones excesivas
+                    // para mejorar enormemente el rendimiento en el menú de estilos.
 
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                            androidx.compose.foundation.lazy.grid.LazyHorizontalGrid(
-                                rows = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
-                                modifier = Modifier.fillMaxWidth().height(185.dp).padding(horizontal = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                    items(sortedStyles, key = { it.name }) { style ->
-                                        val isSelected = currentStyle == style
-                                        val isFavorite = style.name in favoriteVisualizerStyles
-                                        val isLocked = (style == com.example.beatpulse.ui.components.player.VisualizerStyle.STAR || style == com.example.beatpulse.ui.components.player.VisualizerStyle.TERRAIN || style == com.example.beatpulse.ui.components.player.VisualizerStyle.SIDE_PERSPECTIVE_BANDS) && !prefs.isPatreonUnlocked
-                                        
-                                        var showPatreonUnlockDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-                                        if (showPatreonUnlockDialog) {
-                                            AlertDialog(
-                                                onDismissRequest = { showPatreonUnlockDialog = false },
-                                                title = { Text(getLocalizedString("patreon_exclusive_style").takeIf { it != "patreon_exclusive_style" } ?: "Estilo único para Patreons", color = colorVibrant) },
-                                                text = { Text(getLocalizedString("support_patreon_desc").takeIf { it != "support_patreon_desc" } ?: "Apóyanos en Patreon para desbloquear.", color = dynamicTextColor) },
-                                                confirmButton = {
-                                                    TextButton(onClick = {
-                                                        showPatreonUnlockDialog = false
-                                                        com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_PATREON)
-                                                    }) {
-                                                        Text(getLocalizedString("unlock_patreon").takeIf { it != "unlock_patreon" } ?: "Desbloquear", color = colorVibrant)
-                                                    }
-                                                },
-                                                dismissButton = {
-                                                    TextButton(onClick = { showPatreonUnlockDialog = false }) {
-                                                        Text(getLocalizedString("cancel").takeIf { it != "cancel" } ?: "Cancelar", color = dynamicTextColor.copy(alpha=0.6f))
-                                                    }
-                                                },
-                                                containerColor = colorDominant
-                                            )
-                                        }
-                                        
-                                        val starScale by androidx.compose.animation.core.animateFloatAsState(
-                                            targetValue = if (isFavorite) 1.2f else 1.0f,
-                                            animationSpec = androidx.compose.animation.core.spring(
-                                                dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
-                                                stiffness = androidx.compose.animation.core.Spring.StiffnessLow
-                                            ),
-                                            label = "starScale"
-                                        )
-                                        
-                                        val animatedGradientBrush = androidx.compose.ui.graphics.Brush.sweepGradient(
-                                            colors = listOf(colorDominant, colorVibrant, colorMuted, colorDominant),
-                                            center = androidx.compose.ui.geometry.Offset(12f, 12f)
-                                        )
+                    val pagerState = androidx.compose.foundation.pager.rememberPagerState { (sortedStyles.size + 7) / 8 }
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                        androidx.compose.foundation.pager.HorizontalPager(
+                            state = pagerState,
+                            modifier = Modifier.fillMaxWidth().height(190.dp).padding(horizontal = 4.dp),
+                        ) { page ->
+                            val startIdx = page * 8
+                            val endIdx = kotlin.math.min(startIdx + 8, sortedStyles.size)
+                            val pageItems = sortedStyles.subList(startIdx, endIdx)
+                            
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                                for (row in 0..1) {
+                                    Row(horizontalArrangement = Arrangement.SpaceEvenly, modifier = Modifier.fillMaxWidth()) {
+                                        for (col in 0..3) {
+                                            val index = row * 4 + col
+                                            if (index < pageItems.size) {
+                                                val style = pageItems[index]
+                                                val isSelected = currentStyle == style
+                                                val isFavorite = style.name in favoriteVisualizerStyles
+                                                val isLocked = (style == com.example.beatpulse.ui.components.player.VisualizerStyle.STAR || style == com.example.beatpulse.ui.components.player.VisualizerStyle.TERRAIN || style == com.example.beatpulse.ui.components.player.VisualizerStyle.SIDE_PERSPECTIVE_BANDS) && !prefs.isPatreonUnlocked
+                                                
+                                                var showPatreonUnlockDialog by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+                                                if (showPatreonUnlockDialog) {
+                                                    AlertDialog(
+                                                        onDismissRequest = { showPatreonUnlockDialog = false },
+                                                        title = { Text(getLocalizedString("patreon_exclusive_style").takeIf { it != "patreon_exclusive_style" } ?: "Estilo único para Patreons", color = colorVibrant) },
+                                                        text = { Text(getLocalizedString("support_patreon_desc").takeIf { it != "support_patreon_desc" } ?: "Apóyanos en Patreon para desbloquear.", color = dynamicTextColor) },
+                                                        confirmButton = {
+                                                            TextButton(onClick = {
+                                                                showPatreonUnlockDialog = false
+                                                                com.example.beatpulse.core.focus.AppFocusManager.dispatchShortcut(com.example.beatpulse.core.focus.AppShortcut.OPEN_PATREON)
+                                                            }) {
+                                                                Text(getLocalizedString("unlock_patreon").takeIf { it != "unlock_patreon" } ?: "Desbloquear", color = colorVibrant)
+                                                            }
+                                                        },
+                                                        dismissButton = {
+                                                            TextButton(onClick = { showPatreonUnlockDialog = false }) {
+                                                                Text(getLocalizedString("cancel").takeIf { it != "cancel" } ?: "Cancelar", color = dynamicTextColor.copy(alpha=0.6f))
+                                                            }
+                                                        },
+                                                        containerColor = colorDominant
+                                                    )
+                                                }
+                                                
+                                                val starScale by androidx.compose.animation.core.animateFloatAsState(
+                                                    targetValue = if (isFavorite) 1.2f else 1.0f,
+                                                    animationSpec = androidx.compose.animation.core.spring(
+                                                        dampingRatio = androidx.compose.animation.core.Spring.DampingRatioMediumBouncy,
+                                                        stiffness = androidx.compose.animation.core.Spring.StiffnessLow
+                                                    ),
+                                                    label = "starScale"
+                                                )
+                                                
+                                                val animatedGradientBrush = androidx.compose.ui.graphics.Brush.sweepGradient(
+                                                    colors = listOf(colorDominant, colorVibrant, colorMuted, colorDominant),
+                                                    center = androidx.compose.ui.geometry.Offset(12f, 12f)
+                                                )
 
-                                        Column(
-                                            modifier = Modifier.animateItem().padding(horizontal = 4.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally
+                                                Column(
+                                                    modifier = Modifier.padding(horizontal = 2.dp),
+                                                    horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             androidx.compose.foundation.layout.Box(
                                                 modifier = Modifier.width(76.dp).height(70.dp)
@@ -1064,9 +1070,7 @@ fun PlayerSettingsSheet(
                                                         drawContext.canvas.save()
                                                         val pxCenterX = center.x
                                                         val pxCenterY = center.y
-                                                        drawContext.canvas.translate(pxCenterX, pxCenterY)
-                                                        drawContext.canvas.rotate(phase * 180f / 3.14159f)
-                                                        drawContext.canvas.translate(-pxCenterX, -pxCenterY)
+                                                        // Rotación eliminada para evitar lag.
                                                         
                                                         val path = androidx.compose.ui.graphics.vector.PathParser().parsePathString("M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z").toPath()
                                                         if (isFavorite) {
@@ -1086,9 +1090,28 @@ fun PlayerSettingsSheet(
                                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                                 )
                                             }
+                                            } else {
+                                                Spacer(modifier = Modifier.width(76.dp))
+                                            }
                                         }
                                     }
-                        Spacer(modifier = Modifier.height(12.dp))
+                                }
+                            }
+                        }
+                        
+                        Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp), horizontalArrangement = Arrangement.Center) {
+                            repeat(pagerState.pageCount) { iteration ->
+                                val color = if (pagerState.currentPage == iteration) colorVibrant else dynamicTextColor.copy(alpha = 0.2f)
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 2.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .size(5.dp) // Puntos pequeños y comprimidos
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
                     }
                 } else if (page == 1) {
                     // TAB 2: Avanzados

@@ -112,6 +112,7 @@ import com.example.beatpulse.ui.components.PixelIcons
 import com.example.beatpulse.data.TrackEntity
 import com.example.beatpulse.visualizer.FilterMode
 import kotlinx.coroutines.delay
+import com.example.beatpulse.utils.SystemBackHandler
 
 class Spark(var x: Float, var y: Float, var vx: Float, var vy: Float, var alpha: Float, val color: Color)
 
@@ -547,6 +548,12 @@ private fun PlayerScreenContent(
         Box(modifier = aspectModifier) {
     val cleanUiMode by playerViewModel.cleanUiMode.collectAsState()
     val isMicModeCleanUI = (isMicModeActive && !streamConfigUiVisible) || cleanUiMode
+    
+    if (cleanUiMode && !showSettingsMenu) {
+        SystemBackHandler {
+            showSettingsMenu = true
+        }
+    }
     val columnModifier = if (isMicModeCleanUI) {
         Modifier.fillMaxSize()
     } else {
@@ -1232,9 +1239,18 @@ private fun PlayerTrackInfoHeader(
                     }
                 }
                 Row(modifier = Modifier.align(Alignment.CenterEnd)) {
-                    Crossfade(
+                    androidx.compose.animation.AnimatedContent(
                         targetState = if (isMicModeActive) 2 else if (showMicButton) 1 else 0,
-                        animationSpec = tween(500)
+                        transitionSpec = {
+                            if (targetState > initialState) {
+                                (androidx.compose.animation.slideInVertically { height -> height } + androidx.compose.animation.fadeIn()) togetherWith
+                                        (androidx.compose.animation.slideOutVertically { height -> -height } + androidx.compose.animation.fadeOut())
+                            } else {
+                                (androidx.compose.animation.slideInVertically { height -> -height } + androidx.compose.animation.fadeIn()) togetherWith
+                                        (androidx.compose.animation.slideOutVertically { height -> height } + androidx.compose.animation.fadeOut())
+                            }.using(androidx.compose.animation.SizeTransform(clip = false))
+                        },
+                        label = "playerButtonTransition"
                     ) { state ->
                         when (state) {
                             0 -> IconButton(onClick = onAddToPlaylist, modifier = Modifier.padding(end = 8.dp).size(36.dp).clip(CircleShape).background(paletteColors.dominant.copy(alpha = 0.5f))) {
@@ -1359,10 +1375,9 @@ private fun ColumnScope.PlayerVisualizerArea(
             .then(areaModifier)
             .fillMaxWidth()
             .then(
-                if (coverDragEnabled) Modifier
+                if (coverDragEnabled || !abRepeatModeEnabled) Modifier
                 else Modifier.pointerInput(abRepeatModeEnabled) {
                     val coverSizePx = 160f * density
-                    val rPx = coverSizePx / 2f
                     val hitRadiusPx = 48f * density // 48dp touch radius
 
                     detectDragGestures(
@@ -1380,7 +1395,6 @@ private fun ColumnScope.PlayerVisualizerArea(
                                     center.y + updatedOffsetY + updatedMarkerPosB.y * updatedScale
                                 )
 
-                                // Hit test in pixel distance using actual positions from canvas
                                 val distA = kotlin.math.sqrt(
                                     (offset.x - screenA.x) * (offset.x - screenA.x) +
                                     (offset.y - screenA.y) * (offset.y - screenA.y)
@@ -1411,26 +1425,15 @@ private fun ColumnScope.PlayerVisualizerArea(
                             }
                         },
                         onDragEnd = {
-                            if (currentDragAction == DragAction.DJ_SEEK) { dragSeekTimeMs?.let { playerViewModel.seekTo(it) } }
-                            coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }
-                            currentDragAction = DragAction.NONE; lastAngle = null; dragSeekTimeMs = null
+                            currentDragAction = DragAction.NONE; lastAngle = null
                             onActiveDraggingHandleChanged(null)
                         },
-                        onDragCancel = { currentDragAction = DragAction.NONE; coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }; lastAngle = null; dragSeekTimeMs = null; onActiveDraggingHandleChanged(null) }
+                        onDragCancel = { currentDragAction = DragAction.NONE; lastAngle = null; onActiveDraggingHandleChanged(null) }
                     ) { change, dragAmount ->
                         change.consume()
                         val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
                         val touchPos = change.position
-                        // Only promote to DJ_SEEK if we didn't start on an A-B handle
-                        if (currentDragAction == DragAction.NONE) {
-                            if (dragAmount.y < -15f && abs(dragAmount.x) < 20f && touchPos.y > center.y) { currentDragAction = DragAction.OPEN_QUEUE; onShowQueue(); if (showPlaylistSwipeTutorial) onDismissPlaylistSwipeTutorial() }
-                            else if (abs(dragAmount.x) > 5f || abs(dragAmount.y) > 5f) {
-                                currentDragAction = DragAction.DJ_SEEK
-                                val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
-                                lastAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
-                                dragSeekTimeMs = updatedCurrentPosition
-                            }
-                        }
+                        
                         if (currentDragAction == DragAction.DRAG_A || currentDragAction == DragAction.DRAG_B) {
                             val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
                             val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
@@ -1448,23 +1451,6 @@ private fun ColumnScope.PlayerVisualizerArea(
                                     val newProgress = (updatedAbPointB + deltaProgress).coerceIn(updatedAbPointA, 1f)
                                     (playerViewModel.abPointB as? kotlinx.coroutines.flow.MutableStateFlow)?.value = newProgress
                                 }
-                            }
-                            lastAngle = currentAngle
-                        } else if (currentDragAction == DragAction.DJ_SEEK) {
-                            val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
-                            val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
-                            val prevAngle = lastAngle
-                            if (prevAngle != null) {
-                                var deltaAngle = currentAngle - prevAngle; if (deltaAngle > 180f) deltaAngle -= 360f; if (deltaAngle < -180f) deltaAngle += 360f
-                                accumulatedAngle += deltaAngle
-                                if (abs(accumulatedAngle) >= 10f) { /* audioManager click */ accumulatedAngle = 0f }
-                                val seekMs = (deltaAngle / 360f) * 120000f
-                                val current = dragSeekTimeMs ?: updatedCurrentPosition
-                                val maxDuration = if (updatedDuration > 0) updatedDuration else Long.MAX_VALUE
-                                dragSeekTimeMs = (current + seekMs.toLong()).coerceIn(0L, maxDuration)
-                                if (showVinylSeekTutorial) onDismissVinylSeekTutorial()
-                                coroutineScope.launch { coverRotationAnim.snapTo(coverRotationAnim.value + deltaAngle) }
-                                if (Math.random() < 0.5) { val vx = (Math.random().toFloat() - 0.5f) * 15f; val vy = (Math.random().toFloat() - 0.5f) * 15f; sparks.add(Spark(playheadPos.x, playheadPos.y, vx, vy, 1f, if (Math.random() < 0.5) paletteColors.vibrant else paletteColors.dominant)) }
                             }
                             lastAngle = currentAngle
                         }
@@ -1590,6 +1576,46 @@ private fun ColumnScope.PlayerVisualizerArea(
                                     }
                                 }
                             )
+                        }.pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { offset -> 
+                                    currentDragAction = DragAction.DJ_SEEK
+                                    val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
+                                    val dx = offset.x - center.x; val dy = offset.y - center.y
+                                    lastAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
+                                    dragSeekTimeMs = updatedCurrentPosition
+                                    accumulatedAngle = 0f
+                                },
+                                onDragEnd = {
+                                    if (currentDragAction == DragAction.DJ_SEEK) { dragSeekTimeMs?.let { playerViewModel.seekTo(it) } }
+                                    coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }
+                                    currentDragAction = DragAction.NONE; lastAngle = null; dragSeekTimeMs = null
+                                },
+                                onDragCancel = { 
+                                    currentDragAction = DragAction.NONE; coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }; lastAngle = null; dragSeekTimeMs = null 
+                                }
+                            ) { change, _ ->
+                                change.consume()
+                                if (currentDragAction == DragAction.DJ_SEEK) {
+                                    val touchPos = change.position
+                                    val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
+                                    val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
+                                    val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
+                                    val prevAngle = lastAngle
+                                    if (prevAngle != null) {
+                                        var deltaAngle = currentAngle - prevAngle; if (deltaAngle > 180f) deltaAngle -= 360f; if (deltaAngle < -180f) deltaAngle += 360f
+                                        accumulatedAngle += deltaAngle
+                                        if (abs(accumulatedAngle) >= 10f) { accumulatedAngle = 0f }
+                                        val seekMs = (deltaAngle / 360f) * 120000f
+                                        val current = dragSeekTimeMs ?: updatedCurrentPosition
+                                        val maxDuration = if (updatedDuration > 0) updatedDuration else Long.MAX_VALUE
+                                        dragSeekTimeMs = (current + seekMs.toLong()).coerceIn(0L, maxDuration)
+                                        if (showVinylSeekTutorial) onDismissVinylSeekTutorial()
+                                        coroutineScope.launch { coverRotationAnim.snapTo(coverRotationAnim.value + deltaAngle) }
+                                    }
+                                    lastAngle = currentAngle
+                                }
+                            }
                         }
                     )
                     .clip(shape)
@@ -1712,16 +1738,28 @@ fun PlayerOscilloscope(
         val currentXRot = kotlin.math.sin(timeDelta * 0.5f) * 0.4f
         val currentYRot = kotlin.math.cos(timeDelta * 0.7f) * 0.4f
         val currentZRot = ringAngle + timeDelta * 2.0f
-        val numPoints = if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) 60 else 120
+        val numPoints = if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) 40 else 90
+        
+        val cosZ = kotlin.math.cos(currentZRot)
+        val sinZ = kotlin.math.sin(currentZRot)
+        val cosX = kotlin.math.cos(currentXRot)
+        val sinX = kotlin.math.sin(currentXRot)
+        val cosY = kotlin.math.cos(currentYRot)
+        val sinY = kotlin.math.sin(currentYRot)
+        
+        oscilloscopeSharedPath.reset()
         
         for (ring in 0 until numRings) {
             val ringT = ring.toFloat() / numRings
             val ringOffset = ringT * kotlin.math.PI.toFloat() * 2f
+            val cosRing = kotlin.math.cos(ringOffset)
+            val sinRing = kotlin.math.sin(ringOffset)
             
             var prevX = 0f
             var prevY = 0f
             var prevZ = 0f
             var hasPrev = false
+            var isDrawingSegment = false
             
             for (i in 0..numPoints) {
                 val t = (i.toFloat() / numPoints) * kotlin.math.PI.toFloat() * 2f
@@ -1736,43 +1774,44 @@ fun PlayerOscilloscope(
                 val pY = kotlin.math.sin(t) * r
                 
                 var sX = pX
-                var sY = pY * kotlin.math.cos(ringOffset)
-                var sZ = pY * kotlin.math.sin(ringOffset)
+                var sY = pY * cosRing
+                var sZ = pY * sinRing
                 
                 if (!isHorizontal) {
-                    sY = pX * kotlin.math.cos(ringOffset)
+                    sY = pX * cosRing
                     sX = pY
-                    sZ = pX * kotlin.math.sin(ringOffset)
+                    sZ = pX * sinRing
                 }
                 
                 // 1. Z-axis rotation (spin around the cover)
-                val x1 = sX * kotlin.math.cos(currentZRot) - sY * kotlin.math.sin(currentZRot)
-                val y1 = sX * kotlin.math.sin(currentZRot) + sY * kotlin.math.cos(currentZRot)
+                val x1 = sX * cosZ - sY * sinZ
+                val y1 = sX * sinZ + sY * cosZ
                 val z1 = sZ
                 
                 // 2. X-axis rotation (tilt up/down)
                 val x2 = x1
-                val y2 = y1 * kotlin.math.cos(currentXRot) - z1 * kotlin.math.sin(currentXRot)
-                val z2 = y1 * kotlin.math.sin(currentXRot) + z1 * kotlin.math.cos(currentXRot)
+                val y2 = y1 * cosX - z1 * sinX
+                val z2 = y1 * sinX + z1 * cosX
                 
                 // 3. Y-axis rotation (tilt left/right)
-                val x3 = x2 * kotlin.math.cos(currentYRot) - z2 * kotlin.math.sin(currentYRot)
+                val x3 = x2 * cosY - z2 * sinY
                 val y3 = y2
-                val z3 = x2 * kotlin.math.sin(currentYRot) + z2 * kotlin.math.cos(currentYRot)
+                val z3 = x2 * sinY + z2 * cosY
                 
                 val px = cx + x3.toFloat()
                 val py = cy + y3.toFloat()
                 
                 if (hasPrev) {
                     val avgZ = (prevZ + z3) / 2f
-                    if ((isForeground && avgZ >= 0) || (!isForeground && avgZ < 0)) {
-                        scope.drawLine(
-                            color = color,
-                            start = androidx.compose.ui.geometry.Offset(prevX, prevY),
-                            end = androidx.compose.ui.geometry.Offset(px, py),
-                            strokeWidth = lineW,
-                            cap = androidx.compose.ui.graphics.StrokeCap.Round
-                        )
+                    val shouldDraw = if (isForeground) avgZ >= 0 else avgZ < 0
+                    if (shouldDraw) {
+                        if (!isDrawingSegment) {
+                            oscilloscopeSharedPath.moveTo(prevX, prevY)
+                            isDrawingSegment = true
+                        }
+                        oscilloscopeSharedPath.lineTo(px, py)
+                    } else {
+                        isDrawingSegment = false
                     }
                 }
                 prevX = px
@@ -1781,9 +1820,18 @@ fun PlayerOscilloscope(
                 hasPrev = true
             }
         }
+        
+        scope.drawPath(
+            path = oscilloscopeSharedPath,
+            color = color,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = lineW,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round
+            )
+        )
     }
 
-    fun drawTorusKnot(amps: FloatArray, color: androidx.compose.ui.graphics.Color, p: Float, q: Float, lineW: Float, rotSpeedMult: Float) {
+    fun drawTorusKnot(amps: FloatArray, color: androidx.compose.ui.graphics.Color, p: Float, q: Float, lineW: Float, rotSpeedMult: Float, pathEffect: androidx.compose.ui.graphics.PathEffect? = null) {
         if (amps.isEmpty()) return
         val timeDelta = state.accumulatedTime * 0.015f * rotSpeedMult // Faster flowing
         
@@ -1791,12 +1839,22 @@ fun PlayerOscilloscope(
         val currentXRot = kotlin.math.sin(timeDelta * 0.5f) * 0.4f
         val currentYRot = kotlin.math.cos(timeDelta * 0.7f) * 0.4f
         val currentZRot = ringAngle + timeDelta * 1.5f
-        val numPoints = if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) 90 else 250 // Reduced for mobile
+        val numPoints = if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) 60 else 150 // Reduced for mobile
+        
+        val cosZ = kotlin.math.cos(currentZRot)
+        val sinZ = kotlin.math.sin(currentZRot)
+        val cosX = kotlin.math.cos(currentXRot)
+        val sinX = kotlin.math.sin(currentXRot)
+        val cosY = kotlin.math.cos(currentYRot)
+        val sinY = kotlin.math.sin(currentYRot)
         
         var prevX = 0f
         var prevY = 0f
         var prevZ = 0f
         var hasPrev = false
+        var isDrawingSegment = false
+        
+        oscilloscopeSharedPath.reset()
         
         for (i in 0..numPoints) {
             val normalizedT = i.toFloat() / numPoints
@@ -1816,33 +1874,34 @@ fun PlayerOscilloscope(
             val lZ = r2 * kotlin.math.sin(q * t + timeDelta * 1.5f)
             
             // 1. Z-axis rotation (spin around the cover)
-            val x1 = lX * kotlin.math.cos(currentZRot) - lY * kotlin.math.sin(currentZRot)
-            val y1 = lX * kotlin.math.sin(currentZRot) + lY * kotlin.math.cos(currentZRot)
+            val x1 = lX * cosZ - lY * sinZ
+            val y1 = lX * sinZ + lY * cosZ
             val z1 = lZ
             
             // 2. X-axis rotation (tilt up/down)
             val x2 = x1
-            val y2 = y1 * kotlin.math.cos(currentXRot) - z1 * kotlin.math.sin(currentXRot)
-            val z2 = y1 * kotlin.math.sin(currentXRot) + z1 * kotlin.math.cos(currentXRot)
+            val y2 = y1 * cosX - z1 * sinX
+            val z2 = y1 * sinX + z1 * cosX
             
             // 3. Y-axis rotation (tilt left/right)
-            val x3 = x2 * kotlin.math.cos(currentYRot) - z2 * kotlin.math.sin(currentYRot)
+            val x3 = x2 * cosY - z2 * sinY
             val y3 = y2
-            val z3 = x2 * kotlin.math.sin(currentYRot) + z2 * kotlin.math.cos(currentYRot)
+            val z3 = x2 * sinY + z2 * cosY
             
             val px = cx + x3.toFloat()
             val py = cy + y3.toFloat()
             
             if (hasPrev) {
                 val avgZ = (prevZ + z3) / 2f
-                if ((isForeground && avgZ >= 0) || (!isForeground && avgZ < 0)) {
-                    scope.drawLine(
-                        color = color,
-                        start = androidx.compose.ui.geometry.Offset(prevX, prevY),
-                        end = androidx.compose.ui.geometry.Offset(px, py),
-                        strokeWidth = lineW,
-                        cap = androidx.compose.ui.graphics.StrokeCap.Round
-                    )
+                val shouldDraw = if (isForeground) avgZ >= 0 else avgZ < 0
+                if (shouldDraw) {
+                    if (!isDrawingSegment) {
+                        oscilloscopeSharedPath.moveTo(prevX, prevY)
+                        isDrawingSegment = true
+                    }
+                    oscilloscopeSharedPath.lineTo(px, py)
+                } else {
+                    isDrawingSegment = false
                 }
             }
             prevX = px
@@ -1850,12 +1909,26 @@ fun PlayerOscilloscope(
             prevZ = z3.toFloat()
             hasPrev = true
         }
+        
+        scope.drawPath(
+            path = oscilloscopeSharedPath,
+            color = color,
+            style = androidx.compose.ui.graphics.drawscope.Stroke(
+                width = lineW,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+                pathEffect = pathEffect
+            )
+        )
     }
 
     if (visualizerArchetype == 1) { // 3 waves (Torus Knots)
         drawTorusKnot(bassAmps, paletteColors.dominant, 3f, 8f, 6f, 0.8f) // 3 lobes, 8 twists
         drawTorusKnot(midAmps, paletteColors.vibrant, 5f, 3f, 4f, 1.2f)   // 5 lobes, 3 twists
-        drawTorusKnot(highAmps, paletteColors.muted.copy(alpha = 0.7f), 7f, 4f, 2.5f, 1.6f) // 7 lobes, 4 twists
+        
+        val dashPhase = -state.accumulatedTime * 80f // Scroll faster
+        val highEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(25f, 15f), dashPhase)
+        drawTorusKnot(highAmps, paletteColors.muted.copy(alpha = 0.7f), 7f, 4f, 2.5f, 1.6f, highEffect) // 7 lobes, 4 twists
+
     } else { // 1 wave
         drawSphere(bassAmps, paletteColors.dominant.copy(alpha=0.6f), 8, 1.2f, 0.8f, 0.5f, 3f, true)
         drawSphere(midAmps, paletteColors.vibrant.copy(alpha=0.8f), 6, 1.0f, 1.2f, 0.7f, 4f, false)
@@ -1878,7 +1951,8 @@ private val sidePerspectiveYLArr = FloatArray(256)
 private val sidePerspectiveXRArr = FloatArray(256)
 private val sidePerspectiveYRArr = FloatArray(256)
 
-// Pre-allocated paths for Terrain 3D to avoid massive object allocation (100k+/sec)
+// Pre-allocated paths for Terrain 3D and SidePerspective to avoid massive object allocation (100k+/sec)
+private val oscilloscopeSharedPath = androidx.compose.ui.graphics.Path()
 private val terrainSharedQuadPath = androidx.compose.ui.graphics.Path()
 private val terrainSharedLinePath = androidx.compose.ui.graphics.Path()
 private val sidePerspectivePathLeft = androidx.compose.ui.graphics.Path()

@@ -62,7 +62,8 @@ fun UnifiedLibraryScreen(
     currentPlayingTrack: TrackEntity?,
     isPlaying: Boolean,
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit,
-    statsViewModel: com.example.beatpulse.ui.screens.StatsViewModel
+    statsViewModel: com.example.beatpulse.ui.screens.StatsViewModel,
+    onPausePlayback: () -> Unit = {}
 ) {
     val prefs = viewModel.prefs
     val onRescan = { viewModel.scanMediaStore() }
@@ -750,7 +751,8 @@ fun UnifiedLibraryScreen(
                         },
                         colorVibrant = paletteColors.vibrant,
                         colorSurface = paletteColors.dominant.copy(alpha = 0.95f),
-                        colorText = dynamicTextColor
+                        colorText = dynamicTextColor,
+                        onPausePlayback = onPausePlayback
                     )
                 }
 

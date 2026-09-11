@@ -6,12 +6,15 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.background
 import androidx.compose.runtime.*
+import kotlinx.coroutines.isActive
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -58,11 +61,12 @@ fun RetroWallBackground(
     var timeMillis by remember { mutableStateOf(0L) }
     LaunchedEffect(isPlayerScreen) {
         if (isPlayerScreen) {
-            val startTime = withFrameNanos { it / 1_000_000L } - timeMillis
-            while (true) {
-                withFrameNanos { frameTime ->
-                    timeMillis = (frameTime / 1_000_000L) - startTime
-                }
+            var lastTime = withFrameNanos { it }
+            while (isActive) {
+                val currentTime = withFrameNanos { it }
+                val dt = ((currentTime - lastTime) / 1_000_000f)
+                timeMillis += dt.toLong()
+                lastTime = currentTime
             }
         }
     }
@@ -72,18 +76,8 @@ fun RetroWallBackground(
     // Pre-allocated paths for 4 color variants
     val paths = remember { Array(4) { Path() } }
     val cachedScanlinePath = remember { Path() }
-    var cachedRadialBrush by remember { mutableStateOf<Brush?>(null) }
-    var pathsInitialized by remember { mutableStateOf(false) }
-    var lastCanvasSize by remember { mutableStateOf(Size.Zero) }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black),
-        contentAlignment = Alignment.Center
-    ) {
         Box(modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(cornerRadius))) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
+            Spacer(modifier = Modifier.fillMaxSize().drawWithCache {
                 val baseColor = if (paletteColors.dominant != Color.Unspecified && paletteColors.dominant != Color.Transparent) {
                     paletteColors.dominant
                 } else if (paletteColors.vibrant != Color.Unspecified && paletteColors.vibrant != Color.Transparent) {
@@ -99,80 +93,72 @@ fun RetroWallBackground(
                     Color(baseColor.red * 0.4f, baseColor.green * 0.4f, baseColor.blue * 0.4f, baseColor.alpha)
                 )
 
-                // Optimize grid building by caching it. Rebuild only if size changes
                 val brickWidth = size.width / (if (isPlayerScreen) 8 else 12)
                 val brickHeight = brickWidth / 2.2f
                 
-                if (size != lastCanvasSize) {
-                    paths.forEach { it.reset() }
-                    cachedScanlinePath.reset()
-                    
-                    val rowsVisible = (size.height / brickHeight).toInt() + 4
-                    val cols = (size.width / brickWidth).toInt() + 4
+                paths.forEach { it.reset() }
+                cachedScanlinePath.reset()
+                
+                val rowsVisible = (size.height / brickHeight).toInt() + 4
+                val cols = (size.width / brickWidth).toInt() + 4
 
-                    for (row in -2..rowsVisible) {
-                        val isOffsetRow = (row % 2 == 0)
-                        val startX = if (isOffsetRow) -brickWidth / 2f else 0f
-                        for (col in -2..cols) {
-                            val x = startX + (col * brickWidth)
-                            val y = (row * brickHeight)
-                            
-                            val randomHash = ((row * 31) + (col * 17) + (row xor col)) % variants.size
-                            val colorIdx = kotlin.math.abs(randomHash)
-                            
-                            paths[colorIdx].addRect(androidx.compose.ui.geometry.Rect(x + 2f, y + 2f, x + brickWidth - 2f, y + brickHeight - 2f))
-                        }
-                    }
-                    
-                    val scanlineHeight = 18f
-                    val numScanlines = (size.height / scanlineHeight).toInt()
-                    for (i in 0..numScanlines step 2) {
-                        cachedScanlinePath.addRect(androidx.compose.ui.geometry.Rect(0f, i * scanlineHeight, size.width, i * scanlineHeight + scanlineHeight))
-                    }
-                    
-                    cachedRadialBrush = Brush.radialGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
-                        center = center,
-                        radius = size.width * 0.75f
-                    )
-                    
-                    lastCanvasSize = size
-                    pathsInitialized = true
-                }
-
-                scale(scale = animatedScale, pivot = center) {
-                    // Scroll offset (upwards) wrap around every two rows to make it infinite seamless
-                    val pixelsPerSecond = size.height * 0.1f 
-                    val wrapHeight = brickHeight * 2f
-                    val globalYOffset = ((timeMillis / 1000f) * pixelsPerSecond) % wrapHeight
-                    
-                    translate(top = -globalYOffset) {
-                        for (i in 0 until 4) {
-                            drawPath(paths[i], variants[i])
-                        }
+                for (row in -2..rowsVisible) {
+                    val isOffsetRow = (row % 2 == 0)
+                    val startX = if (isOffsetRow) -brickWidth / 2f else 0f
+                    for (col in -2..cols) {
+                        val x = startX + (col * brickWidth)
+                        val y = (row * brickHeight)
+                        
+                        val randomHash = ((row * 31) + (col * 17) + (row xor col)) % variants.size
+                        val colorIdx = kotlin.math.abs(randomHash)
+                        
+                        paths[colorIdx].addRect(androidx.compose.ui.geometry.Rect(x + 2f, y + 2f, x + brickWidth - 2f, y + brickHeight - 2f))
                     }
                 }
                 
-                // CRT Effects overlay
-                drawPath(cachedScanlinePath, Color.Black.copy(alpha = 0.15f))
+                val scanlineHeight = 18f
+                val numScanlines = (size.height / scanlineHeight).toInt()
+                for (i in 0..numScanlines step 2) {
+                    cachedScanlinePath.addRect(androidx.compose.ui.geometry.Rect(0f, i * scanlineHeight, size.width, i * scanlineHeight + scanlineHeight))
+                }
                 
-                cachedRadialBrush?.let { brush ->
+                val centerOffset = Offset(size.width / 2f, size.height / 2f)
+                val radialBrush = Brush.radialGradient(
+                    colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                    center = centerOffset,
+                    radius = size.width * 0.75f
+                )
+                
+                onDrawBehind {
+                    scale(scale = animatedScale, pivot = centerOffset) {
+                        val pixelsPerSecond = size.height * 0.1f 
+                        val wrapHeight = brickHeight * 2f
+                        val globalYOffset = ((timeMillis / 1000f) * pixelsPerSecond) % wrapHeight
+                        
+                        translate(top = -globalYOffset) {
+                            for (i in 0 until 4) {
+                                drawPath(paths[i], variants[i])
+                            }
+                        }
+                    }
+                    
+                    drawPath(cachedScanlinePath, Color.Black.copy(alpha = 0.15f))
+                    
                     drawRect(
-                        brush = brush,
+                        brush = radialBrush,
                         size = size
                     )
+                    
+                    val borderThickness = size.width * 0.05f
+                    val crtCorner = cornerRadius.toPx() * 1.5f
+                    drawRoundRect(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        size = size,
+                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(crtCorner, crtCorner),
+                        style = Stroke(width = borderThickness)
+                    )
                 }
-                
-                val borderThickness = size.width * 0.05f
-                val crtCorner = cornerRadius.toPx() * 1.5f
-                drawRoundRect(
-                    color = Color.Black.copy(alpha = 0.6f),
-                    size = size,
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(crtCorner, crtCorner),
-                    style = Stroke(width = borderThickness)
-                )
-            }
+            })
             content()
         }
-    }
 }

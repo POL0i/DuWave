@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.example.beatpulse.theme.PaletteColors
 import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
+import kotlinx.coroutines.isActive
 
 @Composable
 fun FountainBackground(
@@ -43,14 +44,20 @@ fun FountainBackground(
         animationSpec = tween(150)
     )
 
-    var timeMillis by remember { mutableStateOf(0L) }
-    LaunchedEffect(isPlayerScreen) {
-        if (isPlayerScreen) {
-            val startTime = withFrameNanos { it / 1_000_000L } - timeMillis
-            while (true) {
-                withFrameNanos { frameTime ->
-                    timeMillis = (frameTime / 1_000_000L) - startTime
-                }
+    val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
+    val isActiveApp = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
+
+    var timeFloat by remember { mutableStateOf(0f) }
+    LaunchedEffect(isPlayerScreen, isActiveApp) {
+        if (!isActiveApp) return@LaunchedEffect
+        var lastTime = withFrameNanos { it / 1_000_000L }
+        while (isActive) {
+            withFrameNanos { frameTime ->
+                val currentTime = frameTime / 1_000_000L
+                val dt = currentTime - lastTime
+                lastTime = currentTime
+                // Float precision prevents the trembling that happened with Long truncation
+                timeFloat += if (isPlayerScreen) (dt / 1000f) else (dt / 1000f * 0.4f)
             }
         }
     }
@@ -71,7 +78,7 @@ fun FountainBackground(
                 .clip(RoundedCornerShape(cornerRadius))
                 .scale(animatedScale)
         ) {
-            val timeSecs = timeMillis / 1000f
+            val timeSecs = timeFloat
             val timeMod = timeSecs // Fixed teleportation by not scaling absolute time with treble
             val numParticles = 15 + (avgTreble * 15).toInt()
 
