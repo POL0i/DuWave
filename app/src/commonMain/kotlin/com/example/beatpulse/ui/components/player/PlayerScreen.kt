@@ -1242,13 +1242,8 @@ private fun PlayerTrackInfoHeader(
                     androidx.compose.animation.AnimatedContent(
                         targetState = if (isMicModeActive) 2 else if (showMicButton) 1 else 0,
                         transitionSpec = {
-                            if (targetState > initialState) {
-                                (androidx.compose.animation.slideInVertically { height -> height } + androidx.compose.animation.fadeIn()) togetherWith
-                                        (androidx.compose.animation.slideOutVertically { height -> -height } + androidx.compose.animation.fadeOut())
-                            } else {
-                                (androidx.compose.animation.slideInVertically { height -> -height } + androidx.compose.animation.fadeIn()) togetherWith
-                                        (androidx.compose.animation.slideOutVertically { height -> height } + androidx.compose.animation.fadeOut())
-                            }.using(androidx.compose.animation.SizeTransform(clip = false))
+                            androidx.compose.animation.fadeIn(animationSpec = androidx.compose.animation.core.tween(300)) togetherWith
+                                androidx.compose.animation.fadeOut(animationSpec = androidx.compose.animation.core.tween(300))
                         },
                         label = "playerButtonTransition"
                     ) { state ->
@@ -1329,6 +1324,7 @@ private fun ColumnScope.PlayerVisualizerArea(
     var dragSeekTimeMs by remember { mutableStateOf<Long?>(null) }
 
     val coverRotationAnim = remember { androidx.compose.animation.core.Animatable(0f) }
+    var manualRotation by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     val sparks = remember { mutableListOf<Spark>() }
     var playheadPos by remember { mutableStateOf(Offset.Zero) }
     val coroutineScope = rememberCoroutineScope()
@@ -1543,7 +1539,7 @@ private fun ColumnScope.PlayerVisualizerArea(
                             scaleX = baseScale
                             scaleY = baseScale
                         }
-                        if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value
+                        if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value + manualRotation
                     }
                     .then(
                         if (coverDragEnabled) {
@@ -1588,11 +1584,21 @@ private fun ColumnScope.PlayerVisualizerArea(
                                 },
                                 onDragEnd = {
                                     if (currentDragAction == DragAction.DJ_SEEK) { dragSeekTimeMs?.let { playerViewModel.seekTo(it) } }
-                                    coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }
+                                    coroutineScope.launch { 
+                                        coverRotationAnim.snapTo(coverRotationAnim.value + manualRotation)
+                                        manualRotation = 0f
+                                        coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) 
+                                    }
                                     currentDragAction = DragAction.NONE; lastAngle = null; dragSeekTimeMs = null
                                 },
-                                onDragCancel = { 
-                                    currentDragAction = DragAction.NONE; coroutineScope.launch { coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) }; lastAngle = null; dragSeekTimeMs = null 
+                                onDragCancel = {
+                                    currentDragAction = DragAction.NONE; 
+                                    coroutineScope.launch { 
+                                        coverRotationAnim.snapTo(coverRotationAnim.value + manualRotation)
+                                        manualRotation = 0f
+                                        coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) 
+                                    }; 
+                                    lastAngle = null; dragSeekTimeMs = null
                                 }
                             ) { change, _ ->
                                 change.consume()
@@ -1611,7 +1617,7 @@ private fun ColumnScope.PlayerVisualizerArea(
                                         val maxDuration = if (updatedDuration > 0) updatedDuration else Long.MAX_VALUE
                                         dragSeekTimeMs = (current + seekMs.toLong()).coerceIn(0L, maxDuration)
                                         if (showVinylSeekTutorial) onDismissVinylSeekTutorial()
-                                        coroutineScope.launch { coverRotationAnim.snapTo(coverRotationAnim.value + deltaAngle) }
+                                        manualRotation += deltaAngle
                                     }
                                     lastAngle = currentAngle
                                 }

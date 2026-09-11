@@ -812,13 +812,31 @@ fun PlayerSettingsSheet(
     val currentContainerAlpha by androidx.compose.animation.core.animateFloatAsState(if (isAdjusting) 0.3f else 0.95f, label = "containerAlpha")
     val currentScrimAlpha by androidx.compose.animation.core.animateFloatAsState(if (isAdjusting) 0.0f else 0.2f, label = "scrimAlpha")
 
-    androidx.compose.material3.ModalBottomSheet(
-        onDismissRequest = { onDismissRequest() },
-        containerColor = colorDominant.copy(alpha = currentContainerAlpha),
-        scrimColor = Color.Black.copy(alpha = currentScrimAlpha)
-    ) {
-        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth().animateContentSize(), contentAlignment = Alignment.Center) {
-            Column(
+    if (showSettingsMenu) {
+        com.example.beatpulse.utils.SystemBackHandler { onDismissRequest() }
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = currentScrimAlpha))
+                .clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null
+                ) { onDismissRequest() },
+            contentAlignment = Alignment.BottomCenter
+        ) {
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
+                    .background(colorDominant.copy(alpha = currentContainerAlpha))
+                    .clickable(
+                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                        indication = null
+                    ) { /* Consumir clic interno */ }
+                    .animateContentSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 800.dp)
@@ -1388,6 +1406,7 @@ fun PlayerSettingsSheet(
             }
         }
     }
+}
 }
 
 @Composable

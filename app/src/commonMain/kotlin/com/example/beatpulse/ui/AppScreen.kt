@@ -4,6 +4,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -372,26 +374,43 @@ fun AppScreen(
                     enter = fadeIn(),
                     exit = fadeOut()
                 ) {
-                    BottomNavigationBar(
-                        currentPage = currentPage,
-                        onPageChange = { currentPage = it },
-                        currentTrack = currentTrack,
-                        isPlaying = isPlaying,
-                        currentPosition = currentPosition,
-                        duration = duration,
-                        accentColor = accentColor,
-                        paletteColors = paletteColors,
-                        bgStyle = bgStyle,
-                        prefs = prefs,
-                        onPlayPauseClick = { if (playerViewModel.isPlaying.value) playerViewModel.pause() else playerViewModel.play() }
-                    )
+                    Box(modifier = Modifier.pointerInput(Unit) {
+                        var totalDrag = 0f
+                        detectHorizontalDragGestures(
+                            onDragStart = { totalDrag = 0f },
+                            onDragEnd = {
+                                if (totalDrag > 50f) {
+                                    if (currentPage > 0) currentPage -= 1
+                                } else if (totalDrag < -50f) {
+                                    if (currentPage < 2) currentPage += 1
+                                }
+                            }
+                        ) { change, dragAmount ->
+                            change.consume()
+                            totalDrag += dragAmount
+                        }
+                    }) {
+                        BottomNavigationBar(
+                            currentPage = currentPage,
+                            onPageChange = { currentPage = it },
+                            currentTrack = currentTrack,
+                            isPlaying = isPlaying,
+                            currentPosition = currentPosition,
+                            duration = duration,
+                            accentColor = accentColor,
+                            paletteColors = paletteColors,
+                            bgStyle = bgStyle,
+                            prefs = prefs,
+                            onPlayPauseClick = { if (playerViewModel.isPlaying.value) playerViewModel.pause() else playerViewModel.play() }
+                        )
+                    }
                 }
             }
         ) { innerPadding ->
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize(),
-                userScrollEnabled = !coverDragEnabled
+                userScrollEnabled = false
             ) { page ->
                 when (page % 3) {
                     0 -> Box(modifier = Modifier.padding(innerPadding).fillMaxSize().clipToBounds()) {

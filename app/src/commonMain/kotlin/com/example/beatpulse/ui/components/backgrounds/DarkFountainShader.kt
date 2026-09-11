@@ -39,7 +39,7 @@ const val DARK_FOUNTAIN_SKSL = """
 
     vec4 main(vec2 fragCoord) {
         // Pixelation effect (optimized: larger blocks mean less detail to render perceptually, though math is still per-pixel)
-        float pixelsY = 70.0;
+        float pixelsY = 120.0;
         float pixelSize = max(1.0, u_resolution.y / pixelsY);
         vec2 pCoord = floor(fragCoord / pixelSize) * pixelSize;
         
