@@ -374,22 +374,7 @@ fun AppScreen(
                     enter = fadeIn(),
                     exit = fadeOut()
                 ) {
-                    Box(modifier = Modifier.pointerInput(Unit) {
-                        var totalDrag = 0f
-                        detectHorizontalDragGestures(
-                            onDragStart = { totalDrag = 0f },
-                            onDragEnd = {
-                                if (totalDrag > 50f) {
-                                    if (currentPage > 0) currentPage -= 1
-                                } else if (totalDrag < -50f) {
-                                    if (currentPage < 2) currentPage += 1
-                                }
-                            }
-                        ) { change, dragAmount ->
-                            change.consume()
-                            totalDrag += dragAmount
-                        }
-                    }) {
+
                         BottomNavigationBar(
                             currentPage = currentPage,
                             onPageChange = { currentPage = it },
@@ -403,7 +388,6 @@ fun AppScreen(
                             prefs = prefs,
                             onPlayPauseClick = { if (playerViewModel.isPlaying.value) playerViewModel.pause() else playerViewModel.play() }
                         )
-                    }
                 }
             }
         ) { innerPadding ->
