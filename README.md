@@ -10,10 +10,11 @@ A premium, highly optimized **Local & Online Music Player** for Android, built c
 ## ✨ Features
 
 * **Online & Local Playback:** Stream music directly from the internet with extremely fast buffering, or listen to your local library seamlessly.
-* **Real-time Audio Visualizers:** Highly optimized 60 FPS visualizers synchronized with the music. Choose from multiple styles including *Wave, Slime, Dots, Particles,* and *Bars*.
+* **Song Identification (Shazam):** Identify music playing around you using the new Shazam integration, with a live microphone subsection that listens without recording.
+* **Real-time Audio Visualizers & Backgrounds:** Highly optimized 60 FPS visualizers synchronized with the music. Features new free styles for all users and exclusive, premium wave/background styles and frames for Patreons.
 * **Built-in Equalizer:** Fine-tune your audio experience with a modern, horizontal-slider equalizer and built-in presets.
-* **Audio Trimming (Cut Music):** Built-in tool to trim and cut your local audio files directly inside the app to use as ringtones.
-* **Dynamic Color Theming:** The entire UI (backgrounds, buttons, and visualizers) seamlessly adapts to the dominant colors of the currently playing album art using the Android Palette API.
+* **Audio Trimming (Cut Music):** Completely remodeled built-in tool to trim and cut your local audio files directly inside the app to use as ringtones.
+* **Dynamic Color Theming:** The entire UI seamlessly adapts to the dominant colors of the currently playing album art using the Android Palette API.
 * **Multi-Language Support:** Fully translated into English, Portuguese, and Spanish, with an in-app language selector.
 * **Media3 / ExoPlayer Integration:** Robust background playback, gapless audio, and full support for lock-screen and system media controls.
 * **Local Library Management:** Fast MediaStore scanning, custom playlists, favorites, and play-history tracking using Room Database.
