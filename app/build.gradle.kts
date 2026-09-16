@@ -1,12 +1,123 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.ExperimentalKotlinGradlePluginApi
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-  alias(libs.plugins.android.application)
-  alias(libs.plugins.compose.compiler)
-  alias(libs.plugins.kotlin.serialization)
-  alias(libs.plugins.kotlin.android)
-  alias(libs.plugins.hilt)
-  id("com.google.devtools.ksp")
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.compose.multiplatform)
+    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
+
+    id("com.google.devtools.ksp")
+}
+
+kotlin {
+    androidTarget {
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
+    }
+    
+    jvm("desktop") {
+        mainRun {
+            mainClass.set("com.example.beatpulse.MainKt")
+        }
+    }
+    
+    sourceSets {
+        val desktopMain by getting
+        
+        androidMain.dependencies {
+            implementation(libs.androidx.activity.compose)
+            implementation(libs.androidx.core.ktx)
+            
+            // Media3 (ExoPlayer)
+            implementation("androidx.media3:media3-exoplayer:1.6.0")
+            implementation("androidx.media3:media3-ui:1.6.0")
+            implementation("androidx.media3:media3-session:1.6.0")
+            
+            // RTSP Streaming via Hardware (MediaProjection)
+            implementation("com.github.pedroSG94.RootEncoder:library:2.7.2")
+            implementation("com.github.pedroSG94:RTSP-Server:1.4.1") {
+                exclude(group = "com.github.pedroSG94.RootEncoder")
+            }
+            
+            // Palette API (Removed, using KMPalette in commonMain)
+            
+            // DI
+            implementation(libs.koin.android)
+            implementation(libs.koin.androidx.compose)
+            implementation("io.coil-kt:coil-compose:2.6.0")
+        }
+        
+        commonMain.dependencies {
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.ui)
+            implementation(compose.components.resources)
+            implementation(compose.components.uiToolingPreview)
+            
+            implementation("org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose:2.8.2")
+            implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:2.8.2")
+            
+            implementation("org.jetbrains.androidx.navigation:navigation-compose:2.8.0-alpha10")
+            implementation(compose.materialIconsExtended)
+            
+            implementation("androidx.room:room-runtime:2.7.0-alpha13")
+            
+            implementation("com.squareup.retrofit2:retrofit:2.11.0")
+            implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+            implementation("com.github.TeamNewPipe:NewPipeExtractor:9d31e09745")
+            
+            implementation(libs.koin.core)
+            implementation(libs.kmpalette.core)
+
+            // Ktor Server & Client for Ecosystem
+            implementation(libs.ktor.server.core)
+            implementation(libs.ktor.server.cio)
+            implementation(libs.ktor.server.cors)
+            implementation(libs.ktor.server.content.negotiation)
+            implementation(libs.ktor.client.core)
+            implementation(libs.ktor.client.cio)
+            implementation(libs.ktor.client.content.negotiation)
+            implementation(libs.ktor.serialization.kotlinx.json)
+            implementation(libs.ktor.network)
+        }
+        
+        desktopMain.dependencies {
+            implementation(compose.desktop.currentOs)
+            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-swing:1.10.1")
+            implementation("org.xerial:sqlite-jdbc:3.45.1.0")
+            implementation("net.jthink:jaudiotagger:3.0.1")
+            implementation("com.googlecode.soundlibs:mp3spi:1.9.5.4")
+        }
+    }
+}
+
+compose.desktop {
+    application {
+        mainClass = "com.example.beatpulse.MainKt"
+        nativeDistributions {
+            modules("java.sql")
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb, org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe)
+            packageName = "DuWave"
+            packageVersion = "2.0.1"
+            
+            linux {
+                iconFile.set(project.file("src/desktopMain/resources/drawable/logo.png"))
+            }
+            windows {
+                iconFile.set(project.file("src/desktopMain/resources/drawable/logo.ico"))
+            }
+
+        }
+        buildTypes.release.proguard {
+            isEnabled.set(false)
+        }
+    }
 }
 
 android {
@@ -16,8 +127,18 @@ android {
         applicationId = "com.polonio.duwave"
         minSdk = 24
         targetSdk = 35
-        versionCode = 9
-        versionName = "2.0.1"
+        versionCode = 10
+        versionName = "2.1.0"
+        resConfigs("en", "es")
+    }
+    
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a")
+            isUniversalApk = false
+        }
     }
 
     val keystoreFile = file("../release.keystore")
@@ -40,7 +161,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
-            isShrinkResources = false
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             if (keystoreFile.exists()) {
                 signingConfig = signingConfigs.getByName("release")
@@ -51,107 +172,30 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
+    
+    lint {
+        abortOnError = false
     }
-
-
-    buildFeatures {
-      compose = true
-      aidl = false
-      buildConfig = false
-      shaders = false
-    }
-
+    
     packaging {
-      resources {
-        excludes += "/META-INF/{AL2.0,LGPL2.1}"
-      }
+        resources {
+            excludes += setOf(
+                "**/*.dll",
+                "**/*.jnilib",
+                "**/*.dylib"
+            )
+        }
     }
-
-    dependenciesInfo {
-        includeInApk = false
-        includeInBundle = false
-    }
+    
+    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
+    sourceSets["main"].res.srcDirs("src/androidMain/res")
+    sourceSets["main"].resources.srcDirs("src/commonMain/resources")
 }
-
-
 
 dependencies {
-  val composeBom = platform(libs.androidx.compose.bom)
-  implementation(composeBom)
-  androidTestImplementation(composeBom)
-
-  // Core Android dependencies
-  implementation(libs.androidx.core.ktx)
-  implementation(libs.androidx.lifecycle.runtime.ktx)
-  implementation(libs.androidx.activity.compose)
-
-  // Arch Components
-  implementation(libs.androidx.lifecycle.runtime.compose)
-  implementation(libs.androidx.lifecycle.viewmodel.compose)
-
-  // Compose
-  implementation(libs.androidx.compose.ui)
-  implementation(libs.androidx.compose.ui.tooling.preview)
-  implementation(libs.androidx.compose.material3)
-  // Tooling
-  debugImplementation(libs.androidx.compose.ui.tooling)
-  // Instrumented tests
-  androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-  debugImplementation(libs.androidx.compose.ui.test.manifest)
-
-  // Local tests: jUnit, coroutines, Android runner
-  testImplementation(libs.junit)
-  testImplementation(libs.kotlinx.coroutines.test)
-
-  // Instrumented tests: jUnit rules and runners
-  androidTestImplementation(libs.androidx.test.core)
-  androidTestImplementation(libs.androidx.test.ext.junit)
-  androidTestImplementation(libs.androidx.test.runner)
-  androidTestImplementation(libs.androidx.test.espresso.core)
-
-  // Navigation
-  implementation(libs.androidx.navigation3.ui)
-  implementation(libs.androidx.navigation3.runtime)
-  implementation(libs.androidx.lifecycle.viewmodel.navigation3)
-  implementation("androidx.navigation:navigation-compose:2.8.0")
-
-  // Media3 (ExoPlayer)
-  implementation("androidx.media3:media3-exoplayer:1.6.0")
-  implementation("androidx.media3:media3-ui:1.6.0")
-  implementation("androidx.media3:media3-session:1.6.0")
-
-  // Icons Extended
-  implementation("androidx.compose.material:material-icons-extended:1.6.0")
-
-  // RTSP Streaming via Hardware (MediaProjection)
-  implementation("com.github.pedroSG94.RootEncoder:library:2.7.2")
-  implementation("com.github.pedroSG94:RTSP-Server:1.4.1") {
-      exclude(group = "com.github.pedroSG94.RootEncoder")
-  }
-
-  // Room
-  implementation("androidx.room:room-runtime:2.7.0-alpha13")
-  implementation("androidx.room:room-ktx:2.7.0-alpha13")
-  ksp("androidx.room:room-compiler:2.7.0-alpha13")
-
-  // Palette API
-  implementation("androidx.palette:palette-ktx:1.0.0")
-
-  // Coil for image loading
-  implementation("io.coil-kt:coil-compose:2.6.0")
-
-  // Hilt
-  implementation(libs.hilt.android)
-  ksp(libs.hilt.compiler)
-  implementation(libs.androidx.hilt.navigation.compose)
-
-  // Networking for Piped API
-  implementation("com.squareup.retrofit2:retrofit:2.11.0")
-  implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-
-  // NewPipeExtractor for native YouTube streaming
-  implementation("com.github.TeamNewPipe:NewPipeExtractor:v0.26.4")
+    ksp("androidx.room:room-compiler:2.7.0-alpha13")
 
 }
+
+
+

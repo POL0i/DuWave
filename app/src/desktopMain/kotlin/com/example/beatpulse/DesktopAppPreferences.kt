@@ -1,0 +1,452 @@
+package com.example.beatpulse
+
+import com.example.beatpulse.data.AppPreferences
+import com.example.beatpulse.ui.components.player.IPreferencesManager
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import java.io.File
+
+class DesktopAppPreferences : AppPreferences, IPreferencesManager {
+    private val prefsFile = File(System.getProperty("user.home"), ".beatpulse/prefs.json")
+    private val cache = mutableMapOf<String, String>()
+
+    init {
+        load()
+    }
+
+    private fun load() {
+        if (!prefsFile.exists()) return
+        try {
+            val text = prefsFile.readText().trim()
+            val regex = "\"([^\"]+)\"\\s*:\\s*(\"[^\"]*\"|[^,\\}]+)".toRegex()
+            for (match in regex.findAll(text)) {
+                val key = match.groupValues[1]
+                var value = match.groupValues[2].trim()
+                if (value.startsWith("\"") && value.endsWith("\"")) {
+                    value = value.substring(1, value.length - 1)
+                }
+                cache[key] = value
+            }
+        } catch (e: Exception) { e.printStackTrace() }
+    }
+
+    private fun save() {
+        try {
+            prefsFile.parentFile?.mkdirs()
+            val json = cache.entries.joinToString(prefix = "{\n", postfix = "\n}", separator = ",\n") { (k, v) ->
+                val vStr = if (v == "true" || v == "false" || v.toDoubleOrNull() != null) v else "\"$v\""
+                "  \"$k\": $vStr"
+            }
+            prefsFile.writeText(json)
+        } catch (e: Exception) { e.printStackTrace() }
+    }
+
+    private fun getString(key: String, def: String): String = cache[key] ?: def
+    private fun setString(key: String, value: String?) { 
+        if (value == null) cache.remove(key) else cache[key] = value
+        save() 
+    }
+
+    private fun getBoolean(key: String, def: Boolean): Boolean = cache[key]?.toBooleanStrictOrNull() ?: def
+    private fun setBoolean(key: String, value: Boolean) { cache[key] = value.toString(); save() }
+
+    private fun getInt(key: String, def: Int): Int = cache[key]?.toIntOrNull() ?: def
+    private fun setInt(key: String, value: Int) { cache[key] = value.toString(); save() }
+
+    private fun getLong(key: String, def: Long): Long = cache[key]?.toLongOrNull() ?: def
+    private fun setLong(key: String, value: Long) { cache[key] = value.toString(); save() }
+
+    private fun getFloat(key: String, def: Float): Float = cache[key]?.toFloatOrNull() ?: def
+    private fun setFloat(key: String, value: Float) { cache[key] = value.toString(); save() }
+
+    override var appLanguage: String
+        get() = getString("appLanguage", "en")
+        set(value) {
+            setString("appLanguage", value)
+            com.example.beatpulse.utils.currentAppLanguageState.value = value
+        }
+    override var visualizerStyle: String
+        get() = getString("visualizerStyle", "bars")
+        set(value) = setString("visualizerStyle", value)
+    override var visualizerArchetype: Int
+        get() = getInt("visualizerArchetype", 0)
+        set(value) = setInt("visualizerArchetype", value)
+    override var visualizerFftMode: String
+        get() = getString("visualizerFftMode", "fast")
+        set(value) = setString("visualizerFftMode", value)
+    override var isAdvancedMode: Boolean
+        get() = getBoolean("isAdvancedMode", false)
+        set(value) = setBoolean("isAdvancedMode", value)
+    override var visualizerBandsMode: Int
+        get() = getInt("visualizerBandsMode", 0)
+        set(value) = setInt("visualizerBandsMode", value)
+    override var filterMode: String
+        get() = getString("filterMode", "none")
+        set(value) = setString("filterMode", value)
+    override var physicsMode: String
+        get() = getString("physicsMode", "none")
+        set(value) = setString("physicsMode", value)
+    override var filterWhatsAppShorts: Boolean
+        get() = getBoolean("filterWhatsAppShorts", true)
+        set(value) = setBoolean("filterWhatsAppShorts", value)
+    override var sensitivity: Float
+        get() = getFloat("sensitivity", 1f)
+        set(value) = setFloat("sensitivity", value)
+    override var reactivity: Float
+        get() = getFloat("reactivity", 1f)
+        set(value) = setFloat("reactivity", value)
+    override var bassMultiplier: Float
+        get() = getFloat("bassMultiplier", 1f)
+        set(value) = setFloat("bassMultiplier", value)
+    override var midMultiplier: Float
+        get() = getFloat("midMultiplier", 1f)
+        set(value) = setFloat("midMultiplier", value)
+    override var trebleMultiplier: Float
+        get() = getFloat("trebleMultiplier", 1f)
+        set(value) = setFloat("trebleMultiplier", value)
+    override var usePerBandMultiplier: Boolean
+        get() = getBoolean("usePerBandMultiplier", false)
+        set(value) = setBoolean("usePerBandMultiplier", value)
+
+    override var damping: Float
+        get() = getFloat("damping", 0.6f)
+        set(value) = setFloat("damping", value)
+
+    override var cleanUiMode: Boolean
+        get() = getBoolean("cleanUiMode", false)
+        set(value) = setBoolean("cleanUiMode", value)
+
+    override var dynamicColorsPlus: Boolean
+        get() = getBoolean("dynamicColorsPlus", false)
+        set(value) = setBoolean("dynamicColorsPlus", value)
+
+    override var dynamicColorsInterval: Int
+        get() = getInt("dynamicColorsInterval", 30)
+        set(value) = setInt("dynamicColorsInterval", value)
+
+    private val _lastMainScreenPageFlow = MutableStateFlow(getInt("lastMainScreenPage", 0))
+    override val lastMainScreenPageFlow: StateFlow<Int> = _lastMainScreenPageFlow
+    override var lastMainScreenPage: Int
+        get() = _lastMainScreenPageFlow.value
+        set(value) { 
+            _lastMainScreenPageFlow.value = value
+            setInt("lastMainScreenPage", value)
+        }
+
+    override var lastLibraryTab: Int
+        get() = getInt("lastLibraryTab", 0)
+        set(value) = setInt("lastLibraryTab", value)
+    override var lastLibraryGeneralTab: Int
+        get() = getInt("lastLibraryGeneralTab", 0)
+        set(value) = setInt("lastLibraryGeneralTab", value)
+    override var shuffleModeEnabled: Boolean
+        get() = getBoolean("shuffleModeEnabled", false)
+        set(value) = setBoolean("shuffleModeEnabled", value)
+    override var repeatMode: Int
+        get() = getInt("repeatMode", 0)
+        set(value) = setInt("repeatMode", value)
+    override var eqEnabled: Boolean
+        get() = getBoolean("eqEnabled", false)
+        set(value) = setBoolean("eqEnabled", value)
+    override var eqPreset: Short
+        get() = getInt("eqPreset", 0).toShort()
+        set(value) = setInt("eqPreset", value.toInt())
+    override var eqCustomBands: String
+        get() = getString("eqCustomBands", "")
+        set(value) = setString("eqCustomBands", value)
+    override var eqAutoMode: Boolean
+        get() = getBoolean("eqAutoMode", false)
+        set(value) = setBoolean("eqAutoMode", value)
+    override var lastPlayedTrackPath: String?
+        get() = cache["lastPlayedTrackPath"]
+        set(value) = setString("lastPlayedTrackPath", value)
+    override var lastQueueIds: String
+        get() = getString("lastQueueIds", "")
+        set(value) = setString("lastQueueIds", value)
+    override var systemVolume: Float
+        get() = getFloat("systemVolume", 1.0f)
+        set(value) = setFloat("systemVolume", value)
+    override var hasSeenTutorial: Boolean
+        get() = getBoolean("hasSeenTutorial", false)
+        set(value) = setBoolean("hasSeenTutorial", value)
+    override var hasSeenBottomBarHint: Boolean
+        get() = getBoolean("hasSeenBottomBarHint", false)
+        set(value) = setBoolean("hasSeenBottomBarHint", value)
+    override var hasSeenPlayerHints: Boolean
+        get() = getBoolean("hasSeenPlayerHints", false)
+        set(value) = setBoolean("hasSeenPlayerHints", value)
+    override var hasUsedMiniplayerGesture: Boolean
+        get() = getBoolean("hasUsedMiniplayerGesture", false)
+        set(value) = setBoolean("hasUsedMiniplayerGesture", value)
+    override var hasUsedCoverGesture: Boolean
+        get() = getBoolean("hasUsedCoverGesture", false)
+        set(value) = setBoolean("hasUsedCoverGesture", value)
+    override var hasUsedPlaylistGesture: Boolean
+        get() = getBoolean("hasUsedPlaylistGesture", false)
+        set(value) = setBoolean("hasUsedPlaylistGesture", value)
+    override var albumArtCenterY: Float
+        get() = getFloat("albumArtCenterY", 0f)
+        set(value) = setFloat("albumArtCenterY", value)
+    override var showGestureFeedback: Boolean
+        get() = getBoolean("showGestureFeedback", true)
+        set(value) = setBoolean("showGestureFeedback", value)
+    override var librarySortOrder: String
+        get() = getString("librarySortOrder", "date_added")
+        set(value) = setString("librarySortOrder", value)
+    override var libraryScrollIndex: Int
+        get() = getInt("libraryScrollIndex", 0)
+        set(value) = setInt("libraryScrollIndex", value)
+    override var libraryScrollOffset: Int
+        get() = getInt("libraryScrollOffset", 0)
+        set(value) = setInt("libraryScrollOffset", value)
+    override var playbackSpeed: Float
+        get() = getFloat("playbackSpeed", 1f)
+        set(value) = setFloat("playbackSpeed", value)
+    override var playbackPitch: Float
+        get() = getFloat("playbackPitch", 1f)
+        set(value) = setFloat("playbackPitch", value)
+    override var reverbEnabled: Boolean
+        get() = getBoolean("reverbEnabled", false)
+        set(value) = setBoolean("reverbEnabled", value)
+    override var effectsPreset: String
+        get() = getString("effectsPreset", "none")
+        set(value) = setString("effectsPreset", value)
+    override var lastRecommendationsTimestamp: Long
+        get() = getLong("lastRecommendationsTimestamp", 0L)
+        set(value) = setLong("lastRecommendationsTimestamp", value)
+    override var cachedRecommendationsJson: String
+        get() = getString("cachedRecommendationsJson", "")
+        set(value) = setString("cachedRecommendationsJson", value)
+
+    private val _backgroundStyleFlow = MutableStateFlow(getInt("backgroundStyle", 7))
+    override val backgroundStyleFlow: StateFlow<Int> = _backgroundStyleFlow
+    override var backgroundStyle: Int
+        get() = _backgroundStyleFlow.value
+        set(value) { 
+            _backgroundStyleFlow.value = value
+            setInt("backgroundStyle", value)
+        }
+
+    private val _thumbnailShapeFlow = MutableStateFlow(getInt("thumbnailShape", 0))
+    override val thumbnailShapeFlow: StateFlow<Int> = _thumbnailShapeFlow
+    override var thumbnailShape: Int
+        get() = _thumbnailShapeFlow.value
+        set(value) { 
+            _thumbnailShapeFlow.value = value
+            setInt("thumbnailShape", value)
+        }
+
+    private val _visualizerElementSizeFlow = MutableStateFlow(getFloat("visualizerElementSize", 1.0f))
+    override val visualizerElementSizeFlow: StateFlow<Float> = _visualizerElementSizeFlow
+
+    override var visualizerElementSize: Float
+        get() = _visualizerElementSizeFlow.value
+        set(value) {
+            _visualizerElementSizeFlow.value = value
+            setFloat("visualizerElementSize", value)
+        }
+
+    private val _toastFlow = MutableSharedFlow<String>(extraBufferCapacity = 10)
+    override val toastFlow: SharedFlow<String> = _toastFlow
+    override fun showToast(message: String) {
+        _toastFlow.tryEmit(message)
+    }
+
+    override var autoAnalyzeLyrics: Boolean
+        get() = getBoolean("autoAnalyzeLyrics", false)
+        set(value) = setBoolean("autoAnalyzeLyrics", value)
+    override var hasUsedNextPrevGesture: Boolean
+        get() = getBoolean("hasUsedNextPrevGesture", false)
+        set(value) = setBoolean("hasUsedNextPrevGesture", value)
+    override var hasUsedSeek10sGesture: Boolean
+        get() = getBoolean("hasUsedSeek10sGesture", false)
+        set(value) = setBoolean("hasUsedSeek10sGesture", value)
+    override var hasUsedVinylSeekGesture: Boolean
+        get() = getBoolean("hasUsedVinylSeekGesture", false)
+        set(value) = setBoolean("hasUsedVinylSeekGesture", value)
+    override var hasUsedPlaylistSwipeGesture: Boolean
+        get() = getBoolean("hasUsedPlaylistSwipeGesture", false)
+        set(value) = setBoolean("hasUsedPlaylistSwipeGesture", value)
+    override var showGestureConfirmations: Boolean
+        get() = getBoolean("showGestureConfirmations", false)
+        set(value) = setBoolean("showGestureConfirmations", value)
+    override var streamAvatarUri: String?
+        get() = cache["streamAvatarUri"]
+        set(value) = setString("streamAvatarUri", value)
+    override var lastVerifiedNewPipeVersion: String
+        get() = getString("lastVerifiedNewPipeVersion", "")
+        set(value) = setString("lastVerifiedNewPipeVersion", value)
+    override var lastServiceDownState: Boolean
+        get() = getBoolean("lastServiceDownState", false)
+        set(value) = setBoolean("lastServiceDownState", value)
+
+    override var coverOffsetX: Float
+        get() = getFloat("coverOffsetX", 0f)
+        set(value) = setFloat("coverOffsetX", value)
+
+    override var coverOffsetY: Float
+        get() = getFloat("coverOffsetY", 0f)
+        set(value) = setFloat("coverOffsetY", value)
+
+    override var coverScale: Float
+        get() = getFloat("coverScale", 1f)
+        set(value) = setFloat("coverScale", value)
+
+    private val _vibrateOnVinylFlow = MutableStateFlow(getBoolean("vibrateOnVinyl", true))
+    override val vibrateOnVinylFlow: StateFlow<Boolean> = _vibrateOnVinylFlow
+    override var vibrateOnVinyl: Boolean
+        get() = _vibrateOnVinylFlow.value
+        set(value) {
+            _vibrateOnVinylFlow.value = value
+            setBoolean("vibrateOnVinyl", value)
+        }
+
+    private val _isPatreonUnlockedFlow = MutableStateFlow(getBoolean("isPatreonUnlocked", false))
+    override val isPatreonUnlockedFlow: StateFlow<Boolean> = _isPatreonUnlockedFlow
+    override var isPatreonUnlocked: Boolean
+        get() = _isPatreonUnlockedFlow.value
+        set(value) {
+            _isPatreonUnlockedFlow.value = value
+            setBoolean("isPatreonUnlocked", value)
+        }
+
+    override var patreonFailedAttempts: Int
+        get() = getInt("patreonFailedAttempts", 0)
+        set(value) = setInt("patreonFailedAttempts", value)
+
+    override var patreonLockoutTime: Long
+        get() = getLong("patreonLockoutTime", 0L)
+        set(value) = setLong("patreonLockoutTime", value)
+
+    override var showFps: Boolean
+        get() = getBoolean("showFps", false)
+        set(value) = setBoolean("showFps", value)
+
+    override var showRemainingTime: Boolean
+        get() = getBoolean("showRemainingTime", false)
+        set(value) = setBoolean("showRemainingTime", value)
+
+    private val _favoriteBackgroundStylesFlow = MutableStateFlow(
+        getString("favoriteBackgroundStyles", "").split(",").mapNotNull { it.toIntOrNull() }.toSet()
+    )
+    override val favoriteBackgroundStylesFlow: StateFlow<Set<Int>> = _favoriteBackgroundStylesFlow
+
+    override var favoriteBackgroundStyles: Set<Int>
+        get() = _favoriteBackgroundStylesFlow.value
+        set(value) {
+            _favoriteBackgroundStylesFlow.value = value
+            setString("favoriteBackgroundStyles", value.joinToString(","))
+        }
+
+    private val _favoriteVisualizerStylesFlow = MutableStateFlow(
+        getString("favoriteVisualizerStyles", "").split(",").filter { it.isNotBlank() }.toSet()
+    )
+    override val favoriteVisualizerStylesFlow: StateFlow<Set<String>> = _favoriteVisualizerStylesFlow
+
+    override var favoriteVisualizerStyles: Set<String>
+        get() = _favoriteVisualizerStylesFlow.value
+        set(value) {
+            _favoriteVisualizerStylesFlow.value = value
+            setString("favoriteVisualizerStyles", value.joinToString(","))
+        }
+
+    // Keyboard Shortcuts
+    override var keyMapNextPage: String
+        get() = getString("keyMapNextPage", "Shift+DirectionRight")
+        set(value) = setString("keyMapNextPage", value)
+    override var keyMapPrevPage: String
+        get() = getString("keyMapPrevPage", "Shift+DirectionLeft")
+        set(value) = setString("keyMapPrevPage", value)
+    override var keyMapSeekForward: String
+        get() = getString("keyMapSeekForward", "DirectionRight")
+        set(value) = setString("keyMapSeekForward", value)
+    override var keyMapSeekBackward: String
+        get() = getString("keyMapSeekBackward", "DirectionLeft")
+        set(value) = setString("keyMapSeekBackward", value)
+    override var keyMapNavigateUp: String
+        get() = getString("keyMapNavigateUp", "DirectionUp")
+        set(value) = setString("keyMapNavigateUp", value)
+    override var keyMapNavigateDown: String
+        get() = getString("keyMapNavigateDown", "DirectionDown")
+        set(value) = setString("keyMapNavigateDown", value)
+    override var keyMapNavigateLeft: String
+        get() = getString("keyMapNavigateLeft", "DirectionLeft")
+        set(value) = setString("keyMapNavigateLeft", value)
+    override var keyMapNavigateRight: String
+        get() = getString("keyMapNavigateRight", "DirectionRight")
+        set(value) = setString("keyMapNavigateRight", value)
+    override var keyMapTabNext: String
+        get() = getString("keyMapTabNext", "Tab")
+        set(value) = setString("keyMapTabNext", value)
+    override var keyMapTabPrev: String
+        get() = getString("keyMapTabPrev", "Shift+Tab")
+        set(value) = setString("keyMapTabPrev", value)
+    override var keyMapAction: String
+        get() = getString("keyMapAction", "Enter")
+        set(value) = setString("keyMapAction", value)
+    override var keyMapPlayPause: String
+        get() = getString("keyMapPlayPause", "Spacebar")
+        set(value) = setString("keyMapPlayPause", value)
+
+    override var keyMapGlobalList: String
+        get() = getString("keyMapGlobalList", "Shift+L")
+        set(value) = setString("keyMapGlobalList", value)
+
+    override var keyMapGlobalSearch: String
+        get() = getString("keyMapGlobalSearch", "Shift+K")
+        set(value) = setString("keyMapGlobalSearch", value)
+
+    override var keyMapRecommendations: String
+        get() = getString("keyMapRecommendations", "Shift+J")
+        set(value) = setString("keyMapRecommendations", value)
+
+    override var keyMapLibraryPlaylists: String
+        get() = getString("keyMapLibraryPlaylists", "Shift+M")
+        set(value) = setString("keyMapLibraryPlaylists", value)
+
+    override var keyMapLibraryArtists: String
+        get() = getString("keyMapLibraryArtists", "Shift+N")
+        set(value) = setString("keyMapLibraryArtists", value)
+
+    override var keyMapLibraryAlbums: String
+        get() = getString("keyMapLibraryAlbums", "Shift+B")
+        set(value) = setString("keyMapLibraryAlbums", value)
+
+    override var keyMapLibraryFolders: String
+        get() = getString("keyMapLibraryFolders", "Shift+V")
+        set(value) = setString("keyMapLibraryFolders", value)
+
+    override var keyMapPlayerScreen: String
+        get() = getString("keyMapPlayerScreen", "Shift+Z")
+        set(value) = setString("keyMapPlayerScreen", value)
+
+    override var keyMapOpenStats: String
+        get() = getString("keyMapOpenStats", "Ctrl+Z")
+        set(value) = setString("keyMapOpenStats", value)
+
+    override var keyMapOpenDesign: String
+        get() = getString("keyMapOpenDesign", "Ctrl+X")
+        set(value) = setString("keyMapOpenDesign", value)
+
+    override var keyMapOpenKeyboard: String
+        get() = getString("keyMapOpenKeyboard", "Ctrl+C")
+        set(value) = setString("keyMapOpenKeyboard", value)
+
+    override var keyMapOpenTimer: String
+        get() = getString("keyMapOpenTimer", "Ctrl+V")
+        set(value) = setString("keyMapOpenTimer", value)
+
+    override var keyMapOpenEqualizer: String
+        get() = getString("keyMapOpenEqualizer", "Ctrl+B")
+        set(value) = setString("keyMapOpenEqualizer", value)
+
+    override var keyMapOpenAudioEffects: String
+        get() = getString("keyMapOpenAudioEffects", "Ctrl+N")
+        set(value) = setString("keyMapOpenAudioEffects", value)
+
+    override var keyMapOpenPatreon: String
+        get() = getString("keyMapOpenPatreon", "Ctrl+D")
+        set(value) = setString("keyMapOpenPatreon", value)
+}

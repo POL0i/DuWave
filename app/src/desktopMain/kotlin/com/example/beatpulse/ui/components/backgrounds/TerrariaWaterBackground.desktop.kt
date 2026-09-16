@@ -1,0 +1,148 @@
+package com.example.beatpulse.ui.components.backgrounds
+
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ShaderBrush
+import com.example.beatpulse.theme.PaletteColors
+import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
+import org.jetbrains.skia.RuntimeEffect
+import org.jetbrains.skia.RuntimeShaderBuilder
+
+private const val SEA_THE_NIGHT_SKSL = """
+uniform vec2 u_resolution;
+uniform float u_time;
+uniform vec4 u_dominant;
+uniform vec4 u_vibrant;
+uniform float u_energy;
+
+float myMod(float x, float y) {
+    return x - y * floor(x / y);
+}
+
+float Func(float pX) {
+	return 0.6*(0.5*sin(0.1*pX) + 0.5*sin(0.553*pX) + 0.7*sin(1.2*pX));
+}
+
+float FuncR(float pX) {
+	return 0.5 + 0.25*(1.0 + sin(myMod(40.0*pX, 6.28318530718)));
+}
+
+float Layer(vec2 pQ, float pT) {
+	vec2 Qt = 3.5*pQ;
+	pT *= 0.5;
+	Qt.x += pT;
+
+	float Xi = floor(Qt.x);
+	float Xf = Qt.x - Xi - 0.5;
+
+	vec2 C;
+	float Yi;
+	float D = 1.0 - step(Qt.y, Func(Qt.x));
+
+	Yi = Func(Xi + 0.5);
+	C = vec2(Xf, Qt.y - Yi );
+	D = min(D, length(C) - FuncR(Xi+ pT/80.0));
+
+	Yi = Func(Xi+1.0 + 0.5);
+	C = vec2(Xf-1.0, Qt.y - Yi );
+	D = min(D, length(C) - FuncR(Xi+1.0+ pT/80.0));
+
+	Yi = Func(Xi-1.0 + 0.5);
+	C = vec2(Xf+1.0, Qt.y - Yi );
+	D = min(D, length(C) - FuncR(Xi-1.0+ pT/80.0));
+
+	return min(1.0, D);
+}
+
+vec4 main(vec2 fragCoord) {
+	vec2 UV = 2.0*(fragCoord.xy - u_resolution.xy/2.0) / min(u_resolution.x, u_resolution.y);
+	vec3 Color = mix(u_dominant.rgb * 0.2, u_vibrant.rgb * 0.4, clamp(UV.y, 0.0, 1.0));
+
+	for(int i = 0; i <= 5; i++) {
+        float J = float(i) * 0.2;
+		float Lt = u_time*(0.5 + 2.0*J)*(1.0 + 0.1*sin(226.0*J)) + 17.0*J;
+		vec2 Lp = vec2(0.0, 0.3+1.5*(J - 0.5));
+		float L = Layer(UV + Lp, Lt);
+
+		float Blur = 1.0 + 0.5*sin(0.1*u_time);
+		Blur *= Blur;
+		Blur *= 0.2;
+		float V = mix( 0.0, 1.0, 1.0 - smoothstep( 0.0, 0.01 +0.2*Blur, L ) );
+		vec3 Lc = mix( u_vibrant.rgb, vec3(1.0), J);
+
+		Color = mix(Color, Lc, V);
+	}
+    Color += u_energy * 0.3 * u_vibrant.rgb;
+	return vec4(Color, 1.0);
+}
+"""
+
+@Composable
+actual fun TerrariaWaterBackground(
+    paletteColors: PaletteColors,
+    visualizerManager: IAudioVisualizerManager,
+    isPlayerScreen: Boolean,
+    content: @Composable () -> Unit
+) {
+    val bassAmplitudes by visualizerManager.bassAmplitudes.collectAsState()
+    val bassAvg = remember(bassAmplitudes) { if (bassAmplitudes.isNotEmpty()) bassAmplitudes.average().toFloat().let { if (it.isNaN()) 0f else it } else 0f }
+    
+    val time = rememberInfiniteTransition().animateFloat(
+        initialValue = 0f,
+        targetValue = 1000f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(100000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        )
+    ).value
+
+    val smoothedEnergy by animateFloatAsState(
+        targetValue = bassAvg,
+        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+    )
+
+    val effectiveTime = if (isPlayerScreen) time * 0.6f else time * 0.25f
+    val effectiveEnergy = if (isPlayerScreen) smoothedEnergy * 0.3f else 0f
+
+    val runtimeEffect = remember {
+        try {
+            RuntimeEffect.makeForShader(SEA_THE_NIGHT_SKSL)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    val shaderBrush = remember(runtimeEffect, effectiveTime, effectiveEnergy, paletteColors.dominant, paletteColors.vibrant) {
+        runtimeEffect?.let { effect ->
+            object : androidx.compose.ui.graphics.ShaderBrush() {
+                override fun createShader(size: androidx.compose.ui.geometry.Size): androidx.compose.ui.graphics.Shader {
+                    val builder = org.jetbrains.skia.RuntimeShaderBuilder(effect)
+                    builder.uniform("u_resolution", size.width, size.height)
+                    builder.uniform("u_time", effectiveTime)
+                    builder.uniform("u_energy", effectiveEnergy)
+                    builder.uniform("u_dominant", paletteColors.dominant.red, paletteColors.dominant.green, paletteColors.dominant.blue, paletteColors.dominant.alpha)
+                    builder.uniform("u_vibrant", paletteColors.vibrant.red, paletteColors.vibrant.green, paletteColors.vibrant.blue, paletteColors.vibrant.alpha)
+                    return builder.makeShader()
+                }
+            }
+        }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (shaderBrush != null) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawRect(brush = shaderBrush)
+            }
+        } else {
+            Box(modifier = Modifier.fillMaxSize().background(paletteColors.dominant))
+        }
+
+        content()
+    }
+}

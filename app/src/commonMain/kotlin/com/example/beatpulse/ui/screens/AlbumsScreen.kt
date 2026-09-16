@@ -1,0 +1,685 @@
+package com.example.beatpulse.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import com.example.beatpulse.utils.getLocalizedString
+
+import androidx.compose.ui.draw.clip
+import com.example.beatpulse.utils.SystemBackHandler
+import androidx.compose.ui.text.input.TextFieldValue
+import kotlinx.coroutines.launch
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.example.beatpulse.data.MusicRepository
+import com.example.beatpulse.data.AppPreferences
+import com.example.beatpulse.data.TrackEntity
+import com.example.beatpulse.theme.PaletteColors
+import com.example.beatpulse.ui.components.PixelIcons
+
+@Composable
+fun AlbumsScreen(
+    viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
+    paletteColors: PaletteColors,
+    onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit
+) {
+    val prefs = viewModel.prefs
+    val recentTracks by viewModel.recentTracks.collectAsState()
+    val topTracks by viewModel.topTracks.collectAsState()
+    val recentlyAdded by viewModel.recentlyAdded.collectAsState()
+    val allTracks by viewModel.allTracks.collectAsState()
+    val bgStyle by prefs.backgroundStyleFlow.collectAsState()
+    val shapeIdx by prefs.thumbnailShapeFlow.collectAsState()
+
+    // Group tracks by folder path
+    val tracksByFolder by produceState(initialValue = emptyMap<String, List<TrackEntity>>(), allTracks) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            value = allTracks.groupBy { it.folderPath }.toSortedMap()
+        }
+    }
+
+    data class PlaylistViewData(val title: String, val tracks: List<TrackEntity>, val playlistId: Long? = null, val filterType: Int? = null, val filterValue: String? = null)
+    var selectedPlaylist by remember { mutableStateOf<PlaylistViewData?>(null) }
+    var isCreatingPlaylist by remember { mutableStateOf(false) }
+    var addingTracksToPlaylistId by remember { mutableStateOf<Long?>(null) }
+    val playlists by viewModel.playlists.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
+
+    val isDarkTheme = isSystemInDarkTheme()
+    val dynamicTextColor = remember(bgStyle, paletteColors, isDarkTheme) {
+                if (bgStyle == 3) {
+            val colors = listOf(paletteColors.lightVibrant, paletteColors.vibrant, paletteColors.muted, paletteColors.dominant)
+            val brightestColor = colors.filter { it != androidx.compose.ui.graphics.Color.Unspecified }.maxByOrNull { it.luminance() } ?: androidx.compose.ui.graphics.Color.White
+            if (brightestColor.luminance() < 0.6f) {
+                androidx.compose.ui.graphics.lerp(brightestColor, androidx.compose.ui.graphics.Color.White, 0.5f)
+            } else {
+                brightestColor
+            }
+        } else {
+            val isBackgroundLight = when (bgStyle) {
+                0 -> !isDarkTheme
+                1 -> false
+                2, 4 -> paletteColors.dominant.luminance() > 0.3f
+                5, 6, 7, 8 -> false
+                else -> paletteColors.dominant.luminance() > 0.5f
+            }
+            if (isBackgroundLight) androidx.compose.ui.graphics.Color(0xFF121212) else androidx.compose.ui.graphics.Color.White
+        }
+    }
+
+    val isScanning by viewModel.isScanning.collectAsState()
+    val isOnlineServiceDown by viewModel.isOnlineServiceDown.collectAsState()
+    
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        if (isScanning && allTracks.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(color = paletteColors.vibrant)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(getLocalizedString("searching_music"), color = dynamicTextColor)
+                }
+            }
+        } else if (isCreatingPlaylist) {
+            SystemBackHandler { isCreatingPlaylist = false }
+            CreatePlaylistScreen(
+                viewModel = viewModel,
+                allTracks = allTracks,
+                dynamicTextColor = dynamicTextColor,
+                paletteColors = paletteColors,
+                onClose = { isCreatingPlaylist = false }
+            )
+        } else if (addingTracksToPlaylistId != null) {
+            val plId = addingTracksToPlaylistId!!
+            SystemBackHandler { addingTracksToPlaylistId = null }
+            AddTracksScreen(
+                viewModel = viewModel,
+                playlistId = plId,
+                allTracks = allTracks,
+                dynamicTextColor = dynamicTextColor,
+                paletteColors = paletteColors,
+                onClose = { addingTracksToPlaylistId = null }
+            )
+        } else if (selectedPlaylist == null) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .padding(top = 24.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Inicio",
+                        style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
+                        color = dynamicTextColor
+                    )
+                    
+                    Row {
+                        var showSettingsMenu by remember { mutableStateOf(false) }
+                        var showDesignSettings by remember { mutableStateOf(false) }
+                        var showKeyboardSettings by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton(onClick = { showSettingsMenu = true }) {
+                                Icon(Icons.Default.Settings, contentDescription = "Ajustes", tint = paletteColors.vibrant)
+                            }
+                            DropdownMenu(
+                                expanded = showSettingsMenu,
+                                onDismissRequest = { showSettingsMenu = false }
+                            ) {
+                                val filterWhatsApp = prefs.filterWhatsAppShorts
+                                DropdownMenuItem(
+                                    text = { Text(if (filterWhatsApp) "Mostrar audios WhatsApp" else "Ocultar audios WhatsApp") },
+                                    onClick = {
+                                        prefs.filterWhatsAppShorts = !filterWhatsApp
+                                        showSettingsMenu = false
+                                        viewModel.scanMediaStore()
+                                    }
+                                )
+                            }
+                        }
+                        
+                        IconButton(onClick = { showDesignSettings = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = "Ajustes de Diseño",
+                                tint = paletteColors.vibrant
+                            )
+                        }
+
+                        if (!com.example.beatpulse.utils.SystemUtils.isMobilePlatform) {
+                            IconButton(onClick = { showKeyboardSettings = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Keyboard,
+                                    contentDescription = "Atajos de Teclado",
+                                    tint = paletteColors.vibrant
+                                )
+                            }
+                        }
+
+                        if (showKeyboardSettings) {
+                            KeyboardSettingsDialog(
+                                onDismiss = { showKeyboardSettings = false },
+                                paletteColors = paletteColors,
+                                prefs = prefs
+                            )
+                        }
+
+                        if (showDesignSettings) {
+                            DesignSettingsDialog(
+                                prefs = prefs,
+                                paletteColors = paletteColors,
+                                dynamicTextColor = dynamicTextColor,
+                                currentShapeIdx = shapeIdx,
+                                currentBgStyle = bgStyle,
+                                onDismiss = { showDesignSettings = false }
+                            )
+                        }
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 120.dp)
+                ) {
+                    item {
+                        Text(
+                            text = "Listas de Reproducción",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = dynamicTextColor,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                        )
+                    }
+                    
+                    if (recentTracks.isNotEmpty()) {
+                        item {
+                            PlaylistFolderItem(
+                                title = "20 Últimas Reproducciones",
+                                count = recentTracks.take(20).size,
+                                thumbnailShapeIdx = shapeIdx,
+                                icon = Icons.Default.History,
+                                tint = paletteColors.vibrant,
+                                textColor = dynamicTextColor,
+                                onClick = { selectedPlaylist = PlaylistViewData("20 Últimas Reproducciones", recentTracks.take(20)) }
+                            )
+                        }
+                    }
+                    
+                    if (topTracks.isNotEmpty()) {
+                        item {
+                            PlaylistFolderItem(
+                                title = "Mejores Reproducciones",
+                                count = topTracks.size,
+                                thumbnailShapeIdx = shapeIdx,
+                                icon = Icons.Default.Star,
+                                tint = paletteColors.vibrant,
+                                textColor = dynamicTextColor,
+                                onClick = { selectedPlaylist = PlaylistViewData("Mejores Reproducciones", topTracks) }
+                            )
+                        }
+                    }
+                    
+                    if (recentlyAdded.isNotEmpty()) {
+                        item {
+                            PlaylistFolderItem(
+                                title = "Últimos Agregados",
+                                count = recentlyAdded.size,
+                                thumbnailShapeIdx = shapeIdx,
+                                icon = Icons.Default.NewReleases,
+                                tint = paletteColors.vibrant,
+                                textColor = dynamicTextColor,
+                                onClick = { selectedPlaylist = PlaylistViewData("Últimos Agregados", recentlyAdded) }
+                            )
+                        }
+                    }
+                    
+                    if (playlists.isNotEmpty()) {
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Mis Listas",
+                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                                color = dynamicTextColor,
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                            )
+                        }
+                        items(playlists, key = { "pl_${it.playlistId}" }) { pl ->
+                            val trackCount by viewModel.getPlaylistTrackCountFlow(pl.playlistId).collectAsState(initial = 0)
+                            PlaylistFolderItem(
+                                title = pl.name,
+                                count = trackCount,
+                                thumbnailShapeIdx = shapeIdx,
+                                icon = Icons.AutoMirrored.Filled.QueueMusic,
+                                tint = paletteColors.vibrant,
+                                textColor = dynamicTextColor,
+                                onClick = { selectedPlaylist = PlaylistViewData(pl.name, emptyList(), pl.playlistId) }
+                            )
+                        }
+                    }
+
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = { isCreatingPlaylist = true },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(getLocalizedString("create_playlist"))
+                        }
+                    }
+                    
+                    item {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Carpetas",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                            color = dynamicTextColor,
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                        )
+                    }
+                    
+                    items(tracksByFolder.keys.toList(), key = { "folder_$it" }) { folder ->
+                        val folderTracks = tracksByFolder[folder] ?: emptyList()
+                        PlaylistFolderItem(
+                            title = folder.substringAfterLast("/"),
+                            count = folderTracks.size,
+                            thumbnailShapeIdx = shapeIdx,
+                            icon = if (bgStyle == 8) PixelIcons.Folder else Icons.Default.Folder,
+                            tint = paletteColors.vibrant,
+                            textColor = dynamicTextColor,
+                            onClick = { selectedPlaylist = PlaylistViewData(folder.substringAfterLast("/"), folderTracks, null, 2, folder) }
+                        )
+                    }
+                }
+            }
+        } else {
+            // Detailed View for Selected Playlist/Folder
+            val currentViewData = selectedPlaylist
+            if (currentViewData == null) {
+                // Fallback if null
+            } else {
+                SystemBackHandler { selectedPlaylist = null }
+                val dbTracks by if (currentViewData.playlistId != null) {
+                    viewModel.getTracksForPlaylist(currentViewData.playlistId).collectAsState(initial = emptyList())
+                } else {
+                    remember { mutableStateOf(emptyList()) }
+                }
+            
+            val tracksToDisplay = if (currentViewData.playlistId != null) {
+                dbTracks
+            } else if (currentViewData.filterType != null && currentViewData.filterValue != null) {
+                allTracks.filter { track ->
+                    when (currentViewData.filterType) {
+                        0 -> track.artist == currentViewData.filterValue
+                        1 -> track.album == currentViewData.filterValue
+                        2 -> track.folderPath == currentViewData.filterValue
+                        else -> false
+                    }
+                }
+            } else {
+                currentViewData.tracks
+            }
+
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Header with Back Button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 16.dp)
+                        .padding(top = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { selectedPlaylist = null }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = dynamicTextColor)
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = currentViewData.title,
+                        style = MaterialTheme.typography.titleLarge,
+                        color = dynamicTextColor,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (currentViewData.playlistId != null) {
+                        IconButton(onClick = { addingTracksToPlaylistId = currentViewData.playlistId }) {
+                            Icon(Icons.Default.Add, contentDescription = "Añadir canciones", tint = dynamicTextColor)
+                        }
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 120.dp)
+                ) {
+                    items(tracksToDisplay.size, key = { tracksToDisplay[it].id }) { index ->
+                        val track = tracksToDisplay[index]
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(modifier = Modifier.weight(1f)) {
+                                com.example.beatpulse.ui.screens.TrackItem(
+                                    track = track,
+                                    paletteColors = paletteColors,
+                                    thumbnailShapeIdx = shapeIdx,
+                                    textColor = dynamicTextColor,
+                                    onClick = { 
+                                        if (isOnlineServiceDown && track.dataPath.startsWith("youtube://")) {
+                                            // Do nothing
+                                        } else {
+                                            onTrackClick(track, tracksToDisplay)
+                                        }
+                                    },
+                                    onToggleFavorite = {
+                                        viewModel.toggleFavorite(track, !track.isFavorite)
+                                    },
+                                    onRemoveFromPlaylist = if (currentViewData.playlistId != null) { { viewModel.removeTrackFromPlaylist(currentViewData.playlistId, track.id) } } else null,
+                                    isServiceDown = isOnlineServiceDown
+                                )
+                            }
+                            if (currentViewData.playlistId != null) {
+                                Column {
+                                    if (index > 0) {
+                                        IconButton(onClick = {
+                                            val prevTrack = tracksToDisplay[index - 1]
+                                            viewModel.updatePlaylistOrder(
+                                                currentViewData.playlistId, 
+                                                listOf(Pair(track.id, index - 1), Pair(prevTrack.id, index))
+                                            )
+                                        }) {
+                                            Icon(Icons.Default.KeyboardArrowUp, tint = dynamicTextColor, contentDescription = "Arriba")
+                                        }
+                                    }
+                                    if (index < tracksToDisplay.size - 1) {
+                                        IconButton(onClick = {
+                                            val nextTrack = tracksToDisplay[index + 1]
+                                            viewModel.updatePlaylistOrder(
+                                                currentViewData.playlistId, 
+                                                listOf(Pair(track.id, index + 1), Pair(nextTrack.id, index))
+                                            )
+                                        }) {
+                                            Icon(Icons.Default.KeyboardArrowDown, tint = dynamicTextColor, contentDescription = "Abajo")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        }
+    }
+}
+
+@Composable
+fun PlaylistFolderItem(
+    title: String,
+    count: Int,
+    thumbnailShapeIdx: Int,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: androidx.compose.ui.graphics.Color,
+    textColor: androidx.compose.ui.graphics.Color,
+    isFocused: Boolean = false,
+    onClick: () -> Unit
+) {
+    val isDesktop = !com.example.beatpulse.utils.SystemUtils.isMobilePlatform
+    val boxSize = if (isDesktop) 72.dp else 48.dp
+    val iconSize = if (isDesktop) 36.dp else 24.dp
+    val paddingVert = if (isDesktop) 24.dp else 12.dp
+    val titleStyle = if (isDesktop) MaterialTheme.typography.titleLarge else MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+    val subtitleStyle = if (isDesktop) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium
+
+    val focusedBg = if (isFocused) tint.copy(alpha = 0.2f) else androidx.compose.ui.graphics.Color.Transparent
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .background(focusedBg)
+            .padding(horizontal = 24.dp, vertical = paddingVert),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(boxSize)
+                .clip(com.example.beatpulse.ui.utils.getShapeForIndex(thumbnailShapeIdx))
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(iconSize)
+            )
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = titleStyle, color = textColor)
+            Text(text = "$count canciones", style = subtitleStyle, color = textColor.copy(alpha = 0.7f))
+        }
+        Icon(
+            imageVector = Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = textColor.copy(alpha = 0.5f),
+            modifier = Modifier.size(iconSize)
+        )
+    }
+}
+
+@Composable
+fun CreatePlaylistScreen(
+    viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
+    allTracks: List<TrackEntity>,
+    dynamicTextColor: androidx.compose.ui.graphics.Color,
+    paletteColors: PaletteColors,
+    onClose: () -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var searchQuery by remember { mutableStateOf("") }
+    val selectedTracks = remember { androidx.compose.runtime.mutableStateMapOf<Long, Boolean>() }
+    val coroutineScope = rememberCoroutineScope()
+
+    val filteredTracks by produceState(initialValue = allTracks, searchQuery, allTracks) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            value = if (searchQuery.isEmpty()) allTracks
+            else allTracks.filter { 
+                it.title.contains(searchQuery, ignoreCase = true) || 
+                it.artist.contains(searchQuery, ignoreCase = true) 
+            }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(top = 24.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = dynamicTextColor)
+            }
+            Text(getLocalizedString("new_playlist"), style = MaterialTheme.typography.titleLarge, color = dynamicTextColor, modifier = Modifier.weight(1f))
+            Button(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        coroutineScope.launch {
+                            val id = viewModel.createPlaylist(name)
+                            selectedTracks.filterValues { it }.keys.forEach { trackId ->
+                                val track = allTracks.find { it.id == trackId }
+                                if (track != null) {
+                                    viewModel.addTrackToPlaylist(id, track)
+                                }
+                            }
+                            onClose()
+                        }
+                    }
+                },
+                enabled = name.isNotBlank() && selectedTracks.values.any { it },
+                colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
+            ) {
+                Text(getLocalizedString("save"))
+            }
+        }
+
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            label = { Text(getLocalizedString("playlist_name"), color = dynamicTextColor.copy(alpha=0.7f)) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = dynamicTextColor,
+                unfocusedTextColor = dynamicTextColor,
+                focusedBorderColor = paletteColors.vibrant,
+                unfocusedBorderColor = dynamicTextColor.copy(alpha = 0.5f)
+            )
+        )
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text(getLocalizedString("search_songs"), color = dynamicTextColor.copy(alpha=0.5f)) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = dynamicTextColor.copy(alpha=0.5f)) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = dynamicTextColor,
+                unfocusedTextColor = dynamicTextColor,
+                focusedBorderColor = paletteColors.vibrant,
+                unfocusedBorderColor = dynamicTextColor.copy(alpha = 0.5f)
+            )
+        )
+
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 120.dp)) {
+            items(filteredTracks.size, key = { filteredTracks[it].id }) { index ->
+                val track = filteredTracks[index]
+                val isSelected = selectedTracks[track.id] == true
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { selectedTracks[track.id] = !isSelected }.padding(horizontal = 24.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { selectedTracks[track.id] = it },
+                        colors = CheckboxDefaults.colors(checkedColor = paletteColors.vibrant)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(track.title, color = dynamicTextColor, style = MaterialTheme.typography.bodyLarge)
+                        Text(track.artist, color = dynamicTextColor.copy(alpha=0.7f), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun AddTracksScreen(
+    viewModel: com.example.beatpulse.ui.viewmodels.ILibraryViewModel,
+    playlistId: Long,
+    allTracks: List<TrackEntity>,
+    dynamicTextColor: androidx.compose.ui.graphics.Color,
+    paletteColors: PaletteColors,
+    onClose: () -> Unit
+) {
+    var searchQuery by remember { mutableStateOf("") }
+    val selectedTracks = remember { androidx.compose.runtime.mutableStateMapOf<Long, Boolean>() }
+    val coroutineScope = rememberCoroutineScope()
+    
+    // We fetch current tracks to pre-select them or not allow duplicates
+    val existingTracks by viewModel.getTracksForPlaylist(playlistId).collectAsState(initial = emptyList())
+    val existingTrackIds = remember(existingTracks) { existingTracks.map { it.id }.toSet() }
+
+    val filteredTracks by produceState(initialValue = emptyList<TrackEntity>(), searchQuery, allTracks, existingTrackIds) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            val list = allTracks.filter { it.id !in existingTrackIds }
+            value = if (searchQuery.isEmpty()) list
+            else list.filter { 
+                it.title.contains(searchQuery, ignoreCase = true) || 
+                it.artist.contains(searchQuery, ignoreCase = true) 
+            }
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().padding(top = 24.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onClose) {
+                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = dynamicTextColor)
+            }
+            Text(getLocalizedString("add_songs"), style = MaterialTheme.typography.titleLarge, color = dynamicTextColor, modifier = Modifier.weight(1f))
+            Button(
+                onClick = {
+                    val tracksToAdd = filteredTracks.filter { selectedTracks[it.id] == true }
+                    if (tracksToAdd.isNotEmpty()) {
+                        coroutineScope.launch {
+                            tracksToAdd.forEach { track ->
+                                viewModel.addTrackToPlaylist(playlistId, track)
+                            }
+                            onClose()
+                        }
+                    } else {
+                        onClose()
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
+            ) {
+                Text(if (selectedTracks.values.any { it }) "Añadir" else getLocalizedString("cancel"))
+            }
+        }
+
+        OutlinedTextField(
+            value = searchQuery,
+            onValueChange = { searchQuery = it },
+            placeholder = { Text(getLocalizedString("search_songs"), color = dynamicTextColor.copy(alpha=0.5f)) },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+            singleLine = true,
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = dynamicTextColor.copy(alpha=0.5f)) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = dynamicTextColor,
+                unfocusedTextColor = dynamicTextColor,
+                focusedBorderColor = paletteColors.vibrant,
+                unfocusedBorderColor = dynamicTextColor.copy(alpha = 0.5f)
+            )
+        )
+
+        LazyColumn(modifier = Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 120.dp)) {
+            items(filteredTracks.size, key = { filteredTracks[it].id }) { index ->
+                val track = filteredTracks[index]
+                val isSelected = selectedTracks[track.id] == true
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { selectedTracks[track.id] = !isSelected }.padding(horizontal = 24.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isSelected,
+                        onCheckedChange = { selectedTracks[track.id] = it },
+                        colors = CheckboxDefaults.colors(checkedColor = paletteColors.vibrant)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(track.title, color = dynamicTextColor, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(track.artist, color = dynamicTextColor.copy(alpha=0.7f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+    }
+}

@@ -49,4 +49,31 @@
 -dontwarn javax.script.**
 -dontwarn jdk.dynalink.**
 -dontwarn org.schabi.newpipe.extractor.**
+-keep class org.schabi.newpipe.extractor.** { *; }
 -keep class org.mozilla.javascript.** { *; }
+# Ktor references java.lang.management which doesn't exist on Android
+-dontwarn java.lang.management.**
+
+# Ktor rules
+-dontwarn io.ktor.**
+-dontwarn io.ktor.**
+-dontwarn org.slf4j.**
+
+-dontwarn java.lang.management.ManagementFactory
+-dontwarn java.lang.management.RuntimeMXBean
+
+# OkHttp
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+
+# JSoup & Nanojson (for NewPipeExtractor)
+-dontwarn org.jsoup.**
+-keep class org.jsoup.** { *; }
+-dontwarn com.grack.nanojson.**
+-keep class com.grack.nanojson.** { *; }
+
+# Ktor
+-keep class io.ktor.** { *; }
+-keep class com.pedro.** { *; }

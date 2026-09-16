@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+shazamio
+python-multipart
+pydub
+aiohttp
