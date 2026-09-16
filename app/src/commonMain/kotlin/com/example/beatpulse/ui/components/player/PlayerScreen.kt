@@ -1440,7 +1440,7 @@ private fun ColumnScope.PlayerVisualizerArea(
                         val touchPos = change.position
 
                         if (currentDragAction == DragAction.NONE) {
-                            if (dragAmount.y < -10f && abs(dragAmount.x) < 20f && touchPos.y < center.y) {
+                            if (dragAmount.y < -10f && abs(dragAmount.x) < 20f) {
                                 currentDragAction = DragAction.OPEN_QUEUE
                                 onShowQueue()
                                 if (showPlaylistSwipeTutorial) onDismissPlaylistSwipeTutorial()
