@@ -78,7 +78,7 @@ fun LuminousBackground(
     val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
     
-    var accumulatedTime by remember { mutableFloatStateOf(0f) }
+    var time by remember { mutableFloatStateOf(0f) }
     
     LaunchedEffect(Unit) {
         var smoothEnergy = 0f
@@ -97,16 +97,13 @@ fun LuminousBackground(
                 }
                 val rawEnergy = if (limit > 0) sumAmps / limit else 0f
                 
-                // Fluid smoothing
                 smoothEnergy += (rawEnergy - smoothEnergy) * (1f - kotlin.math.exp(-5f * dt))
                 val reactFactor = if (currentIsPlayerScreen) 1.0f else 0.2f
                 dynamicEnergy = smoothEnergy * reactFactor
                 
-                // Fluid accumulated time
-                val baseSpeed = if (currentIsPlayerScreen) 0.05f else 0.02f
-                val energySpeed = dynamicEnergy * 0.4f
-                accumulatedTime += (baseSpeed + energySpeed) * dt
+                time += dt * 10f
             }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
 
@@ -137,7 +134,7 @@ fun LuminousBackground(
                 val centerY = (currentAlbumArtCenterY ?: (size.height / 2f)) + currentCoverOffset.y
                 
                 runtimeShader.setFloatUniform("iResolution", size.width, size.height)
-                runtimeShader.setFloatUniform("iTime", accumulatedTime * finalSpeed)
+                runtimeShader.setFloatUniform("iTime", time * 0.05f * finalSpeed)
                 runtimeShader.setFloatUniform("iEnergy", dynamicEnergy)
                 runtimeShader.setFloatUniform("colorVibrant", vib.red, vib.green, vib.blue, vib.alpha)
                 runtimeShader.setFloatUniform("colorLightVibrant", lVib.red, lVib.green, lVib.blue, lVib.alpha)

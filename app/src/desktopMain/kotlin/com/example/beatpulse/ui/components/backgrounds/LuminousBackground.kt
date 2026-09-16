@@ -120,11 +120,10 @@ fun LuminousBackground(
                 val reactFactor = if (currentIsPlayerScreen) 1.0f else 0.2f
                 dynamicEnergy = smoothEnergy * reactFactor
                 
-                // Fluid accumulated time
-                val baseSpeed = if (currentIsPlayerScreen) 0.05f else 0.02f
-                val energySpeed = dynamicEnergy * 0.4f
-                accumulatedTime += (baseSpeed + energySpeed) * dt
+                // Match Android time scaling
+                accumulatedTime += dt * 10f
             }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
 
@@ -152,7 +151,7 @@ fun LuminousBackground(
                 val buffer = ByteBuffer.allocate(56).order(ByteOrder.LITTLE_ENDIAN)
                 buffer.putFloat(size.width)
                 buffer.putFloat(size.height)
-                buffer.putFloat(accumulatedTime * finalSpeed)
+                buffer.putFloat(accumulatedTime * 0.05f * finalSpeed)
                 buffer.putFloat(dynamicEnergy)
                 buffer.putFloat(vib.red)
                 buffer.putFloat(vib.green)

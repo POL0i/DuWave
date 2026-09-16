@@ -60,16 +60,25 @@ fun AlbumsScreen(
     val coroutineScope = rememberCoroutineScope()
 
     val isDarkTheme = isSystemInDarkTheme()
-    val dynamicTextColor = remember(bgStyle, paletteColors.dominant, isDarkTheme) {
-        val isBackgroundLight = when (bgStyle) {
-            0 -> !isDarkTheme
-            1 -> false
-            2, 4 -> paletteColors.dominant.luminance() > 0.3f
-            3 -> true
-            5, 6, 7, 8 -> false
-            else -> paletteColors.dominant.luminance() > 0.5f
+    val dynamicTextColor = remember(bgStyle, paletteColors, isDarkTheme) {
+                if (bgStyle == 3) {
+            val colors = listOf(paletteColors.lightVibrant, paletteColors.vibrant, paletteColors.muted, paletteColors.dominant)
+            val brightestColor = colors.filter { it != androidx.compose.ui.graphics.Color.Unspecified }.maxByOrNull { it.luminance() } ?: androidx.compose.ui.graphics.Color.White
+            if (brightestColor.luminance() < 0.6f) {
+                androidx.compose.ui.graphics.lerp(brightestColor, androidx.compose.ui.graphics.Color.White, 0.5f)
+            } else {
+                brightestColor
+            }
+        } else {
+            val isBackgroundLight = when (bgStyle) {
+                0 -> !isDarkTheme
+                1 -> false
+                2, 4 -> paletteColors.dominant.luminance() > 0.3f
+                5, 6, 7, 8 -> false
+                else -> paletteColors.dominant.luminance() > 0.5f
+            }
+            if (isBackgroundLight) androidx.compose.ui.graphics.Color(0xFF121212) else androidx.compose.ui.graphics.Color.White
         }
-        if (isBackgroundLight) Color(0xFF121212) else Color.White
     }
 
     val isScanning by viewModel.isScanning.collectAsState()

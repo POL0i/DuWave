@@ -102,12 +102,17 @@ compose.desktop {
         mainClass = "com.example.beatpulse.MainKt"
         nativeDistributions {
             modules("java.sql")
-            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb, org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage)
+            targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb, org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe)
             packageName = "DuWave"
             packageVersion = "2.0.1"
+            
             linux {
-                iconFile.set(project.file("src/androidMain/res/mipmap-xxxhdpi/ic_launcher.webp"))
+                iconFile.set(project.file("src/desktopMain/resources/drawable/logo.png"))
             }
+            windows {
+                iconFile.set(project.file("src/desktopMain/resources/drawable/logo.ico"))
+            }
+
         }
         buildTypes.release.proguard {
             isEnabled.set(false)
@@ -122,8 +127,8 @@ android {
         applicationId = "com.polonio.duwave"
         minSdk = 24
         targetSdk = 35
-        versionCode = 9
-        versionName = "2.0.1"
+        versionCode = 10
+        versionName = "2.1.0"
         resConfigs("en", "es")
     }
     

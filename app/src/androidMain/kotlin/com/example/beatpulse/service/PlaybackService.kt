@@ -40,6 +40,11 @@ class PlaybackService : MediaSessionService() {
 
     override fun onCreate() {
         super.onCreate()
+        
+        val notificationProvider = androidx.media3.session.DefaultMediaNotificationProvider.Builder(this).build()
+        notificationProvider.setSmallIcon(R.drawable.ic_notification_logo)
+        setMediaNotificationProvider(notificationProvider)
+        
         val audioAttributes = AudioAttributes.Builder()
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .setUsage(C.USAGE_MEDIA)
@@ -195,7 +200,48 @@ class PlaybackService : MediaSessionService() {
                 android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
             )
 
+            val serviceContext = this
+            val customBitmapLoader = object : androidx.media3.common.util.BitmapLoader {
+                override fun supportsMimeType(mimeType: String): Boolean = mimeType.startsWith("image/")
+                override fun decodeBitmap(data: ByteArray): com.google.common.util.concurrent.ListenableFuture<android.graphics.Bitmap> {
+                    val future = com.google.common.util.concurrent.SettableFuture.create<android.graphics.Bitmap>()
+                    try {
+                        val bitmap = android.graphics.BitmapFactory.decodeByteArray(data, 0, data.size)
+                        if (bitmap != null) future.set(bitmap) else future.setException(Exception("Decode failed"))
+                    } catch (e: Exception) { future.setException(e) }
+                    return future
+                }
+                override fun loadBitmap(uri: android.net.Uri): com.google.common.util.concurrent.ListenableFuture<android.graphics.Bitmap> {
+                    val future = com.google.common.util.concurrent.SettableFuture.create<android.graphics.Bitmap>()
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                        try {
+                            if (uri.scheme == "appcache") {
+                                val fingerprint = uri.host ?: uri.path?.removePrefix("/") ?: ""
+                                val file = java.io.File(serviceContext.cacheDir, "full_$fingerprint.jpg")
+                                if (file.exists()) {
+                                    val bitmap = android.graphics.BitmapFactory.decodeFile(file.absolutePath)
+                                    if (bitmap != null) { future.set(bitmap); return@launch }
+                                }
+                            } else if (uri.scheme == "http" || uri.scheme == "https") {
+                                val req = okhttp3.Request.Builder().url(uri.toString()).build()
+                                val resp = okhttp3.OkHttpClient().newCall(req).execute()
+                                if (resp.isSuccessful) {
+                                    val bytes = resp.body?.bytes()
+                                    if (bytes != null) {
+                                        val bitmap = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                                        if (bitmap != null) { future.set(bitmap); return@launch }
+                                    }
+                                }
+                            }
+                            future.setException(Exception("Failed to load bitmap"))
+                        } catch (e: Exception) { future.setException(e) }
+                    }
+                    return future
+                }
+            }
+
             mediaSession = MediaSession.Builder(this, player)
+                .setBitmapLoader(customBitmapLoader)
                 .setSessionActivity(pendingIntent)
                 .setCallback(object : MediaSession.Callback {
                     override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
@@ -329,7 +375,13 @@ class PlaybackService : MediaSessionService() {
             putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_IS_PLAYING, player.isPlaying)
             
             // Extract cover art path
-            val coverPath = metadata?.artworkUri?.toString()?.removePrefix("file://")
+            var coverPath = metadata?.artworkUri?.toString()
+            if (coverPath != null && coverPath.startsWith("appcache://")) {
+                val fingerprint = coverPath.removePrefix("appcache://")
+                coverPath = java.io.File(cacheDir, "full_$fingerprint.jpg").absolutePath
+            } else {
+                coverPath = coverPath?.removePrefix("file://")
+            }
             putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_COVER_PATH, coverPath)
             
             // Add current position for Chronometer
@@ -343,7 +395,13 @@ class PlaybackService : MediaSessionService() {
             putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_ARTIST, metadata?.artist?.toString() ?: "DuWave")
             putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_IS_PLAYING, player.isPlaying)
             
-            val coverPath = metadata?.artworkUri?.toString()?.removePrefix("file://")
+            var coverPath = metadata?.artworkUri?.toString()
+            if (coverPath != null && coverPath.startsWith("appcache://")) {
+                val fingerprint = coverPath.removePrefix("appcache://")
+                coverPath = java.io.File(cacheDir, "full_$fingerprint.jpg").absolutePath
+            } else {
+                coverPath = coverPath?.removePrefix("file://")
+            }
             putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_COVER_PATH, coverPath)
             putExtra(com.example.beatpulse.widget.MediaWidgetProvider.EXTRA_POSITION, player.currentPosition)
         }

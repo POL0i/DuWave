@@ -24,6 +24,8 @@ import androidx.compose.ui.input.key.isCtrlPressed
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.isAltPressed
 import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
@@ -77,7 +79,6 @@ fun AppScreen(
     var activeDynamicColor by remember { mutableStateOf<Color?>(null) }
     
     LaunchedEffect(Unit) {
-        com.example.beatpulse.data.sync.EcosystemManager.startEcosystem()
     }
     
     LaunchedEffect(dynamicColorsPlus, dynamicColorsInterval, paletteColorsFlow) {
@@ -393,7 +394,21 @@ fun AppScreen(
         ) { innerPadding ->
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
+                            if (event.key == androidx.compose.ui.input.key.Key.DirectionRight) {
+                                scope.launch { pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(2)) }
+                                return@onPreviewKeyEvent true
+                            }
+                            if (event.key == androidx.compose.ui.input.key.Key.DirectionLeft) {
+                                scope.launch { pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0)) }
+                                return@onPreviewKeyEvent true
+                            }
+                        }
+                        false
+                    }
+                    .focusable(),
                 userScrollEnabled = false
             ) { page ->
                 when (page % 3) {
@@ -593,14 +608,21 @@ fun AppScreen(
 
     var blurRadius by remember { mutableFloatStateOf(if (showTutorial) 30f else 0f) }
     var blurTarget by remember { mutableFloatStateOf(if (showTutorial) 30f else 0f) }
-    var showSwipeHint by remember { mutableStateOf(false) }
+    var showSwipeHint by remember { mutableStateOf(!(prefs as AppPreferences).hasUsedMiniplayerGesture && prefs.hasSeenTutorial) }
+
+    LaunchedEffect(pagerState.isScrollInProgress) {
+        if (pagerState.isScrollInProgress && showSwipeHint) {
+            showSwipeHint = false
+            (prefs as AppPreferences).hasUsedMiniplayerGesture = true
+        }
+    }
 
     if (showTutorial) {
         Box(
             modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)).clickable {
                 showTutorial = false
                 prefs.hasSeenTutorial = true
-                showSwipeHint = true
+                showSwipeHint = !(prefs as AppPreferences).hasUsedMiniplayerGesture
             },
             contentAlignment = Alignment.Center
         ) {
@@ -635,7 +657,6 @@ fun AppScreen(
                     .padding(horizontal = 24.dp)
                     .clip(androidx.compose.foundation.shape.RoundedCornerShape(16.dp))
                     .background(Color.Black.copy(alpha = 0.8f))
-                    .clickable { showSwipeHint = false }
                     .padding(16.dp)
             ) {
                 Box(modifier = Modifier.offset(x = offsetX.dp).size(24.dp).background(Color.White, androidx.compose.foundation.shape.CircleShape))

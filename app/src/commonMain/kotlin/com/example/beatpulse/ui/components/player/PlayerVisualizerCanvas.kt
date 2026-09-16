@@ -34,23 +34,23 @@ fun PlayerVisualizerCanvas(
     coverOffsetY: Float = 0f,
     currentStyle: VisualizerStyle,
     thumbnailShapeIdx: Int,
-    bassAmplitudes: FloatArray,
-    midAmplitudes: FloatArray,
-    highAmplitudes: FloatArray,
-    combinedAmplitudes: FloatArray,
-    bassAvg: Float,
-    midAvg: Float,
-    trebleAvg: Float,
-    bassOpacity: Float,
-    midOpacity: Float,
-    highOpacity: Float,
+    bassAmplitudes: () -> FloatArray,
+    midAmplitudes: () -> FloatArray,
+    highAmplitudes: () -> FloatArray,
+    combinedAmplitudes: () -> FloatArray,
+    bassAvg: () -> Float,
+    midAvg: () -> Float,
+    trebleAvg: () -> Float,
+    bassOpacity: () -> Float,
+    midOpacity: () -> Float,
+    highOpacity: () -> Float,
     visualizerArchetype: Int,
     colorDominant: Color,
     colorVibrant: Color,
     colorMuted: Color,
     paletteColors: PaletteColors,
-    rotationAngle: Float,
-    fastRotationAngle: Float,
+    rotationAngle: () -> Float,
+    fastRotationAngle: () -> Float,
     currentPosition: Long,
     duration: Long,
     dragSeekTimeMs: Long?,
@@ -58,7 +58,7 @@ fun PlayerVisualizerCanvas(
     abPointA: Float,
     abPointB: Float,
     activeDraggingHandle: String?,
-    animatedScale: Float,
+    animatedScale: () -> Float,
     coverScale: Float,
     cleanUiMode: Boolean = false,
     elementSize: Float = 1f,
@@ -74,10 +74,13 @@ fun PlayerVisualizerCanvas(
     val sharedSlimeY = remember { FloatArray(1024) }
     val starPeaks = remember { FloatArray(512) }
     val starPeakTimes = remember { LongArray(512) }
-    val trapParticles = remember { mutableStateListOf<TrapParticle>() }
+    val trapParticles = remember { ArrayList<TrapParticle>() }
 
-    var lastSize = remember { Size.Zero }
-    var lastShape = remember { -1 }
+    class CanvasCache {
+        var lastSize: Size = Size.Zero
+        var lastShape: Int = -1
+    }
+    val cache = remember { CanvasCache() }
 
     val sweepGradient = remember(colorVibrant, colorDominant, colorMuted) {
         Brush.sweepGradient(colors = listOf(colorVibrant, colorDominant, colorMuted, colorVibrant))
@@ -87,8 +90,9 @@ fun PlayerVisualizerCanvas(
         .offset { androidx.compose.ui.unit.IntOffset(coverOffsetX.toInt(), coverOffsetY.toInt()) }
         .size(320.dp)
         .graphicsLayer {
-            scaleX = animatedScale * coverScale
-            scaleY = animatedScale * coverScale
+            val ascale = animatedScale()
+            scaleX = ascale * coverScale
+            scaleY = ascale * coverScale
         }) {
         val radius = size.minDimension / 4f
         val center = Offset(size.width / 2, size.height / 2)
@@ -97,7 +101,7 @@ fun PlayerVisualizerCanvas(
 
         val aggressiveElementSize = if (elementSize >= 1f) 1f + (elementSize - 1f) * 4f else elementSize * elementSize
 
-        if (size != lastSize || thumbnailShapeIdx != lastShape) {
+        if (size != cache.lastSize || thumbnailShapeIdx != cache.lastShape) {
             basePath.reset()
             when (thumbnailShapeIdx) {
                 0 -> basePath.addOval(Rect(center.x - rPx, center.y - rPx, center.x + rPx, center.y + rPx))
@@ -143,8 +147,8 @@ fun PlayerVisualizerCanvas(
             }
             basePath.close()
             progressMeasure.setPath(basePath, forceClosed = false)
-            lastSize = size
-            lastShape = thumbnailShapeIdx
+            cache.lastSize = size
+            cache.lastShape = thumbnailShapeIdx
         }
 
         val pathLength = if (thumbnailShapeIdx == 0) rPx * 2f * Math.PI.toFloat() else progressMeasure.length
@@ -426,13 +430,13 @@ fun PlayerVisualizerCanvas(
                         
                         computePointAndNormal(d)
                         
-                        // Separate the 3 layers a bit if using archetype 2 or 3
-                        val baseOffset = if (visualizerArchetype != 1) (layerScale - 1f) * 80f else 0f
-                        
+                        // Separate the 3 layers
+                        val baseOffset = (layerScale - 1f) * 120f
+
                         // Push outward using the normal to preserve the exact cover art shape
                         val px = outPx + outNx * (extrude + baseOffset)
                         val py = outPy + outNy * (extrude + baseOffset)
-                        
+
                         if (i == 0) {
                             path.moveTo(px, py)
                         } else {
@@ -440,30 +444,31 @@ fun PlayerVisualizerCanvas(
                         }
                     }
                     path.close()
-                    
-                    if (visualizerArchetype == 1) {
-                        // Tinted fill (heavily tinted by vibrant color)
-                        val vColor = paletteColors.vibrant
+
+                    val isClosestLayer = layerScale == 1.0f
+                    if (visualizerArchetype == 1 || isClosestLayer) {
+                        // For the closest layer, use the layerColor (which could be dominant/vibrant/muted depending on archetype) 
+                        // to tint the fill dynamically
+                        val fillAlpha = if (visualizerArchetype == 1) 1f else 0.4f * opacity
                         val tintedFill = Color(
-                            red = 0.4f + vColor.red * 0.6f,
-                            green = 0.4f + vColor.green * 0.6f,
-                            blue = 0.4f + vColor.blue * 0.6f,
-                            alpha = 1f
+                            red = 0.4f + layerColor.red * 0.6f,
+                            green = 0.4f + layerColor.green * 0.6f,
+                            blue = 0.4f + layerColor.blue * 0.6f,
+                            alpha = fillAlpha
                         )
-                        
+
                         drawPath(
                             path = path,
                             color = tintedFill,
                             style = Fill
                         )
-                        // Thinner stroke with dominant color instead of rainbow
                         drawPath(
                             path = path,
-                            color = paletteColors.dominant,
+                            color = layerColor.copy(alpha = if (visualizerArchetype == 1) 1f else 0.9f * opacity),
                             style = Stroke(width = 4f, join = StrokeJoin.Round)
                         )
                     } else {
-                        // Multi-layer (archetype 2 or 3) -> Distinct outlines instead of solid overlap
+                        // Distinct outlines instead of solid overlap
                         drawPath(
                             path = path,
                             color = layerColor.copy(alpha = 0.9f * opacity),
@@ -473,11 +478,12 @@ fun PlayerVisualizerCanvas(
 
                     // 3. Update and draw particles (ONLY on bass layer so we don't duplicate work)
                     if (isBassLayer) {
+                        val bAvg = bassAvg()
                         // Fix for low sensitivity: spawn even at very low bassAvg
-                        if (bassAvg > 0.05f && Random.nextFloat() < 0.2f + bassAvg * 0.5f) {
-                            val numToSpawn = (bassAvg * 6).toInt().coerceIn(1, 3)
+                        if (bAvg > 0.05f && Random.nextFloat() < 0.2f + bAvg * 0.5f) {
+                            val numToSpawn = (bAvg * 6).toInt().coerceIn(1, 3)
                             for (s in 0 until numToSpawn) {
-                                val speed = 1f + Random.nextFloat() * 4f * bassAvg
+                                val speed = 1f + Random.nextFloat() * 4f * bAvg
                                 val pColor = Color.White
                                 val maxLife = 120f + Random.nextFloat() * 80f
                                 
@@ -535,8 +541,11 @@ fun PlayerVisualizerCanvas(
         if (currentStyle == VisualizerStyle.RINGS || currentStyle == VisualizerStyle.AURA || currentStyle == VisualizerStyle.BANDS) {
             when (currentStyle) {
                 VisualizerStyle.RINGS -> {
-                    val dynamicRotation = rotationAngle + (bassAvg * 90f)
-                    val dynamicFastRotation = fastRotationAngle - (midAvg * 90f)
+                    val bAvg = bassAvg()
+                    val mAvg = midAvg()
+                    val tAvg = trebleAvg()
+                    val dynamicRotation = rotationAngle() + (bAvg * 90f)
+                    val dynamicFastRotation = fastRotationAngle() - (mAvg * 90f)
                     fun drawGlitchRing(r: Float, thickness: Float, gapAngle: Float, startOffset: Float, brushColor: Color) {
                         val ringPath = Path().apply {
                             when (thumbnailShapeIdx) {
@@ -612,29 +621,32 @@ fun PlayerVisualizerCanvas(
                         )
                     }
                     if (visualizerArchetype == 1) {
-                        val maxPulse = maxOf(bassAvg, midAvg, trebleAvg)
+                        val maxPulse = maxOf(bAvg, mAvg, tAvg)
                         val combinedRadius = radius + 60f + (maxPulse * 80f)
                         drawGlitchRing(combinedRadius, 8f + (maxPulse * 15f), 20f, dynamicRotation, colorVibrant.copy(alpha = 0.8f))
                     } else {
-                        val bassRadius = radius + 30f + (bassAvg * 80f)
-                        val midRadius = radius + 60f + (midAvg * 70f)
-                        val trebleRadius = radius + 90f + (trebleAvg * 60f)
-                        drawGlitchRing(bassRadius, 8f + (bassAvg * 15f), 20f - (bassAvg * 10f), dynamicRotation, colorDominant.copy(alpha = 0.8f))
-                        drawGlitchRing(midRadius, 4f + (midAvg * 10f), 30f, dynamicFastRotation, colorVibrant.copy(alpha = 0.6f))
-                        drawGlitchRing(trebleRadius, 2f + (trebleAvg * 5f), 45f, dynamicRotation * 0.5f, colorMuted.copy(alpha = 0.5f))
+                        val bassRadius = radius + 30f + (bAvg * 80f)
+                        val midRadius = radius + 60f + (mAvg * 70f)
+                        val trebleRadius = radius + 90f + (tAvg * 60f)
+                        drawGlitchRing(bassRadius, 8f + (bAvg * 15f), 20f - (bAvg * 10f), dynamicRotation, colorDominant.copy(alpha = 0.8f))
+                        drawGlitchRing(midRadius, 4f + (mAvg * 10f), 30f, dynamicFastRotation, colorVibrant.copy(alpha = 0.6f))
+                        drawGlitchRing(trebleRadius, 2f + (tAvg * 5f), 45f, dynamicRotation * 0.5f, colorMuted.copy(alpha = 0.5f))
                     }
                 }
                 VisualizerStyle.AURA -> {
+                    val bAvg = bassAvg()
+                    val mAvg = midAvg()
+                    val tAvg = trebleAvg()
                     if (visualizerArchetype == 1) {
-                        val maxPulse = maxOf(bassAvg, midAvg, trebleAvg)
+                        val maxPulse = maxOf(bAvg, mAvg, tAvg)
                         drawPath(path = basePath, color = colorVibrant.copy(alpha = 0.2f + 0.2f * maxPulse.coerceIn(0f, 1f)), style = Stroke(width = 60f + maxPulse * 150f, join = StrokeJoin.Round))
                     } else {
-                        val bassPulse = (bassAvg * 1.5f).coerceIn(0f, 1f)
-                        val midPulse = (midAvg * 1.5f).coerceIn(0f, 1f)
-                        val treblePulse = (trebleAvg * 1.5f).coerceIn(0f, 1f)
-                        drawPath(path = basePath, color = colorDominant.copy(alpha = 0.1f + 0.1f * bassPulse), style = Stroke(width = 80f + bassAvg * 200f, join = StrokeJoin.Round))
-                        drawPath(path = basePath, color = colorVibrant.copy(alpha = 0.15f + 0.15f * midPulse), style = Stroke(width = 40f + midAvg * 100f, join = StrokeJoin.Round))
-                        drawPath(path = basePath, color = colorMuted.copy(alpha = 0.25f + 0.25f * treblePulse), style = Stroke(width = 15f + trebleAvg * 50f, join = StrokeJoin.Round))
+                        val bassPulse = (bAvg * 1.5f).coerceIn(0f, 1f)
+                        val midPulse = (mAvg * 1.5f).coerceIn(0f, 1f)
+                        val treblePulse = (tAvg * 1.5f).coerceIn(0f, 1f)
+                        drawPath(path = basePath, color = colorDominant.copy(alpha = 0.1f + 0.1f * bassPulse), style = Stroke(width = 80f + bAvg * 200f, join = StrokeJoin.Round))
+                        drawPath(path = basePath, color = colorVibrant.copy(alpha = 0.15f + 0.15f * midPulse), style = Stroke(width = 40f + mAvg * 100f, join = StrokeJoin.Round))
+                        drawPath(path = basePath, color = colorMuted.copy(alpha = 0.25f + 0.25f * treblePulse), style = Stroke(width = 15f + tAvg * 50f, join = StrokeJoin.Round))
                     }
                 }
                 VisualizerStyle.BANDS -> { /* Drawn in background */ }
@@ -642,11 +654,17 @@ fun PlayerVisualizerCanvas(
             }
         } else {
             if (visualizerArchetype == 1) {
-                drawLayer(combinedAmplitudes, paletteColors.vibrant, maxOf(bassOpacity, midOpacity, highOpacity), true, 1.0f)
+                drawLayer(combinedAmplitudes(), paletteColors.vibrant, maxOf(bassOpacity(), midOpacity(), highOpacity()), true, 1.0f)
             } else {
-                drawLayer(bassAmplitudes, paletteColors.dominant, bassOpacity, true, 1.5f)
-                drawLayer(midAmplitudes, paletteColors.vibrant, midOpacity, false, 1.0f)
-                drawLayer(highAmplitudes, paletteColors.muted, highOpacity, false, 0.6f)
+                if (currentStyle == VisualizerStyle.TRAP_NATION) {
+                    drawLayer(bassAmplitudes(), paletteColors.dominant, bassOpacity(), true, 1.0f)
+                    drawLayer(midAmplitudes(), paletteColors.vibrant, midOpacity(), false, 1.4f)
+                    drawLayer(highAmplitudes(), paletteColors.muted, highOpacity(), false, 1.8f)
+                } else {
+                    drawLayer(bassAmplitudes(), paletteColors.dominant, bassOpacity(), true, 1.5f)
+                    drawLayer(midAmplitudes(), paletteColors.vibrant, midOpacity(), false, 1.0f)
+                    drawLayer(highAmplitudes(), paletteColors.muted, highOpacity(), false, 0.6f)
+                }
             }
         }
 
@@ -685,7 +703,7 @@ fun PlayerVisualizerCanvas(
                 progressMeasure.getSegment(startD, endD, progressPath, true)
             } else {
                 progressMeasure.getSegment(startD, pLen, progressPath, true)
-                progressMeasure.getSegment(0f, endD % pLen, progressPath, true)
+                progressMeasure.getSegment(0f, endD % pLen, progressPath, false)
             }
             if (!cleanUiMode) drawPath(path = progressPath, brush = sweepGradient, style = Stroke(width = 6f, cap = StrokeCap.Round))
             val thumbDist = endD % pLen

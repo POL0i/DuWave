@@ -85,6 +85,7 @@ fun main() = application {
     Window(
         onCloseRequest = ::exitApplication,
         title = "DuWave",
+        icon = painterResource("drawable/logo.png"),
         onPreviewKeyEvent = { keyEvent ->
             if (keyEvent.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
                 val keyName = keyEvent.key.toString()
@@ -248,6 +249,7 @@ fun main() = application {
         
         val isMicModeActive by playerViewModel.isMicModeActive.collectAsState()
         val selectedAudioDevice by playerViewModel.selectedAudioDevice.collectAsState()
+        val bgStyle by prefs.backgroundStyleFlow.collectAsState()
         
         androidx.compose.runtime.LaunchedEffect(isMicModeActive, selectedAudioDevice) {
             visualizerManager.stopMicMode()
@@ -256,7 +258,7 @@ fun main() = application {
             }
         }
 
-        com.example.beatpulse.theme.BeatPulseTheme { com.example.beatpulse.ui.AppScreen(
+        com.example.beatpulse.theme.BeatPulseTheme(isPixelArt = bgStyle == 8 || bgStyle == 4) { com.example.beatpulse.ui.AppScreen(
             prefs = prefs,
             libraryViewModel = libraryViewModel,
             playerViewModel = playerViewModel,

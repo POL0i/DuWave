@@ -42,6 +42,14 @@ fun EcosystemScreen(
     val discoveredDevices by EcosystemManager.discovery.discoveredDevices.collectAsState()
     var client by remember { mutableStateOf<EcosystemClient?>(null) }
     var connectionStatus by remember { mutableStateOf("") }
+
+    val strSearchingDevice = getLocalizedString("eco_searching_device")
+    val strCouldNotConnect = getLocalizedString("eco_could_not_connect_to")
+    val strUnexpectedError = getLocalizedString("eco_unexpected_error")
+    val strDeviceNotFound = getLocalizedString("eco_device_not_found")
+    val strConnectingTo = getLocalizedString("eco_connecting_to")
+    val strDeviceFound = getLocalizedString("eco_device_found")
+
     
     var remoteFolders by remember { mutableStateOf<List<SyncFolder>>(emptyList()) }
     var selectedFolder by remember { mutableStateOf<SyncFolder?>(null) }
@@ -49,12 +57,16 @@ fun EcosystemScreen(
     
     val repository = GlobalContext.get().get<MusicRepository>()
 
+    LaunchedEffect(Unit) {
+        EcosystemManager.startEcosystem()
+    }
+
     Column(modifier = Modifier.fillMaxSize()) {
         TopAppBar(
             title = { Text(getLocalizedString("song_transfer"), color = dynamicTextColor) },
             navigationIcon = {
                 IconButton(onClick = onNavigateBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Volver", tint = paletteColors.vibrant)
+                    Icon(Icons.Default.ArrowBack, contentDescription = getLocalizedString("eco_back"), tint = paletteColors.vibrant)
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
@@ -114,10 +126,10 @@ fun EcosystemScreen(
                             onClick = {
                                 if (inputPin.length == 4) {
                                     isPairing = true
-                                    connectionStatus = "Buscando dispositivo..."
+                                    connectionStatus = strSearchingDevice
                                     EcosystemManager.discovery.pairWithPin(inputPin) { success ->
                                         if (success) {
-                                            connectionStatus = "¡Dispositivo encontrado! Conectando..."
+                                            connectionStatus = strDeviceFound
                                             val devices = EcosystemManager.discovery.discoveredDevices.value
                                             val firstDevice = devices.entries.firstOrNull()
                                             if (firstDevice != null) {
@@ -128,18 +140,18 @@ fun EcosystemScreen(
                                                         connectionStatus = ""
                                                         remoteFolders = newClient.getFolders()
                                                     } else {
-                                                        connectionStatus = "No se pudo conectar a ${firstDevice.value}"
+                                                        connectionStatus = strCouldNotConnect.replace("%1\$s", firstDevice.value)
                                                         newClient.close()
                                                         isPairing = false
                                                     }
                                                 }
                                             } else {
                                                 isPairing = false
-                                                connectionStatus = "Error inesperado al conectar."
+                                                connectionStatus = strUnexpectedError
                                             }
                                         } else {
                                             isPairing = false
-                                            connectionStatus = "No se pudo encontrar el dispositivo. Revisa el código."
+                                            connectionStatus = strDeviceNotFound
                                         }
                                     }
                                 }
@@ -151,7 +163,7 @@ fun EcosystemScreen(
                             if (isPairing) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), color = paletteColors.dominant)
                             } else {
-                                Text("Vincular", color = paletteColors.dominant)
+                                Text(getLocalizedString("eco_pair"), color = paletteColors.dominant)
                             }
                         }
                     }
@@ -164,7 +176,7 @@ fun EcosystemScreen(
                 
                 if (discoveredDevices.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(16.dp))
-                    Text("Dispositivos Encontrados", style = MaterialTheme.typography.titleSmall, color = dynamicTextColor)
+                    Text(getLocalizedString("eco_found_devices"), style = MaterialTheme.typography.titleSmall, color = dynamicTextColor)
                     LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
                         items(discoveredDevices.toList()) { (ip, name) ->
                             ListItem(
@@ -173,14 +185,14 @@ fun EcosystemScreen(
                                 leadingContent = { Icon(Icons.Default.Computer, contentDescription = null, tint = paletteColors.vibrant) },
                                 modifier = Modifier.clickable {
                                     coroutineScope.launch {
-                                        connectionStatus = "Conectando a $name..."
+                                        connectionStatus = strConnectingTo.replace("%1\$s", name)
                                         val newClient = EcosystemClient(ip)
                                         if (newClient.handshake()) {
                                             client = newClient
                                             connectionStatus = ""
                                             remoteFolders = newClient.getFolders()
                                         } else {
-                                            connectionStatus = "No se pudo conectar a $name"
+                                            connectionStatus = strCouldNotConnect.replace("%1\$s", name)
                                             newClient.close()
                                         }
                                     }
@@ -201,11 +213,11 @@ fun EcosystemScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
                 ) {
-                    Text("Desconectar", color = paletteColors.dominant)
+                    Text(getLocalizedString("eco_disconnect"), color = paletteColors.dominant)
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    "Listas Disponibles",
+                    getLocalizedString("eco_available_lists"),
                     style = MaterialTheme.typography.titleMedium,
                     color = dynamicTextColor
                 )
@@ -235,7 +247,7 @@ fun EcosystemScreen(
             Row(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { selectedFolder = null }) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Volver a Listas", tint = paletteColors.vibrant)
+                        Icon(Icons.Default.ArrowBack, contentDescription = getLocalizedString("eco_back_to_lists"), tint = paletteColors.vibrant)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
@@ -300,7 +312,7 @@ fun EcosystemScreen(
                     } else {
                         Icon(Icons.Default.SelectAll, contentDescription = null, tint = paletteColors.dominant, modifier = Modifier.size(20.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Descargar Todo", color = paletteColors.dominant)
+                        Text(getLocalizedString("eco_download_all"), color = paletteColors.dominant)
                     }
                 }
             }
@@ -337,7 +349,7 @@ fun EcosystemScreen(
                             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp)
                         ) {
                             if (isDuplicate || isDownloaded) {
-                                Icon(Icons.Default.Check, contentDescription = "Listo", tint = paletteColors.vibrant)
+                                Icon(Icons.Default.Check, contentDescription = getLocalizedString("eco_done"), tint = paletteColors.vibrant)
                             } else if (isDownloading) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp), color = paletteColors.vibrant)
                             } else {
@@ -380,7 +392,7 @@ fun EcosystemScreen(
                                         isDownloading = false
                                     }
                                 }) {
-                                    Icon(Icons.Default.CloudDownload, contentDescription = "Descargar", tint = dynamicTextColor)
+                                    Icon(Icons.Default.CloudDownload, contentDescription = getLocalizedString("eco_download"), tint = dynamicTextColor)
                                 }
                             }
                         }

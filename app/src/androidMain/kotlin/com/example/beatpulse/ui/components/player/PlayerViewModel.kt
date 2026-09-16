@@ -464,7 +464,11 @@ class PlayerViewModel(
                                         .setAlbumTitle(track.customAlbum ?: track.album)
                                         .setIsPlayable(true)
                                         .apply {
-                                            if (!track.customCoverPath.isNullOrEmpty()) {
+                                            val fingerprint = com.example.beatpulse.ui.components.ThumbnailCache.getTrackFingerprint(track)
+                                            val cachedFile = java.io.File(context.cacheDir, "full_${fingerprint}.jpg")
+                                            if (cachedFile.exists() && cachedFile.length() > 0L) {
+                                                setArtworkUri(android.net.Uri.parse("appcache://$fingerprint"))
+                                            } else if (!track.customCoverPath.isNullOrEmpty()) {
                                                 val path = track.customCoverPath
                                                 setArtworkUri(android.net.Uri.parse(if (path.startsWith("/")) "file://$path" else path))
                                             }
@@ -576,7 +580,11 @@ class PlayerViewModel(
                         .setIsBrowsable(false)
                         .setIsPlayable(true)
                         .apply {
-                            if (!it.customCoverPath.isNullOrEmpty()) {
+                            val fingerprint = com.example.beatpulse.ui.components.ThumbnailCache.getTrackFingerprint(it)
+                            val cachedFile = java.io.File(context.cacheDir, "full_${fingerprint}.jpg")
+                            if (cachedFile.exists() && cachedFile.length() > 0L) {
+                                setArtworkUri(android.net.Uri.parse("appcache://$fingerprint"))
+                            } else if (!it.customCoverPath.isNullOrEmpty()) {
                                 val path = it.customCoverPath
                                 setArtworkUri(android.net.Uri.parse(if (path.startsWith("/")) "file://$path" else path))
                             }
@@ -652,62 +660,24 @@ class PlayerViewModel(
         }
         withContext(Dispatchers.IO) {
             try {
-                var bitmap: android.graphics.Bitmap? = null
-                if (!track.customCoverPath.isNullOrEmpty()) {
-                    if (track.customCoverPath.startsWith("http")) {
-                        try {
-                            val request = okhttp3.Request.Builder().url(track.customCoverPath).build()
-                            val response = okhttp3.OkHttpClient().newCall(request).execute()
-                            response.body?.byteStream()?.use { inputStream ->
-                                bitmap = BitmapFactory.decodeStream(inputStream)
-                            }
-                        } catch (e: Exception) {
-                            // fallback
-                        }
-                    } else {
-                        val customFile = java.io.File(track.customCoverPath)
-                        if (customFile.exists()) {
-                            bitmap = BitmapFactory.decodeFile(customFile.absolutePath)
-                        } else {
-                            val uri = android.net.Uri.parse(track.customCoverPath)
-                            try {
-                                val inputStream = context.contentResolver.openInputStream(uri)
-                                bitmap = BitmapFactory.decodeStream(inputStream)
-                                inputStream?.close()
-                            } catch (e: Exception) {
-                                // fallback
-                            }
-                        }
-                    }
-                }
-                
-                if (bitmap == null && !track.dataPath.startsWith("youtube://")) {
-                    try {
-                        val mmr = MediaMetadataRetriever()
-                        mmr.setDataSource(track.dataPath)
-                        val data = mmr.embeddedPicture
-                        mmr.release()
-                        if (data != null) {
-                            bitmap = BitmapFactory.decodeByteArray(data, 0, data.size)
-                        }
-                    } catch (e: Exception) {}
-                }
-
-                if (bitmap != null) {
-                    val palette = Palette.from(bitmap!!.asImageBitmap()).generate()
-                    val dominantRaw = (palette.dominantSwatch?.rgb ?: android.graphics.Color.DKGRAY)
+                val imageBitmap = com.example.beatpulse.ui.components.ThumbnailCache.loadThumbnail(context, track)
+                if (imageBitmap != null) {
+                    val palette = Palette.from(imageBitmap).generate()
+                    val dominantRaw = (palette.getDominantColor(android.graphics.Color.DKGRAY))
                     val colors = PaletteColors(
                         dominant = Color(dominantRaw),
-                        vibrant = Color((palette.vibrantSwatch?.rgb ?: dominantRaw)),
-                        muted = Color((palette.mutedSwatch?.rgb ?: dominantRaw)),
-                        darkVibrant = Color((palette.darkVibrantSwatch?.rgb ?: dominantRaw)),
-                        lightVibrant = Color((palette.lightVibrantSwatch?.rgb ?: dominantRaw)),
-                        darkMuted = Color((palette.darkMutedSwatch?.rgb ?: dominantRaw))
+                        vibrant = Color((palette.getVibrantColor(dominantRaw))),
+                        muted = Color((palette.getMutedColor(dominantRaw))),
+                        darkVibrant = Color((palette.getDarkVibrantColor(dominantRaw))),
+                        lightVibrant = Color((palette.getLightVibrantColor(dominantRaw))),
+                        darkMuted = Color((palette.getDarkMutedColor(dominantRaw)))
                     )
                     PaletteCache.put(fingerprint, colors)
                     _paletteColors.value = colors
                 } else {
-                    _paletteColors.value = PaletteColors()
+                    val defaultColors = PaletteColors()
+                    PaletteCache.put(fingerprint, defaultColors)
+                    _paletteColors.value = defaultColors
                 }
             } catch (e: Exception) {
                 _paletteColors.value = PaletteColors()

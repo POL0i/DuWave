@@ -90,11 +90,13 @@ class DummyAppPreferences : AppPreferences {
     override var hasUsedPlaylistSwipeGesture = true
     override var coverOffsetX = 0f
     override var coverOffsetY = 0f
+    override var coverScale = 1f
+    override var vibrateOnVinyl: Boolean = true
+    override val vibrateOnVinylFlow: StateFlow<Boolean> = MutableStateFlow(true)
     override var showGestureConfirmations = true
     override var streamAvatarUri: String? = null
     override var lastVerifiedNewPipeVersion = "v0.26.5"
     override var lastServiceDownState = false
-    override var coverScale = 1f
     
     private val _isPatreonUnlockedFlow = MutableStateFlow(false)
     override val isPatreonUnlockedFlow: StateFlow<Boolean> = _isPatreonUnlockedFlow

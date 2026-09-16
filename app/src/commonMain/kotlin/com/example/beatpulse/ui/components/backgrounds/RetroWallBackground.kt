@@ -57,17 +57,19 @@ fun RetroWallBackground(
         animationSpec = androidx.compose.animation.core.tween(150)
     )
 
-    // Continuous scroll time
+    val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
+
     var timeMillis by remember { mutableStateOf(0L) }
-    LaunchedEffect(isPlayerScreen) {
-        if (isPlayerScreen) {
-            var lastTime = withFrameNanos { it }
-            while (isActive) {
-                val currentTime = withFrameNanos { it }
+    LaunchedEffect(Unit) {
+        var lastTime = 0L
+        while (isActive) {
+            withFrameNanos { currentTime ->
+                if (lastTime == 0L) lastTime = currentTime
                 val dt = ((currentTime - lastTime) / 1_000_000f)
                 timeMillis += dt.toLong()
                 lastTime = currentTime
             }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
 

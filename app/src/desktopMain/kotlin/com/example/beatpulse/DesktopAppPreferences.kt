@@ -294,6 +294,15 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
         get() = getFloat("coverScale", 1f)
         set(value) = setFloat("coverScale", value)
 
+    private val _vibrateOnVinylFlow = MutableStateFlow(getBoolean("vibrateOnVinyl", true))
+    override val vibrateOnVinylFlow: StateFlow<Boolean> = _vibrateOnVinylFlow
+    override var vibrateOnVinyl: Boolean
+        get() = _vibrateOnVinylFlow.value
+        set(value) {
+            _vibrateOnVinylFlow.value = value
+            setBoolean("vibrateOnVinyl", value)
+        }
+
     private val _isPatreonUnlockedFlow = MutableStateFlow(getBoolean("isPatreonUnlocked", false))
     override val isPatreonUnlockedFlow: StateFlow<Boolean> = _isPatreonUnlockedFlow
     override var isPatreonUnlocked: Boolean

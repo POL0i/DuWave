@@ -130,14 +130,16 @@ fun Y2KBackground(
     val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
     
+    var time by remember { mutableFloatStateOf(0f) }
+    
     LaunchedEffect(Unit) {
         var smoothEnergy = 0f
         var lastTime = 0L
         while (true) {
-            withFrameMillis { time ->
-                if (lastTime == 0L) lastTime = time
-                val dt = ((time - lastTime) / 1000f).coerceAtMost(0.1f)
-                lastTime = time
+            withFrameMillis { frameTime ->
+                if (lastTime == 0L) lastTime = frameTime
+                val dt = ((frameTime - lastTime) / 1000f).coerceAtMost(0.1f)
+                lastTime = frameTime
                 
                 val currentAmps = amplitudesState.value
                 var sumAmps = 0f
@@ -150,16 +152,12 @@ fun Y2KBackground(
                 smoothEnergy += (rawEnergy - smoothEnergy) * (1f - kotlin.math.exp(-15f * dt))
                 val reactFactor = if (currentIsPlayerScreen) 0.8f else 0.2f
                 dynamicEnergy = smoothEnergy * reactFactor
+                
+                time += dt * 10f
             }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "y2k_anim")
-    val time by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 10000f,
-        animationSpec = infiniteRepeatable(tween(1000000, easing = LinearEasing), RepeatMode.Restart),
-        label = "time"
-    )
 
     val runtimeShader = remember {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

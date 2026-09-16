@@ -326,6 +326,15 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
         get() = prefs.getFloat("coverScale", 1.0f)
         set(value) = prefs.edit().putFloat("coverScale", value).apply()
 
+    private val _vibrateOnVinylFlow = MutableStateFlow(prefs.getBoolean("vibrateOnVinyl", true))
+    override val vibrateOnVinylFlow: StateFlow<Boolean> = _vibrateOnVinylFlow
+    override var vibrateOnVinyl: Boolean
+        get() = _vibrateOnVinylFlow.value
+        set(value) {
+            _vibrateOnVinylFlow.value = value
+            prefs.edit().putBoolean("vibrateOnVinyl", value).apply()
+        }
+
     private val _isPatreonUnlockedFlow = MutableStateFlow(prefs.getBoolean("isPatreonUnlocked", false))
     override val isPatreonUnlockedFlow: StateFlow<Boolean> = _isPatreonUnlockedFlow
     override var isPatreonUnlocked: Boolean

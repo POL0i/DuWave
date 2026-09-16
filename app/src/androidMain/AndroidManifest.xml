@@ -50,6 +50,9 @@
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService"/>
             </intent-filter>
+            <meta-data
+                android:name="androidx.media3.session.default_notification_icon"
+                android:resource="@drawable/ic_notification_logo" />
         </service>
 
         <service

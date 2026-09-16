@@ -92,6 +92,8 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     override var coverOffsetX: Float = 0f
     override var coverOffsetY: Float = 0f
     override var coverScale: Float = 1f
+    override var vibrateOnVinyl: Boolean = true
+    override val vibrateOnVinylFlow: StateFlow<Boolean> = MutableStateFlow(true)
     private val _isPatreonUnlockedFlow = MutableStateFlow(false)
     override val isPatreonUnlockedFlow: StateFlow<Boolean> = _isPatreonUnlockedFlow
     override var isPatreonUnlocked: Boolean

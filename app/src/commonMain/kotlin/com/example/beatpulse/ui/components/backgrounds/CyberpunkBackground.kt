@@ -60,24 +60,27 @@ fun CyberpunkBackground(
                 
                 // --- LOOP_HOOK ---
             }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
 
     
     val infiniteTransition = rememberInfiniteTransition(label = "cyberpunk_anim")
-    val glowPulse by infiniteTransition.animateFloat(
+    val glowPulseState = infiniteTransition.animateFloat(
         initialValue = 0.8f,
         targetValue = 1.2f,
         animationSpec = infiniteRepeatable(tween(4000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "glow_pulse"
     )
+    val glowPulse = if (isPlayerScreen) glowPulseState.value else 0.8f
     
-    val flowPhase by infiniteTransition.animateFloat(
+    val flowPhaseState = infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 1000f,
         animationSpec = infiniteRepeatable(tween(20000, easing = LinearEasing), RepeatMode.Reverse),
         label = "flow_phase"
     )
+    val flowPhase = if (isPlayerScreen) flowPhaseState.value else 0f
 
     // Particle system state
     val numLasers = if (isPlayerScreen) 45 else 12
@@ -131,6 +134,7 @@ fun CyberpunkBackground(
                     val safeDt = dt.coerceAtMost(0.1f)
                     lasers.forEach { it.update(safeDt, dynamicEnergy) }
                 }
+                if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
             }
         }
         

@@ -47,18 +47,21 @@ fun FountainBackground(
     val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val isActiveApp = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
 
-    var timeFloat by remember { mutableStateOf(0f) }
-    LaunchedEffect(isPlayerScreen, isActiveApp) {
+    var timeFloat by remember { mutableFloatStateOf(0f) }
+    val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
+    
+    LaunchedEffect(isActiveApp) {
         if (!isActiveApp) return@LaunchedEffect
-        var lastTime = withFrameNanos { it / 1_000_000L }
+        var lastTime = 0L
         while (isActive) {
-            withFrameNanos { frameTime ->
-                val currentTime = frameTime / 1_000_000L
-                val dt = currentTime - lastTime
-                lastTime = currentTime
-                // Float precision prevents the trembling that happened with Long truncation
-                timeFloat += if (isPlayerScreen) (dt / 1000f) else (dt / 1000f * 0.4f)
+            withFrameMillis { frameTime ->
+                if (lastTime == 0L) lastTime = frameTime
+                val dt = ((frameTime - lastTime) / 1000f).coerceAtMost(0.1f)
+                lastTime = frameTime
+                
+                timeFloat += dt
             }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
 

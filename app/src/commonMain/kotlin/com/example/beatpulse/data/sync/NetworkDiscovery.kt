@@ -148,7 +148,7 @@ class NetworkDiscovery(private val deviceName: String = "DuWave Device") {
                         tempSocket.send(Datagram(buildPacket { writeText(packetData) }, broadcastAddress))
                     } catch (e: Exception) {}
                     
-                    val subnets = listOf("192.168.100.", "192.168.1.", "192.168.0.", "10.0.0.", "172.16.0.", "192.168.18.")
+                    val subnets = listOf("192.168.100.", "192.168.1.", "192.168.0.", "10.0.0.", "172.16.0.", "192.168.18.", "192.168.68.", "192.168.50.", "192.168.8.", "192.168.15.", "192.168.2.", "192.168.3.", "10.0.1.")
                     for (subnet in subnets) {
                         for (i in 1..254) {
                             if (!isActive) return@launch

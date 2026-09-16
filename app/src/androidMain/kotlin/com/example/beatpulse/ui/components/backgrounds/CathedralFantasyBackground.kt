@@ -105,15 +105,17 @@ fun CathedralFantasyBackground(
     val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
 
+    var time by remember { mutableFloatStateOf(0f) }
+    
     LaunchedEffect(Unit) {
         var smoothEnergy = 0f
         var lastTime = 0L
         while (true) {
-            withFrameMillis { time ->
-                if (lastTime == 0L) lastTime = time
-                val dt = ((time - lastTime) / 1000f).coerceAtMost(0.1f)
-                lastTime = time
-
+            withFrameMillis { frameTime ->
+                if (lastTime == 0L) lastTime = frameTime
+                val dt = ((frameTime - lastTime) / 1000f).coerceAtMost(0.1f)
+                lastTime = frameTime
+                
                 val currentAmps = amplitudesState.value
                 var sumAmps = 0f
                 val limit = if (currentAmps.size < 24) currentAmps.size else 24
@@ -121,19 +123,15 @@ fun CathedralFantasyBackground(
                     sumAmps += currentAmps[i]
                 }
                 val rawEnergy = if (limit > 0) sumAmps / limit else 0f
-
+                
                 smoothEnergy += (rawEnergy - smoothEnergy) * (1f - kotlin.math.exp(-15f * dt))
-                dynamicEnergy = smoothEnergy * 0.8f // Keep it dynamic on both screens!
+                dynamicEnergy = smoothEnergy * 0.8f
+                
+                time += dt * 10f
             }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "ash_fall")
-    val time by infiniteTransition.animateFloat(
-        initialValue = 0f, targetValue = 100000f,
-        animationSpec = infiniteRepeatable(tween(10000000, easing = LinearEasing), RepeatMode.Restart),
-        label = "time"
-    )
 
     val deepBlack = Color(0xFF030305)
     val darkBlueGrey = Color(0xFF10121A)

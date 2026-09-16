@@ -131,10 +131,12 @@ fun LibraryScreen(
     currentPlayingTrack: TrackEntity?,
     isPlaying: Boolean,
     onTrackClick: (TrackEntity, List<TrackEntity>) -> Unit,
-    onPausePlayback: () -> Unit = {}
+    onPausePlayback: () -> Unit = {},
+    onResumePlayback: () -> Unit = {}
 ) {
     val prefs = viewModel.prefs
     val shapeIdx by prefs.thumbnailShapeFlow.collectAsState(initial = 0)
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
     val onRescan = { viewModel.scanMediaStore() }
     var selectedTabIndex by remember { mutableIntStateOf(prefs.lastLibraryGeneralTab) }
     LaunchedEffect(selectedTabIndex) {
@@ -183,6 +185,8 @@ fun LibraryScreen(
     var trackPendingTrim by remember { mutableStateOf<TrackEntity?>(null) }
 
     var shazamPhase by remember { mutableStateOf(0) }
+    var pauseMusicForShazam by remember { mutableStateOf(false) }
+    var shazamJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var listeningProgress by remember { mutableFloatStateOf(0f) }
     var listeningAmplitude by remember { mutableFloatStateOf(0f) }
     val musicRecognizer = remember { MusicRecognizer() }
@@ -260,16 +264,25 @@ fun LibraryScreen(
 
     val bgStyle by prefs.backgroundStyleFlow.collectAsState()
     val isDarkTheme = isSystemInDarkTheme()
-    val dynamicTextColor = remember(bgStyle, paletteColors.dominant, isDarkTheme) {
-        val isBackgroundLight = when (bgStyle) {
-            0 -> !isDarkTheme
-            1 -> false
-            2, 4 -> paletteColors.dominant.luminance() > 0.3f
-            3 -> true
-            5, 6, 7, 8 -> false
-            else -> paletteColors.dominant.luminance() > 0.5f
+    val dynamicTextColor = remember(bgStyle, paletteColors, isDarkTheme) {
+                if (bgStyle == 3) {
+            val colors = listOf(paletteColors.lightVibrant, paletteColors.vibrant, paletteColors.muted, paletteColors.dominant)
+            val brightestColor = colors.filter { it != androidx.compose.ui.graphics.Color.Unspecified }.maxByOrNull { it.luminance() } ?: androidx.compose.ui.graphics.Color.White
+            if (brightestColor.luminance() < 0.6f) {
+                androidx.compose.ui.graphics.lerp(brightestColor, androidx.compose.ui.graphics.Color.White, 0.5f)
+            } else {
+                brightestColor
+            }
+        } else {
+            val isBackgroundLight = when (bgStyle) {
+                0 -> !isDarkTheme
+                1 -> false
+                2, 4 -> paletteColors.dominant.luminance() > 0.3f
+                5, 6, 7, 8 -> false
+                else -> paletteColors.dominant.luminance() > 0.5f
+            }
+            if (isBackgroundLight) androidx.compose.ui.graphics.Color(0xFF121212) else androidx.compose.ui.graphics.Color.White
         }
-        if (isBackgroundLight) Color(0xFF121212) else Color.White
     }
 
     var accumulatedDrag by remember { mutableFloatStateOf(0f) }
@@ -451,6 +464,7 @@ fun LibraryScreen(
                                                     if (isOnlineServiceDown && track.dataPath.startsWith("youtube://")) {
                                                         // Do nothing
                                                     } else {
+                                                        keyboardController?.hide()
                                                         onTrackClick(track, tracks) 
                                                     }
                                                 },
@@ -488,6 +502,7 @@ fun LibraryScreen(
                                         if (isOnlineServiceDown && track.dataPath.startsWith("youtube://")) {
                                             // Do nothing if service is down and it's an online track
                                         } else {
+                                            keyboardController?.hide()
                                             onTrackClick(track, itemsToShow) 
                                         }
                                     },
@@ -580,7 +595,6 @@ fun LibraryScreen(
              }
              AnimatedVisibility(visible = isSearchExpanded) {
                  Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 8.dp)) {
-                     val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
                      OutlinedTextField(
                          value = if (isSearchingOnline) onlineSearchQuery else localSearchQuery,
                          onValueChange = { if (isSearchingOnline) viewModel.searchQuery.value = it else localSearchQuery = it },
@@ -615,10 +629,12 @@ fun LibraryScreen(
                      )
                      if (isSearchingOnline) {
                          fun startRecognition() {
-                             scope.launch {
+                             shazamJob = scope.launch {
                                  recognitionResult = null
                                  recognitionError = null
-                                 onPausePlayback()
+                                 if (pauseMusicForShazam) {
+                                     onPausePlayback()
+                                 }
                                  shazamPhase = 1
                                  listeningProgress = 0f
                                  
@@ -792,14 +808,18 @@ fun LibraryScreen(
         }
 
         // Listening dialog
-        // Listening dialog
         if (shazamPhase > 0) {
+            val sqDist = (colorVibrant.red - paletteColors.dominant.red) * (colorVibrant.red - paletteColors.dominant.red) +
+                         (colorVibrant.green - paletteColors.dominant.green) * (colorVibrant.green - paletteColors.dominant.green) +
+                         (colorVibrant.blue - paletteColors.dominant.blue) * (colorVibrant.blue - paletteColors.dominant.blue)
+            val intelligentAccentColor = if (sqDist < 0.05f) dynamicTextColor else colorVibrant
+
             AlertDialog(
                 onDismissRequest = { /* Modal, espera a que termine */ },
                 title = { 
                     val titleText = when (shazamPhase) {
-                        1 -> "Verificando Servidor"
-                        2 -> "Iniciando Servidor"
+                        1 -> getLocalizedString("shazam_verifying_server")
+                        2 -> getLocalizedString("shazam_starting_server")
                         else -> getLocalizedString("shazam_listening_title")
                     }
                     Text(titleText, color = dynamicTextColor) 
@@ -821,7 +841,7 @@ fun LibraryScreen(
                                             repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
                                         ), label = "wifiAlpha"
                                     )
-                                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(64.dp).alpha(alpha), tint = colorVibrant)
+                                    Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(64.dp).alpha(alpha), tint = intelligentAccentColor)
                                 }
                                 2 -> {
                                     val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition(label = "power")
@@ -832,29 +852,58 @@ fun LibraryScreen(
                                             repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
                                         ), label = "powerScale"
                                     )
-                                    Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(64.dp).scale(scale), tint = colorVibrant)
+                                    Icon(Icons.Default.PowerSettingsNew, contentDescription = null, modifier = Modifier.size(64.dp).scale(scale), tint = intelligentAccentColor)
                                 }
                                 else -> {
-                                    Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(64.dp), tint = colorVibrant)
+                                    Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(64.dp), tint = intelligentAccentColor)
                                 }
                             }
                         }
                         Spacer(Modifier.height(16.dp))
                         val descText = when (shazamPhase) {
-                            1 -> "Comprobando conexión con el servicio..."
-                            2 -> "Despertando el motor de reconocimiento..."
+                            1 -> getLocalizedString("shazam_checking_connection")
+                            2 -> getLocalizedString("shazam_waking_engine")
                             else -> getLocalizedString("shazam_listening_desc")
                         }
                         Text(descText, color = dynamicTextColor, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                         Spacer(Modifier.height(16.dp))
                         if (shazamPhase == 3) {
-                            MicVisualizer(progress = listeningProgress, amplitude = listeningAmplitude, color = colorVibrant)
+                            MicVisualizer(progress = listeningProgress, amplitude = listeningAmplitude, color = intelligentAccentColor)
                         } else {
-                            androidx.compose.material3.LinearProgressIndicator(color = colorVibrant, trackColor = paletteColors.dominant.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth().height(4.dp))
+                            androidx.compose.material3.LinearProgressIndicator(color = intelligentAccentColor, trackColor = paletteColors.dominant.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth().height(4.dp))
                         }
                     }
                 },
                 confirmButton = { },
+                dismissButton = {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            androidx.compose.material3.Checkbox(
+                                checked = pauseMusicForShazam,
+                                onCheckedChange = { isChecked ->
+                                    pauseMusicForShazam = isChecked
+                                    if (isChecked) {
+                                        onPausePlayback()
+                                    } else {
+                                        onResumePlayback()
+                                    }
+                                },
+                                colors = androidx.compose.material3.CheckboxDefaults.colors(
+                                    checkedColor = intelligentAccentColor,
+                                    uncheckedColor = dynamicTextColor.copy(alpha = 0.6f),
+                                    checkmarkColor = paletteColors.dominant
+                                )
+                            )
+                            Text("Pausar", color = dynamicTextColor, fontSize = 13.sp)
+                        }
+                        TextButton(onClick = {
+                            shazamJob?.cancel()
+                            shazamPhase = 0
+                        }) {
+                            Text(getLocalizedString("cancel"), color = intelligentAccentColor)
+                        }
+                    }
+                },
                 containerColor = paletteColors.dominant
             )
         }
@@ -908,10 +957,12 @@ fun LibraryScreen(
                     TextButton(onClick = {
                         recognitionError = null
                         // Retry: trigger recognition again
-                        scope.launch {
+                        shazamJob = scope.launch {
                             recognitionResult = null
                             recognitionError = null
-                            onPausePlayback()
+                            if (pauseMusicForShazam) {
+                                onPausePlayback()
+                            }
                             shazamPhase = 1
                             listeningProgress = 0f
                             

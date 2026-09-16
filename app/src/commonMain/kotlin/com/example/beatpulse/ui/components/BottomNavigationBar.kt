@@ -203,7 +203,7 @@ fun DotsIndicator(
                 animationSpec = tween(300), label = "indicator"
             )
             val size by animateFloatAsState(
-                targetValue = if (currentPage == p) 10f else 6f,
+                targetValue = if (currentPage == p) { if(com.example.beatpulse.utils.SystemUtils.isMobilePlatform) 10f else 16f } else { if(com.example.beatpulse.utils.SystemUtils.isMobilePlatform) 6f else 10f },
                 animationSpec = tween(300), label = "size"
             )
             Box(

@@ -89,6 +89,38 @@ fun DesignSettingsDialog(
 ) {
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
+    val isDesktop = !com.example.beatpulse.utils.SystemUtils.isMobilePlatform
+    
+    val isPatreonUnlocked by prefs.isPatreonUnlockedFlow.collectAsState()
+    val favoriteStyles by prefs.favoriteBackgroundStylesFlow.collectAsState()
+    
+    val list = mutableListOf(
+        0 to (getLocalizedString("style_classic").takeIf { it != "style_classic" } ?: "Clásico"),
+        1 to (getLocalizedString("style_cyberpunk").takeIf { it != "style_cyberpunk" } ?: "Cyberpunk"),
+        2 to (getLocalizedString("style_anime").takeIf { it != "style_anime" } ?: "Anime"),
+        3 to (getLocalizedString("style_luminous").takeIf { it != "style_luminous" } ?: "Luminoso"),
+        4 to (getLocalizedString("style_kawaii").takeIf { it != "style_kawaii" } ?: "Kawaii"),
+        5 to (getLocalizedString("style_black_metal").takeIf { it != "style_black_metal" } ?: "Black Metal"),
+        6 to (getLocalizedString("style_dark_fantasy").takeIf { it != "style_dark_fantasy" } ?: "Fantasía Oscura"),
+        7 to (getLocalizedString("style_cathedral").takeIf { it != "style_cathedral" } ?: "Catedral"),
+        8 to (getLocalizedString("style_hearts").takeIf { it != "style_hearts" } ?: "Corazones"),
+        14 to "Ojos Lullaby",
+        9 to getLocalizedString("patreon_wall"),
+        10 to "Fuente Oscura",
+        11 to (getLocalizedString("clouds_filter").takeIf { it.isNotBlank() } ?: "Nubes"),
+        12 to "Zen Clear",
+        13 to "Mareas de Arena",
+        15 to (getLocalizedString("style_retro_crt").takeIf { it != "style_retro_crt" } ?: "Retro CRT"),
+        16 to "Procedural CRT"
+    ).map { (id, name) -> id to name.removePrefix("Estilo: ").trim() }.toMutableList()
+    
+    val styles = list
+    
+    val sortedStyles = remember(favoriteStyles, styles) {
+        styles.sortedByDescending { it.first in favoriteStyles }
+    }
+    
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState { (sortedStyles.size + 2) / 3 }
     
     androidx.compose.runtime.LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -104,9 +136,20 @@ fun DesignSettingsDialog(
                 .focusRequester(focusRequester)
                 .focusable()
                 .onKeyEvent { event ->
-                    if (event.type == KeyEventType.KeyDown && event.isAltPressed) {
-                        false
-                    } else false
+                    if (isDesktop && event.type == KeyEventType.KeyDown) {
+                        if (event.key == Key.DirectionRight) {
+                            if (pagerState.currentPage < pagerState.pageCount - 1) {
+                                coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                                return@onKeyEvent true
+                            }
+                        } else if (event.key == Key.DirectionLeft) {
+                            if (pagerState.currentPage > 0) {
+                                coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                                return@onKeyEvent true
+                            }
+                        }
+                    }
+                    false
                 }
                 .fillMaxWidth(0.95f)
                 .widthIn(max = 560.dp)
@@ -123,33 +166,6 @@ fun DesignSettingsDialog(
                 )
                 
                 Spacer(modifier = Modifier.height(24.dp))
-                
-                val styles = listOf(
-                    0 to (getLocalizedString("style_classic").takeIf { it != "style_classic" } ?: "Clásico"),
-                    1 to (getLocalizedString("style_cyberpunk").takeIf { it != "style_cyberpunk" } ?: "Cyberpunk"),
-                    2 to (getLocalizedString("style_anime").takeIf { it != "style_anime" } ?: "Anime"),
-                    3 to (getLocalizedString("style_luminous").takeIf { it != "style_luminous" } ?: "Luminoso"),
-                    4 to (getLocalizedString("style_kawaii").takeIf { it != "style_kawaii" } ?: "Kawaii"),
-                    5 to (getLocalizedString("style_black_metal").takeIf { it != "style_black_metal" } ?: "Black Metal"),
-                    6 to (getLocalizedString("style_dark_fantasy").takeIf { it != "style_dark_fantasy" } ?: "Fantasía Oscura"),
-                    7 to (getLocalizedString("style_cathedral").takeIf { it != "style_cathedral" } ?: "Catedral"),
-                    8 to (getLocalizedString("style_tale_legend").takeIf { it != "style_tale_legend" } ?: "Leyenda"),
-                    14 to "Ojos Lullaby"
-                ).map { (id, name) -> id to name.removePrefix("Estilo: ").trim() }.toMutableList()
-                
-                val isPatreonUnlocked by prefs.isPatreonUnlockedFlow.collectAsState()
-                if (isPatreonUnlocked) {
-                    styles.add(9 to getLocalizedString("patreon_wall"))
-                    styles.add(10 to "Fuente Oscura")
-                    styles.add(11 to (getLocalizedString("clouds_filter").takeIf { it.isNotBlank() } ?: "Nubes"))
-                    styles.add(12 to "Zen Clear")
-                    styles.add(13 to "Mareas de Arena")
-                    styles.add(15 to ((getLocalizedString("style_retro_crt").takeIf { it != "style_retro_crt" } ?: "Retro CRT") + "\nby Kabuto"))
-                    styles.add(16 to "Procedural CRT")
-                }
-                
-                val favoriteStyles by prefs.favoriteBackgroundStylesFlow.collectAsState()
-                val sortedStyles = styles.sortedByDescending { it.first in favoriteStyles }
                 
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -190,8 +206,6 @@ fun DesignSettingsDialog(
                         )
                     }
 
-                    val isPatreonUnlocked by prefs.isPatreonUnlockedFlow.collectAsState()
-                    
                     LazyRow(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -255,7 +269,6 @@ fun DesignSettingsDialog(
                         color = dynamicTextColor,
                         style = MaterialTheme.typography.titleMedium
                     )
-                    val pagerState = androidx.compose.foundation.pager.rememberPagerState { (sortedStyles.size + 2) / 3 }
                     Column(modifier = Modifier.fillMaxWidth()) {
                         androidx.compose.foundation.pager.HorizontalPager(
                             state = pagerState,
@@ -282,11 +295,13 @@ fun DesignSettingsDialog(
                                             name = name,
                                             isSelected = isSelected,
                                             isFavorite = isFavorite,
+                                            isLocked = (idx in 9..16 && idx != 14) && !isPatreonUnlocked,
                                             onToggleFavorite = {
                                                 val newFavorites = favoriteStyles.toMutableSet()
                                                 if (isFavorite) newFavorites.remove(idx) else newFavorites.add(idx)
                                                 prefs.favoriteBackgroundStyles = newFavorites
                                             },
+                                            onLockedClick = { showPatreonUnlockDialog = true },
                                             paletteColors = paletteColors,
                                             dynamicTextColor = dynamicTextColor,
                                             prefs = prefs,
@@ -300,14 +315,17 @@ fun DesignSettingsDialog(
                         }
                         
                         Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.Center) {
+                            val dotSize = if (isDesktop) 10.dp else 5.dp
+                            val dotPadding = if (isDesktop) 6.dp else 2.dp
                             repeat(pagerState.pageCount) { iteration ->
                                 val indicatorColor = if (pagerState.currentPage == iteration) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.2f)
                                 Box(
                                     modifier = Modifier
-                                        .padding(horizontal = 2.dp)
+                                        .padding(horizontal = dotPadding)
+                                        .size(dotSize)
                                         .clip(CircleShape)
                                         .background(indicatorColor)
-                                        .size(5.dp) // Puntos comprimidos
+                                        .then(if (isDesktop) Modifier.clickable { coroutineScope.launch { pagerState.animateScrollToPage(iteration) } } else Modifier)
                                 )
                             }
                         }
@@ -338,7 +356,9 @@ fun StyleGridItem(
     name: String,
     isSelected: Boolean,
     isFavorite: Boolean,
+    isLocked: Boolean = false,
     onToggleFavorite: () -> Unit,
+    onLockedClick: () -> Unit = {},
     paletteColors: PaletteColors,
     dynamicTextColor: Color,
     prefs: AppPreferences,
@@ -362,7 +382,9 @@ fun StyleGridItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .clickable { prefs.backgroundStyle = idx }
+            .clickable { 
+                if (isLocked) onLockedClick() else prefs.backgroundStyle = idx 
+            }
             .padding(4.dp)
     ) {
         Box(
@@ -402,6 +424,20 @@ fun StyleGridItem(
                         15 -> com.example.beatpulse.ui.components.backgrounds.RetroCRTBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = 0.5f, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = false) {}
                         16 -> com.example.beatpulse.ui.components.backgrounds.ProceduralCRTCdc3rxBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = 0.5f, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = false) {}
                         else -> Box(modifier = Modifier.fillMaxSize().background(paletteColors.dominant))
+                    }
+                }
+                
+                if (isLocked) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.85f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = "Patreon Locked",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
                     }
                 }
             }

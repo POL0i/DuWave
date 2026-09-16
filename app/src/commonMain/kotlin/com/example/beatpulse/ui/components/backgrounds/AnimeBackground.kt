@@ -34,52 +34,48 @@ fun AnimeBackground(
     var dynamicEnergy by remember { mutableFloatStateOf(0f) }
     
     // Custom loop to prevent recompositions
-    LaunchedEffect(isPlayerScreen) {
-        if (isPlayerScreen) {
-            var smoothEnergy = 0f
-            var lastTime = 0L
-            while (true) {
-                withFrameMillis { time ->
-                    if (lastTime == 0L) lastTime = time
-                    val dt = ((time - lastTime) / 1000f).coerceAtMost(0.1f)
-                    lastTime = time
-                    
-                    val currentAmps = amplitudesState.value
-                    var sumAmps = 0f
-                    val limit = if (currentAmps.size < 24) currentAmps.size else 24
-                    for (i in 0 until limit) {
-                        sumAmps += currentAmps[i]
-                    }
-                    val rawEnergy = if (limit > 0) sumAmps / limit else 0f
-                    
-                    // Exponential decay interpolation for smoothness
-                    smoothEnergy += (rawEnergy - smoothEnergy) * (1f - kotlin.math.exp(-15f * dt))
-                    val reactFactor = if (currentIsPlayerScreen) 0.8f else 0.2f
-                    dynamicEnergy = smoothEnergy * reactFactor
-                    
-                    // --- LOOP_HOOK ---
+    LaunchedEffect(Unit) {
+        var smoothEnergy = 0f
+        var lastTime = 0L
+        while (true) {
+            withFrameMillis { time ->
+                if (lastTime == 0L) lastTime = time
+                val dt = ((time - lastTime) / 1000f).coerceAtMost(0.1f)
+                lastTime = time
+                
+                val currentAmps = amplitudesState.value
+                var sumAmps = 0f
+                val limit = if (currentAmps.size < 24) currentAmps.size else 24
+                for (i in 0 until limit) {
+                    sumAmps += currentAmps[i]
                 }
+                val rawEnergy = if (limit > 0) sumAmps / limit else 0f
+                
+                // Exponential decay interpolation for smoothness
+                smoothEnergy += (rawEnergy - smoothEnergy) * (1f - kotlin.math.exp(-15f * dt))
+                val reactFactor = if (currentIsPlayerScreen) 0.8f else 0.2f
+                dynamicEnergy = smoothEnergy * reactFactor
             }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
 
     
     var wavePhase by remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(isPlayerScreen) {
-        if (isPlayerScreen) {
-            var lastTime = 0L
-            while (true) {
-                withFrameMillis { time ->
-                    if (lastTime == 0L) lastTime = time
-                    val dt = (time - lastTime) / 1000f
-                    lastTime = time
-                    
-                    // Speed increases with dynamicEnergy, integrated smoothly
-                    val speed = 1f + dynamicEnergy * 3f
-                    wavePhase += dt * speed
-                }
+    LaunchedEffect(Unit) {
+        var lastTime = 0L
+        while (true) {
+            withFrameMillis { time ->
+                if (lastTime == 0L) lastTime = time
+                val dt = (time - lastTime) / 1000f
+                lastTime = time
+                
+                // Speed increases with dynamicEnergy, integrated smoothly
+                val speed = 1f + dynamicEnergy * 3f
+                wavePhase += dt * speed
             }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
 

@@ -1,4 +1,5 @@
 package com.example.beatpulse.ui.components.player
+import kotlinx.coroutines.isActive
 
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Favorite
@@ -1323,7 +1324,6 @@ private fun ColumnScope.PlayerVisualizerArea(
     var lastAngle by remember { mutableStateOf<Float?>(null) }
     var dragSeekTimeMs by remember { mutableStateOf<Long?>(null) }
 
-    val coverRotationAnim = remember { androidx.compose.animation.core.Animatable(0f) }
     var manualRotation by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     val sparks = remember { mutableListOf<Spark>() }
     var playheadPos by remember { mutableStateOf(Offset.Zero) }
@@ -1366,16 +1366,19 @@ private fun ColumnScope.PlayerVisualizerArea(
     val updatedOffsetX by rememberUpdatedState(coverOffsetX)
     val updatedOffsetY by rememberUpdatedState(coverOffsetY)
 
+    val manualRotationAnim = remember { androidx.compose.animation.core.Animatable(0f) }
+    val dragScope = rememberCoroutineScope()
+
     Box(
         modifier = Modifier
             .then(areaModifier)
             .fillMaxWidth()
             .then(
-                if (coverDragEnabled || !abRepeatModeEnabled) Modifier
+                if (coverDragEnabled) Modifier
                 else Modifier.pointerInput(abRepeatModeEnabled) {
                     val coverSizePx = 160f * density
                     val hitRadiusPx = 48f * density // 48dp touch radius
-
+                    
                     detectDragGestures(
                         onDragStart = { offset -> 
                             var action = DragAction.NONE
@@ -1421,16 +1424,53 @@ private fun ColumnScope.PlayerVisualizerArea(
                             }
                         },
                         onDragEnd = {
-                            currentDragAction = DragAction.NONE; lastAngle = null
+                            if (currentDragAction == DragAction.DJ_SEEK) { dragSeekTimeMs?.let { playerViewModel.seekTo(it) } }
+                            currentDragAction = DragAction.NONE; lastAngle = null; dragSeekTimeMs = null
+                            dragScope.launch { manualRotationAnim.animateTo(0f, androidx.compose.animation.core.tween(700)) }
                             onActiveDraggingHandleChanged(null)
                         },
-                        onDragCancel = { currentDragAction = DragAction.NONE; lastAngle = null; onActiveDraggingHandleChanged(null) }
+                        onDragCancel = {
+                            currentDragAction = DragAction.NONE; lastAngle = null; dragSeekTimeMs = null
+                            dragScope.launch { manualRotationAnim.animateTo(0f, androidx.compose.animation.core.tween(700)) }
+                            onActiveDraggingHandleChanged(null)
+                        }
                     ) { change, dragAmount ->
                         change.consume()
                         val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
                         val touchPos = change.position
-                        
-                        if (currentDragAction == DragAction.DRAG_A || currentDragAction == DragAction.DRAG_B) {
+
+                        if (currentDragAction == DragAction.NONE) {
+                            if (dragAmount.y < -10f && abs(dragAmount.x) < 20f && touchPos.y < center.y) {
+                                currentDragAction = DragAction.OPEN_QUEUE
+                                onShowQueue()
+                                if (showPlaylistSwipeTutorial) onDismissPlaylistSwipeTutorial()
+                            } else if (abs(dragAmount.x) > 5f || abs(dragAmount.y) > 5f) {
+                                currentDragAction = DragAction.DJ_SEEK
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
+                                lastAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
+                                dragSeekTimeMs = updatedCurrentPosition
+                                accumulatedAngle = 0f
+                            }
+                        }
+
+                        if (currentDragAction == DragAction.DJ_SEEK) {
+                            val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
+                            val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
+                            val prevAngle = lastAngle
+                            if (prevAngle != null) {
+                                var deltaAngle = currentAngle - prevAngle; if (deltaAngle > 180f) deltaAngle -= 360f; if (deltaAngle < -180f) deltaAngle += 360f
+                                accumulatedAngle += deltaAngle
+                                if (abs(accumulatedAngle) >= 10f) { accumulatedAngle = 0f }
+                                val seekMs = (deltaAngle / 360f) * 120000f
+                                val current = dragSeekTimeMs ?: updatedCurrentPosition
+                                val maxDuration = if (updatedDuration > 0) updatedDuration else Long.MAX_VALUE
+                                dragSeekTimeMs = (current + seekMs.toLong()).coerceIn(0L, maxDuration)
+                                if (showVinylSeekTutorial) onDismissVinylSeekTutorial()
+                                dragScope.launch { manualRotationAnim.snapTo(manualRotationAnim.value + deltaAngle) }
+                            }
+                            lastAngle = currentAngle
+                        } else if (currentDragAction == DragAction.DRAG_A || currentDragAction == DragAction.DRAG_B) {
                             val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
                             val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
                             val prevAngle = lastAngle
@@ -1492,22 +1532,22 @@ private fun ColumnScope.PlayerVisualizerArea(
             coverOffsetY = coverOffsetY,
             currentStyle = currentStyle,
             thumbnailShapeIdx = thumbnailShapeIdx,
-            bassAmplitudes = bassAmplitudesState.value,
-            midAmplitudes = midAmplitudesState.value,
-            highAmplitudes = highAmplitudesState.value,
-            combinedAmplitudes = combinedAmplitudesState.value,
-            bassAvg = bassAvg, midAvg = midAvg, trebleAvg = trebleAvg,
-            bassOpacity = bassOpacity, midOpacity = midOpacity, highOpacity = highOpacity,
+            bassAmplitudes = { bassAmplitudesState.value },
+            midAmplitudes = { midAmplitudesState.value },
+            highAmplitudes = { highAmplitudesState.value },
+            combinedAmplitudes = { combinedAmplitudesState.value },
+            bassAvg = { bassAvg }, midAvg = { midAvg }, trebleAvg = { trebleAvg },
+            bassOpacity = { bassOpacity }, midOpacity = { midOpacity }, highOpacity = { highOpacity },
             visualizerArchetype = visualizerArchetype,
                         colorDominant = colorDominant, colorVibrant = colorVibrant, colorMuted = colorMuted,
             paletteColors = paletteColors,
-            rotationAngle = rotationAngle, fastRotationAngle = fastRotationAngle,
+            rotationAngle = { rotationAngle }, fastRotationAngle = { fastRotationAngle },
             currentPosition = currentPosition, duration = duration,
             dragSeekTimeMs = dragSeekTimeMs,
             abRepeatModeEnabled = abRepeatModeEnabled,
             abPointA = abPointA, abPointB = abPointB,
             activeDraggingHandle = activeDraggingHandle,
-            animatedScale = animatedScaleAnim.value,
+            animatedScale = { animatedScaleAnim.value },
             coverScale = coverScale,
             cleanUiMode = cleanUiMode,
             elementSize = elementSize,
@@ -1539,7 +1579,7 @@ private fun ColumnScope.PlayerVisualizerArea(
                             scaleX = baseScale
                             scaleY = baseScale
                         }
-                        if (thumbnailShapeIdx == 0) rotationZ = coverRotationAnim.value + manualRotation
+                        rotationZ = manualRotationAnim.value
                     }
                     .then(
                         if (coverDragEnabled) {
@@ -1547,6 +1587,8 @@ private fun ColumnScope.PlayerVisualizerArea(
                                 var localDragOffset = Offset.Zero
                                 detectDragGestures(
                                     onDragStart = { localDragOffset = Offset(playerViewModel.coverOffsetX.value, playerViewModel.coverOffsetY.value) },
+                                    onDragEnd = { playerViewModel.setCoverOffset(0f, 0f) },
+                                    onDragCancel = { playerViewModel.setCoverOffset(0f, 0f) },
                                     onDrag = { change, dragAmount ->
                                         change.consume()
                                         localDragOffset = Offset(localDragOffset.x + dragAmount.x, localDragOffset.y + dragAmount.y)
@@ -1572,56 +1614,6 @@ private fun ColumnScope.PlayerVisualizerArea(
                                     }
                                 }
                             )
-                        }.pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = { offset -> 
-                                    currentDragAction = DragAction.DJ_SEEK
-                                    val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
-                                    val dx = offset.x - center.x; val dy = offset.y - center.y
-                                    lastAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
-                                    dragSeekTimeMs = updatedCurrentPosition
-                                    accumulatedAngle = 0f
-                                },
-                                onDragEnd = {
-                                    if (currentDragAction == DragAction.DJ_SEEK) { dragSeekTimeMs?.let { playerViewModel.seekTo(it) } }
-                                    coroutineScope.launch { 
-                                        coverRotationAnim.snapTo(coverRotationAnim.value + manualRotation)
-                                        manualRotation = 0f
-                                        coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) 
-                                    }
-                                    currentDragAction = DragAction.NONE; lastAngle = null; dragSeekTimeMs = null
-                                },
-                                onDragCancel = {
-                                    currentDragAction = DragAction.NONE; 
-                                    coroutineScope.launch { 
-                                        coverRotationAnim.snapTo(coverRotationAnim.value + manualRotation)
-                                        manualRotation = 0f
-                                        coverRotationAnim.animateTo(0f, spring(stiffness = Spring.StiffnessLow)) 
-                                    }; 
-                                    lastAngle = null; dragSeekTimeMs = null
-                                }
-                            ) { change, _ ->
-                                change.consume()
-                                if (currentDragAction == DragAction.DJ_SEEK) {
-                                    val touchPos = change.position
-                                    val center = Offset(size.width.toFloat() / 2f, size.height.toFloat() / 2f)
-                                    val dx = touchPos.x - center.x; val dy = touchPos.y - center.y
-                                    val currentAngle = (Math.toDegrees(kotlin.math.atan2(dy.toDouble(), dx.toDouble())).toFloat() + 360f) % 360f
-                                    val prevAngle = lastAngle
-                                    if (prevAngle != null) {
-                                        var deltaAngle = currentAngle - prevAngle; if (deltaAngle > 180f) deltaAngle -= 360f; if (deltaAngle < -180f) deltaAngle += 360f
-                                        accumulatedAngle += deltaAngle
-                                        if (abs(accumulatedAngle) >= 10f) { accumulatedAngle = 0f }
-                                        val seekMs = (deltaAngle / 360f) * 120000f
-                                        val current = dragSeekTimeMs ?: updatedCurrentPosition
-                                        val maxDuration = if (updatedDuration > 0) updatedDuration else Long.MAX_VALUE
-                                        dragSeekTimeMs = (current + seekMs.toLong()).coerceIn(0L, maxDuration)
-                                        if (showVinylSeekTutorial) onDismissVinylSeekTutorial()
-                                        manualRotation += deltaAngle
-                                    }
-                                    lastAngle = currentAngle
-                                }
-                            }
                         }
                     )
                     .clip(shape)
@@ -1645,17 +1637,7 @@ private fun ColumnScope.PlayerVisualizerArea(
                     if (bmp != null) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             Image(bitmap = bmp, contentDescription = "Album Art", modifier = Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
-                            if (thumbnailShapeIdx == 4) {
-                                androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxSize()) {
-                                    val w = size.width
-                                    val h = size.height
-                                    val lineColor = colorVibrant.copy(alpha = 0.6f)
-                                    drawLine(color = lineColor, start = androidx.compose.ui.geometry.Offset(w / 2f, 0f), end = androidx.compose.ui.geometry.Offset(w / 2f, h), strokeWidth = 4f)
-                                    drawLine(color = lineColor, start = androidx.compose.ui.geometry.Offset(0f, h * 0.4f), end = androidx.compose.ui.geometry.Offset(w, h * 0.4f), strokeWidth = 4f)
-                                    drawLine(color = lineColor, start = androidx.compose.ui.geometry.Offset(w / 4f, h * 0.4f), end = androidx.compose.ui.geometry.Offset(w / 4f, h), strokeWidth = 2f)
-                                    drawLine(color = lineColor, start = androidx.compose.ui.geometry.Offset(w * 0.75f, h * 0.4f), end = androidx.compose.ui.geometry.Offset(w * 0.75f, h), strokeWidth = 2f)
-                                }
-                            }
+                            // Se removieron las líneas de la vidriera a petición del usuario.
                         }
                     }
                 }

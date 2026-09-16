@@ -93,14 +93,21 @@ actual fun TerrariaWaterBackground(
     val lifecycleState by androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsState()
     val isActiveApp = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
     
-    var time by remember { mutableStateOf(0f) }
-    LaunchedEffect(isActiveApp, isPlayerScreen) {
+    var time by remember { mutableFloatStateOf(0f) }
+    val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
+    
+    LaunchedEffect(isActiveApp) {
         if (!isActiveApp) return@LaunchedEffect
-        val startTime = withFrameNanos { it } - (time * 1_000_000_000f).toLong()
+        var lastTime = 0L
         while (true) {
-            val frameTime = withFrameNanos { it }
-            val t = (frameTime - startTime) / 1_000_000_000f
-            time = if (isPlayerScreen) t else t * 0.4f
+            withFrameMillis { frameTime ->
+                if (lastTime == 0L) lastTime = frameTime
+                val dt = ((frameTime - lastTime) / 1000f).coerceAtMost(0.1f)
+                lastTime = frameTime
+                
+                time += dt
+            }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
 

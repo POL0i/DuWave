@@ -77,7 +77,7 @@ actual fun ProceduralCRTCdc3rxBackground(
 
         var time by remember { mutableStateOf(0f) }
         
-        LaunchedEffect(isPlayerScreen, isActiveApp) {
+        LaunchedEffect(isActiveApp) {
             if (!isActiveApp) return@LaunchedEffect
             var lastFrameTime = -1L
             while (true) {
@@ -88,6 +88,7 @@ actual fun ProceduralCRTCdc3rxBackground(
                     val speed = if (isPlayerScreen) 1.0f else 0.3f
                     time += delta * speed
                 }
+                if (!isPlayerScreen) kotlinx.coroutines.delay(24L)
             }
         }
 

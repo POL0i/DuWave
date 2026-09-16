@@ -110,7 +110,11 @@ class DesktopPlayerViewModel(
     override val systemVolume = MutableStateFlow(
         com.example.beatpulse.utils.SystemUtils.getSystemVolumeLevel().let { sysVol ->
             val prefVol = prefs.systemVolume
-            if (prefVol > 1.0f && sysVol >= 0.99f) prefVol else sysVol
+            if (com.example.beatpulse.utils.SystemUtils.isMobilePlatform) {
+                if (prefVol > 1.0f && sysVol >= 0.99f) prefVol else sysVol
+            } else {
+                prefVol
+            }
         }
     )
 
@@ -156,6 +160,20 @@ class DesktopPlayerViewModel(
                         muted = Color(0xFF9E9E9E),
                         darkMuted = Color(0xFF616161)
                     )
+                }
+            }
+        }
+        
+        scope.launch {
+            repository.allTracksFlow.collect { tracks ->
+                val current = currentTrack.value
+                if (current != null) {
+                    val updated = tracks.find { it.id == current.id }
+                    if (updated != null && (updated.customCoverPath != current.customCoverPath || updated.title != current.title || updated.artist != current.artist || updated.album != current.album)) {
+                        currentTrack.value = updated
+                        val bitmap = com.example.beatpulse.ui.components.loadDesktopThumbnail(updated)
+                        albumArt.value = bitmap
+                    }
                 }
             }
         }

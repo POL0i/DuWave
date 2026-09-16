@@ -83,16 +83,25 @@ fun UnifiedLibraryScreen(
 
     val isDarkTheme = isSystemInDarkTheme()
     
-    val dynamicTextColor = remember(bgStyle, paletteColors.dominant, isDarkTheme) {
-        val isBackgroundLight = when (bgStyle) {
-            0 -> !isDarkTheme
-            1 -> false
-            2, 4 -> paletteColors.dominant.luminance() > 0.3f
-            3 -> true
-            5, 6, 7, 8 -> false
-            else -> paletteColors.dominant.luminance() > 0.5f
+    val dynamicTextColor = remember(bgStyle, paletteColors, isDarkTheme) {
+        if (bgStyle == 3) {
+            val colors = listOf(paletteColors.lightVibrant, paletteColors.vibrant, paletteColors.muted, paletteColors.dominant)
+            val brightestColor = colors.filter { it != androidx.compose.ui.graphics.Color.Unspecified }.maxByOrNull { it.luminance() } ?: androidx.compose.ui.graphics.Color.White
+            if (brightestColor.luminance() < 0.6f) {
+                androidx.compose.ui.graphics.lerp(brightestColor, androidx.compose.ui.graphics.Color.White, 0.5f)
+            } else {
+                brightestColor
+            }
+        } else {
+            val isBackgroundLight = when (bgStyle) {
+                0 -> !isDarkTheme
+                1 -> false
+                2, 4 -> paletteColors.dominant.luminance() > 0.3f
+                5, 6, 7, 8 -> false
+                else -> paletteColors.dominant.luminance() > 0.5f
+            }
+            if (isBackgroundLight) androidx.compose.ui.graphics.Color(0xFF121212) else androidx.compose.ui.graphics.Color.White
         }
-        if (isBackgroundLight) Color(0xFF121212) else Color.White
     }
 
     var selectedViewData by viewModel.selectedViewData
@@ -278,14 +287,15 @@ fun UnifiedLibraryScreen(
                         Box {
                             IconButton(
                                 onClick = { showSettingsMenu = true },
-                                modifier = Modifier.background(color = paletteColors.dominant.copy(alpha = 0.6f), shape = CircleShape)
+                                modifier = Modifier.background(color = Color.Black.copy(alpha = 0.4f), shape = CircleShape)
                             ) {
-                                Icon(Icons.Default.Settings, contentDescription = "Ajustes", tint = paletteColors.vibrant)
+                                Icon(Icons.Default.Settings, contentDescription = "Ajustes", tint = Color.White)
                             }
                             androidx.compose.material3.MaterialTheme(
                                 colorScheme = androidx.compose.material3.MaterialTheme.colorScheme.copy(
-                                    surface = paletteColors.dominant,
-                                    onSurface = paletteColors.vibrant
+                                    surface = Color(0xFF1A1A1A), // Always dark background
+                                    onSurface = Color.White,
+                                    onSurfaceVariant = Color.White // For icons
                                 )
                             ) {
                                 DropdownMenu(
@@ -295,6 +305,7 @@ fun UnifiedLibraryScreen(
                                     val filterWhatsApp = prefs.filterWhatsAppShorts
                                     DropdownMenuItem(
                                         text = { Text(if (filterWhatsApp) getLocalizedString("show_whatsapp_audio") else getLocalizedString("hide_whatsapp_audio")) },
+                                        leadingIcon = { Icon(if (filterWhatsApp) Icons.Default.Visibility else Icons.Default.VisibilityOff, contentDescription = null) },
                                         onClick = {
                                             prefs.filterWhatsAppShorts = !filterWhatsApp
                                             showSettingsMenu = false
@@ -303,6 +314,7 @@ fun UnifiedLibraryScreen(
                                     )
                                     DropdownMenuItem(
                                         text = { Text(getLocalizedString("language")) },
+                                        leadingIcon = { Icon(Icons.Default.Language, contentDescription = null) },
                                         onClick = {
                                             showSettingsMenu = false
                                             showLanguageDialog = true
@@ -311,6 +323,7 @@ fun UnifiedLibraryScreen(
                                     val showGestures = prefs.showGestureConfirmations
                                     DropdownMenuItem(
                                         text = { Text(getLocalizedString("gesture_confirmations_toggle") + ": " + if(showGestures) "ON" else "OFF") },
+                                        leadingIcon = { Icon(Icons.Default.TouchApp, contentDescription = null) },
                                         onClick = {
                                             prefs.showGestureConfirmations = !showGestures
                                             showSettingsMenu = false
@@ -318,6 +331,7 @@ fun UnifiedLibraryScreen(
                                     )
                                     DropdownMenuItem(
                                         text = { Text(getLocalizedString("scan_music_now")) },
+                                        leadingIcon = { Icon(Icons.Default.Sync, contentDescription = null) },
                                         onClick = {
                                             showSettingsMenu = false
                                             onRescan()
@@ -325,6 +339,7 @@ fun UnifiedLibraryScreen(
                                     )
                                     DropdownMenuItem(
                                         text = { Text(getLocalizedString("local_network_online")) },
+                                        leadingIcon = { Icon(Icons.Default.Wifi, contentDescription = null) },
                                         onClick = {
                                             showSettingsMenu = false
                                             showEcosystemScreen = true
@@ -337,12 +352,12 @@ fun UnifiedLibraryScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         IconButton(
                             onClick = { showDesignSettings = true },
-                            modifier = Modifier.background(color = paletteColors.dominant.copy(alpha = 0.6f), shape = CircleShape)
+                            modifier = Modifier.background(color = Color.Black.copy(alpha = 0.4f), shape = CircleShape)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Palette,
                                 contentDescription = "Ajustes de Diseño",
-                                tint = paletteColors.vibrant
+                                tint = Color.White
                             )
                         }
 
@@ -350,12 +365,12 @@ fun UnifiedLibraryScreen(
                         if (!com.example.beatpulse.utils.SystemUtils.isMobilePlatform) {
                             IconButton(
                                 onClick = { showKeyboardSettings = true },
-                                modifier = Modifier.background(color = paletteColors.dominant.copy(alpha = 0.6f), shape = androidx.compose.foundation.shape.CircleShape)
+                                modifier = Modifier.background(color = Color.Black.copy(alpha = 0.4f), shape = CircleShape)
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Keyboard,
                                     contentDescription = "Atajos de Teclado",
-                                    tint = paletteColors.vibrant
+                                    tint = Color.White
                                 )
                             }
                         }

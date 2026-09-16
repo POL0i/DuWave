@@ -30,16 +30,21 @@ fun ZenClearBackground(
     
     val accumulatedTimeState = remember { mutableStateOf(0f) }
 
-    LaunchedEffect(isPlayerScreen, isActiveApp) {
-        if (isActiveApp && isPlayerScreen) {
-            var lastTime = withFrameNanos { it }
+    val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
+
+    LaunchedEffect(isActiveApp) {
+        if (isActiveApp) {
+            var lastTime = 0L
             while (isActive) {
-                val currentTime = withFrameNanos { it }
-                val dt = ((currentTime - lastTime) / 1_000_000_000f).coerceAtMost(0.1f)
-                val currentBass = bassAvgState.value
-                // Multiply dt by 0.5f directly here instead of using derivedStateOf
-                accumulatedTimeState.value += dt * (1f + currentBass * 1.0f) * 0.5f
-                lastTime = currentTime
+                withFrameNanos { currentTime ->
+                    if (lastTime == 0L) lastTime = currentTime
+                    val dt = ((currentTime - lastTime) / 1_000_000_000f).coerceAtMost(0.1f)
+                    val currentBass = bassAvgState.value
+                    
+                    accumulatedTimeState.value += dt * (1f + currentBass * 1.0f) * 0.5f
+                    lastTime = currentTime
+                }
+                if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
             }
         }
     }

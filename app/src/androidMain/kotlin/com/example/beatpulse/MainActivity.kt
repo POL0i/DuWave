@@ -155,7 +155,10 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         instance = this
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = androidx.activity.SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+        )
         
         // VisualizerState is handled in commonMain now
         ContextCompat.registerReceiver(
@@ -189,22 +192,24 @@ class MainActivity : ComponentActivity() {
             val currentConfig = androidx.compose.ui.platform.LocalConfiguration.current
             val context = androidx.compose.ui.platform.LocalContext.current
             val updatedConfig = remember(localeCode, currentConfig) {
-                val newConfig = android.content.res.Configuration(currentConfig).apply {
+                android.content.res.Configuration(currentConfig).apply {
                     setLocale(java.util.Locale(localeCode))
                 }
+            }
+            
+            LaunchedEffect(localeCode) {
                 val res = context.resources
                 val resConfig = android.content.res.Configuration(res.configuration).apply {
                     setLocale(java.util.Locale(localeCode))
                 }
                 @Suppress("DEPRECATION")
                 res.updateConfiguration(resConfig, res.displayMetrics)
-                newConfig
             }
             
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalConfiguration provides updatedConfig
             ) {
-                BeatPulseTheme(isPixelArt = bgStyle == 8) {
+                BeatPulseTheme(isPixelArt = bgStyle == 8 || bgStyle == 4) {
                     androidx.compose.animation.Crossfade(
                         targetState = localeCode,
                         animationSpec = androidx.compose.animation.core.tween(durationMillis = 600),

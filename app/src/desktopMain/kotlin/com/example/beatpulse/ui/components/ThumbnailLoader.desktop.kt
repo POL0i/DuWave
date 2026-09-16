@@ -18,12 +18,17 @@ private val fullArtCache = mutableMapOf<String, ImageBitmap>()
 private val paletteCache = mutableMapOf<String, PaletteColors>()
 private val noArtSet = mutableSetOf<String>()
 
+private fun getTrackFingerprint(track: TrackEntity): String {
+    return Math.abs((track.title + track.artist + track.album + track.duration + (track.customCoverPath ?: "")).hashCode()).toString()
+}
+
 @Composable
 actual fun rememberAlbumArt(track: TrackEntity): ImageBitmap? {
-    var bitmap by remember(track.id) { mutableStateOf(thumbnailCache[track.id.toString()]) }
+    val fingerprint = remember(track) { getTrackFingerprint(track) }
+    var bitmap by remember(fingerprint) { mutableStateOf(thumbnailCache[fingerprint]) }
     
-    if (bitmap == null && !noArtSet.contains(track.id.toString())) {
-        LaunchedEffect(track.id) {
+    if (bitmap == null && !noArtSet.contains(fingerprint)) {
+        LaunchedEffect(fingerprint) {
             val loaded = loadDesktopThumbnail(track)
             if (loaded != null) {
                 bitmap = loaded
@@ -36,10 +41,11 @@ actual fun rememberAlbumArt(track: TrackEntity): ImageBitmap? {
 
 @Composable
 actual fun rememberFullAlbumArt(track: TrackEntity): ImageBitmap? {
-    var bitmap by remember(track.id) { mutableStateOf(fullArtCache[track.id.toString()]) }
+    val fingerprint = remember(track) { getTrackFingerprint(track) }
+    var bitmap by remember(fingerprint) { mutableStateOf(fullArtCache[fingerprint]) }
     
-    if (bitmap == null && !noArtSet.contains(track.id.toString())) {
-        LaunchedEffect(track.id) {
+    if (bitmap == null && !noArtSet.contains(fingerprint)) {
+        LaunchedEffect(fingerprint) {
             val loaded = loadDesktopThumbnail(track) // We can use the same for now, or load a bigger one
             if (loaded != null) {
                 bitmap = loaded
@@ -84,8 +90,9 @@ actual fun rememberStreamAvatar(uri: String?): ImageBitmap? {
 }
 
 internal suspend fun loadDesktopThumbnail(track: TrackEntity): ImageBitmap? = withContext(Dispatchers.IO) {
-    if (noArtSet.contains(track.id.toString())) return@withContext null
-    thumbnailCache[track.id.toString()]?.let { return@withContext it }
+    val fingerprint = getTrackFingerprint(track)
+    if (noArtSet.contains(fingerprint)) return@withContext null
+    thumbnailCache[fingerprint]?.let { return@withContext it }
     
     try {
         val coverPath = track.customCoverPath
@@ -96,8 +103,8 @@ internal suspend fun loadDesktopThumbnail(track: TrackEntity): ImageBitmap? = wi
                     connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
                     val bytes = connection.inputStream.use { it.readBytes() }
                     val imageBitmap = Image.makeFromEncoded(bytes).toComposeImageBitmap()
-                    thumbnailCache[track.id.toString()] = imageBitmap
-                    fullArtCache[track.id.toString()] = imageBitmap
+                    thumbnailCache[fingerprint] = imageBitmap
+                    fullArtCache[fingerprint] = imageBitmap
                     return@withContext imageBitmap
                 } catch (e: Exception) {
                     e.printStackTrace()
@@ -107,8 +114,8 @@ internal suspend fun loadDesktopThumbnail(track: TrackEntity): ImageBitmap? = wi
                 if (file.exists()) {
                     val bytes = file.readBytes()
                     val imageBitmap = Image.makeFromEncoded(bytes).toComposeImageBitmap()
-                    thumbnailCache[track.id.toString()] = imageBitmap
-                    fullArtCache[track.id.toString()] = imageBitmap
+                    thumbnailCache[fingerprint] = imageBitmap
+                    fullArtCache[fingerprint] = imageBitmap
                     return@withContext imageBitmap
                 }
             }
@@ -120,8 +127,8 @@ internal suspend fun loadDesktopThumbnail(track: TrackEntity): ImageBitmap? = wi
         if (fallbackFile.exists()) {
             val bytes = fallbackFile.readBytes()
             val imageBitmap = Image.makeFromEncoded(bytes).toComposeImageBitmap()
-            thumbnailCache[track.id.toString()] = imageBitmap
-            fullArtCache[track.id.toString()] = imageBitmap
+            thumbnailCache[fingerprint] = imageBitmap
+            fullArtCache[fingerprint] = imageBitmap
             return@withContext imageBitmap
         }
 
@@ -136,8 +143,8 @@ internal suspend fun loadDesktopThumbnail(track: TrackEntity): ImageBitmap? = wi
                     if (artwork != null) {
                         val bytes = artwork.binaryData
                         val imageBitmap = Image.makeFromEncoded(bytes).toComposeImageBitmap()
-                        thumbnailCache[track.id.toString()] = imageBitmap
-                        fullArtCache[track.id.toString()] = imageBitmap
+                        thumbnailCache[fingerprint] = imageBitmap
+                        fullArtCache[fingerprint] = imageBitmap
                         return@withContext imageBitmap
                     }
                 }
@@ -145,10 +152,10 @@ internal suspend fun loadDesktopThumbnail(track: TrackEntity): ImageBitmap? = wi
         }
         
         // No cover found
-        noArtSet.add(track.id.toString())
+        noArtSet.add(fingerprint)
     } catch (e: Exception) {
         e.printStackTrace()
-        noArtSet.add(track.id.toString())
+        noArtSet.add(fingerprint)
     }
     return@withContext null
 }

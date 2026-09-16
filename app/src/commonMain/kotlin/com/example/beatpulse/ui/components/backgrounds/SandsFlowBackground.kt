@@ -29,16 +29,19 @@ fun SandsFlowBackground(
 
     val accumulatedTimeState = remember { mutableStateOf(0f) }
 
-    LaunchedEffect(isPlayerScreen) {
-        if (isPlayerScreen) {
-            var lastTime = withFrameNanos { it }
-            while (isActive) {
-                val currentTime = withFrameNanos { it }
+    val currentIsPlayerScreen by rememberUpdatedState(isPlayerScreen)
+
+    LaunchedEffect(Unit) {
+        var lastTime = 0L
+        while (isActive) {
+            withFrameNanos { currentTime ->
+                if (lastTime == 0L) lastTime = currentTime
                 val dt = ((currentTime - lastTime) / 1_000_000_000f).coerceAtMost(0.1f)
                 val currentBass = bassAvgState.value
                 accumulatedTimeState.value += dt * (1f + currentBass * 1.0f)
                 lastTime = currentTime
             }
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
 

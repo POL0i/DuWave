@@ -24,6 +24,8 @@ interface IPreferencesManager {
     var coverOffsetX: Float
     var coverOffsetY: Float
     var coverScale: Float
+    var vibrateOnVinyl: Boolean
+    val vibrateOnVinylFlow: StateFlow<Boolean>
     var isPatreonUnlocked: Boolean
     val isPatreonUnlockedFlow: StateFlow<Boolean>
     var patreonFailedAttempts: Int

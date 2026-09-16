@@ -128,7 +128,7 @@ actual fun RetroCRTBackground(
     val isActiveApp = lifecycleState.isAtLeast(androidx.lifecycle.Lifecycle.State.RESUMED)
 
     var time by remember { mutableStateOf(0f) }
-    LaunchedEffect(isPlayerScreen, isActiveApp) {
+    LaunchedEffect(isActiveApp) {
         if (!isActiveApp) return@LaunchedEffect
         var lastTime = withFrameNanos { it }
         while (true) {
@@ -137,6 +137,7 @@ actual fun RetroCRTBackground(
                 lastTime = frameTime
                 time += if (isPlayerScreen) dt else dt * 0.25f
             }
+            if (!isPlayerScreen) kotlinx.coroutines.delay(24L)
         }
     }
 

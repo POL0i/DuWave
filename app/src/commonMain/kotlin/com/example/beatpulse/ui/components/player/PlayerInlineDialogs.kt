@@ -16,6 +16,10 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyColumn
@@ -812,31 +816,13 @@ fun PlayerSettingsSheet(
     val currentContainerAlpha by androidx.compose.animation.core.animateFloatAsState(if (isAdjusting) 0.3f else 0.95f, label = "containerAlpha")
     val currentScrimAlpha by androidx.compose.animation.core.animateFloatAsState(if (isAdjusting) 0.0f else 0.2f, label = "scrimAlpha")
 
-    if (showSettingsMenu) {
-        com.example.beatpulse.utils.SystemBackHandler { onDismissRequest() }
-        androidx.compose.foundation.layout.Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = currentScrimAlpha))
-                .clickable(
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null
-                ) { onDismissRequest() },
-            contentAlignment = Alignment.BottomCenter
-        ) {
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                    .background(colorDominant.copy(alpha = currentContainerAlpha))
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null
-                    ) { /* Consumir clic interno */ }
-                    .animateContentSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
+    androidx.compose.material3.ModalBottomSheet(
+        onDismissRequest = { onDismissRequest() },
+        containerColor = colorDominant.copy(alpha = currentContainerAlpha),
+        scrimColor = Color.Black.copy(alpha = currentScrimAlpha)
+    ) {
+        androidx.compose.foundation.layout.Box(modifier = Modifier.fillMaxWidth().animateContentSize(), contentAlignment = Alignment.Center) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 800.dp)
@@ -963,9 +949,38 @@ fun PlayerSettingsSheet(
                     
                     // Eliminamos la animación infinita de rotación que causaba recomposiciones excesivas
                     // para mejorar enormemente el rendimiento en el menú de estilos.
-
+                    val isDesktop = !com.example.beatpulse.utils.SystemUtils.isMobilePlatform
+                    val focusRequester = androidx.compose.runtime.remember { androidx.compose.ui.focus.FocusRequester() }
+                    val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+                    
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        if (isDesktop) {
+                            try { focusRequester.requestFocus() } catch (e: Exception) {}
+                        }
+                    }
+                    
                     val pagerState = androidx.compose.foundation.pager.rememberPagerState { (sortedStyles.size + 7) / 8 }
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp), modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(4.dp), 
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .then(if (isDesktop) Modifier.focusRequester(focusRequester).focusable().onKeyEvent { event ->
+                                if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown) {
+                                    if (event.key == androidx.compose.ui.input.key.Key.DirectionRight) {
+                                        if (pagerState.currentPage < pagerState.pageCount - 1) {
+                                            coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                                            return@onKeyEvent true
+                                        }
+                                    } else if (event.key == androidx.compose.ui.input.key.Key.DirectionLeft) {
+                                        if (pagerState.currentPage > 0) {
+                                            coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                                            return@onKeyEvent true
+                                        }
+                                    }
+                                }
+                                false
+                            } else Modifier)
+                    ) {
                         androidx.compose.foundation.pager.HorizontalPager(
                             state = pagerState,
                             modifier = Modifier.fillMaxWidth().height(190.dp).padding(horizontal = 4.dp),
@@ -1118,14 +1133,17 @@ fun PlayerSettingsSheet(
                         }
                         
                         Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp), horizontalArrangement = Arrangement.Center) {
+                            val dotSize = if (isDesktop) 10.dp else 5.dp
+                            val dotPadding = if (isDesktop) 6.dp else 2.dp
                             repeat(pagerState.pageCount) { iteration ->
                                 val color = if (pagerState.currentPage == iteration) colorVibrant else dynamicTextColor.copy(alpha = 0.2f)
                                 Box(
                                     modifier = Modifier
-                                        .padding(horizontal = 2.dp)
+                                        .padding(horizontal = dotPadding)
+                                        .size(dotSize)
                                         .clip(CircleShape)
                                         .background(color)
-                                        .size(5.dp) // Puntos pequeños y comprimidos
+                                        .then(if (isDesktop) Modifier.clickable { coroutineScope.launch { pagerState.animateScrollToPage(iteration) } } else Modifier)
                                 )
                             }
                         }
@@ -1331,6 +1349,17 @@ fun PlayerSettingsSheet(
                         }
                         
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
+                            val vibrateOnVinyl by prefs.vibrateOnVinylFlow.collectAsState()
+                            IconToggleButton(
+                                checked = vibrateOnVinyl,
+                                onCheckedChange = { prefs.vibrateOnVinyl = it }
+                            ) {
+                                Icon(Icons.Default.GraphicEq, contentDescription = getLocalizedString("vibrate_on_vinyl").takeIf { it != "vibrate_on_vinyl" } ?: "Vibrate", tint = if (vibrateOnVinyl) colorVibrant else dynamicTextColor.copy(alpha = 0.6f))
+                            }
+                            Text(getLocalizedString("vibrate_on_vinyl").takeIf { it != "vibrate_on_vinyl" } ?: "Vibrate", color = Color.White, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        }
+                        
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.weight(1f)) {
                             IconToggleButton(
                                 checked = coverVisibilityMode == "CHROMA_KEY",
                                 onCheckedChange = { playerViewModel.setCoverVisibilityMode("CHROMA_KEY") }
@@ -1367,6 +1396,8 @@ fun PlayerSettingsSheet(
                         }
                     }
                     
+                    Spacer(modifier = Modifier.height(16.dp))
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     val showFps by playerViewModel.showFps.collectAsState()
@@ -1406,7 +1437,6 @@ fun PlayerSettingsSheet(
             }
         }
     }
-}
 }
 
 @Composable

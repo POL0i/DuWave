@@ -61,3 +61,19 @@
 
 -dontwarn java.lang.management.ManagementFactory
 -dontwarn java.lang.management.RuntimeMXBean
+
+# OkHttp
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+
+# JSoup & Nanojson (for NewPipeExtractor)
+-dontwarn org.jsoup.**
+-keep class org.jsoup.** { *; }
+-dontwarn com.grack.nanojson.**
+-keep class com.grack.nanojson.** { *; }
+
+# Ktor
+-keep class io.ktor.** { *; }
+-keep class com.pedro.** { *; }
