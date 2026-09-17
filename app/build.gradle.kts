@@ -108,7 +108,7 @@ compose.desktop {
             modules("java.sql")
             targetFormats(org.jetbrains.compose.desktop.application.dsl.TargetFormat.Dmg, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Msi, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Deb, org.jetbrains.compose.desktop.application.dsl.TargetFormat.AppImage, org.jetbrains.compose.desktop.application.dsl.TargetFormat.Exe)
             packageName = "DuWave"
-            packageVersion = "2.0.1"
+            packageVersion = "2.1.0"
             
             linux {
                 iconFile.set(project.file("src/desktopMain/resources/drawable/logo.png"))
