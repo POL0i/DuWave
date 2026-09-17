@@ -181,6 +181,11 @@ android {
         abortOnError = false
     }
     
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+    
     packaging {
         resources {
             excludes += setOf(
