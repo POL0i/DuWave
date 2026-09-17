@@ -13,8 +13,6 @@ plugins {
 }
 
 kotlin {
-    jvmToolchain(17)
-
     androidTarget {
         @OptIn(ExperimentalKotlinGradlePluginApi::class)
         compilerOptions {
@@ -23,6 +21,10 @@ kotlin {
     }
     
     jvm("desktop") {
+        @OptIn(ExperimentalKotlinGradlePluginApi::class)
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_17)
+        }
         mainRun {
             mainClass.set("com.example.beatpulse.MainKt")
         }
