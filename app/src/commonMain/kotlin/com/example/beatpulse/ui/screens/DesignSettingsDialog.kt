@@ -111,7 +111,10 @@ fun DesignSettingsDialog(
         12 to "Zen Clear",
         13 to "Mareas de Arena",
         15 to (getLocalizedString("style_retro_crt").takeIf { it != "style_retro_crt" } ?: "Retro CRT"),
-        16 to "Procedural CRT"
+        16 to "Procedural CRT",
+        17 to "Synthwave",
+        18 to "Polygon Unfold",
+        19 to "Wind Waker Ocean"
     ).map { (id, name) -> id to name.removePrefix("Estilo: ").trim() }.toMutableList()
     
     val styles = list
@@ -423,6 +426,9 @@ fun StyleGridItem(
                         14 -> com.example.beatpulse.ui.components.backgrounds.LullabyEyesBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
                         15 -> com.example.beatpulse.ui.components.backgrounds.RetroCRTBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = 0.5f, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = false) {}
                         16 -> com.example.beatpulse.ui.components.backgrounds.ProceduralCRTCdc3rxBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = 0.5f, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = false) {}
+                        17 -> SynthwaveBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        18 -> PolygonUnfoldBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
+                        19 -> WindWakerOceanBackground(paletteColors = paletteColors, visualizerManager = DummyVisualizerManager, isPlayerScreen = false) {}
                         else -> Box(modifier = Modifier.fillMaxSize().background(paletteColors.dominant))
                     }
                 }

@@ -529,6 +529,9 @@ fun AppScreen(
                     val energy = if (amps.isNotEmpty()) amps.average().toFloat() else 0f
                     com.example.beatpulse.ui.components.backgrounds.ProceduralCRTCdc3rxBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = energy, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = currentPage == 2) { content() }
                 }
+                17 -> SynthwaveBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                18 -> PolygonUnfoldBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
+                19 -> WindWakerOceanBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
                 else -> { Box(modifier = Modifier.fillMaxSize().then(bgModifier)) { content() } }
             }
         }
