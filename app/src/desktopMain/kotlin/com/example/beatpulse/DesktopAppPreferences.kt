@@ -340,6 +340,14 @@ class DesktopAppPreferences : AppPreferences, IPreferencesManager {
             setString("favoriteBackgroundStyles", value.joinToString(","))
         }
 
+    override var designSettingsPagerPage: Int
+        get() = properties.getProperty("design_settings_pager_page", "0").toIntOrNull() ?: 0
+        set(value) { properties.setProperty("design_settings_pager_page", value.toString()); save() }
+
+    override var designSettingsFilterFavorites: Boolean
+        get() = properties.getProperty("design_settings_filter_favs", "false").toBooleanStrictOrNull() ?: false
+        set(value) { properties.setProperty("design_settings_filter_favs", value.toString()); save() }
+
     private val _favoriteVisualizerStylesFlow = MutableStateFlow(
         getString("favoriteVisualizerStyles", "").split(",").filter { it.isNotBlank() }.toSet()
     )

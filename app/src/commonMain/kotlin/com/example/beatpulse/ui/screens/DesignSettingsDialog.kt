@@ -57,6 +57,7 @@ import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.ui.graphics.luminance
 
 private val DummyVisualizerManager = object : IAudioVisualizerManager {
     override val bassAmplitudes: StateFlow<FloatArray> = MutableStateFlow(FloatArray(0))
@@ -82,7 +83,6 @@ private val DummyVisualizerManager = object : IAudioVisualizerManager {
 fun DesignSettingsDialog(
     prefs: AppPreferences,
     paletteColors: PaletteColors,
-    dynamicTextColor: Color,
     currentShapeIdx: Int,
     currentBgStyle: Int,
     onDismiss: () -> Unit
@@ -90,6 +90,8 @@ fun DesignSettingsDialog(
     val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     val isDesktop = !com.example.beatpulse.utils.SystemUtils.isMobilePlatform
+    
+    val dynamicTextColor = if (paletteColors.dominant.luminance() > 0.5f) Color(0xFF121212) else Color.White
     
     val isPatreonUnlocked by prefs.isPatreonUnlockedFlow.collectAsState()
     val favoriteStyles by prefs.favoriteBackgroundStylesFlow.collectAsState()
@@ -117,13 +119,31 @@ fun DesignSettingsDialog(
         19 to "Wind Waker Ocean"
     ).map { (id, name) -> id to name.removePrefix("Estilo: ").trim() }.toMutableList()
     
-    val styles = list
+    var filterFavorites by remember { androidx.compose.runtime.mutableStateOf(prefs.designSettingsFilterFavorites) }
+    
+    val styles = if (filterFavorites) {
+        list.filter { it.first in favoriteStyles }
+    } else {
+        list
+    }
     
     val sortedStyles = remember(favoriteStyles, styles) {
         styles.sortedByDescending { it.first in favoriteStyles }
     }
     
-    val pagerState = androidx.compose.foundation.pager.rememberPagerState { (sortedStyles.size + 2) / 3 }
+    val pageCount = kotlin.math.max(1, (sortedStyles.size + 2) / 3)
+    val initialPage = prefs.designSettingsPagerPage.coerceIn(0, pageCount - 1)
+    val pagerState = androidx.compose.foundation.pager.rememberPagerState(initialPage = initialPage) { pageCount }
+    
+    androidx.compose.runtime.LaunchedEffect(pageCount) {
+        if (pagerState.currentPage >= pageCount) {
+            pagerState.scrollToPage(pageCount - 1)
+        }
+    }
+    
+    androidx.compose.runtime.LaunchedEffect(pagerState.currentPage) {
+        prefs.designSettingsPagerPage = pagerState.currentPage
+    }
     
     androidx.compose.runtime.LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -267,11 +287,27 @@ fun DesignSettingsDialog(
                     }
                     
                     // Bottom Row: Visual Styles
-                    Text(
-                        getLocalizedString("visual_style").takeIf { it.isNotBlank() && it != "visual_style" } ?: "Estilo Visual",
-                        color = dynamicTextColor,
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            getLocalizedString("visual_style").takeIf { it.isNotBlank() && it != "visual_style" } ?: "Estilos Visuales",
+                            color = dynamicTextColor,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+                        IconButton(onClick = { 
+                            filterFavorites = !filterFavorites
+                            prefs.designSettingsFilterFavorites = filterFavorites
+                        }) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = "Filter Favorites",
+                                tint = if (filterFavorites) paletteColors.vibrant else dynamicTextColor.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
                     Column(modifier = Modifier.fillMaxWidth()) {
                         androidx.compose.foundation.pager.HorizontalPager(
                             state = pagerState,
@@ -298,7 +334,7 @@ fun DesignSettingsDialog(
                                             name = name,
                                             isSelected = isSelected,
                                             isFavorite = isFavorite,
-                                            isLocked = (idx in 9..16 && idx != 14) && !isPatreonUnlocked,
+                                            isLocked = (idx in listOf(9, 10, 12, 13, 15, 19)) && !isPatreonUnlocked,
                                             onToggleFavorite = {
                                                 val newFavorites = favoriteStyles.toMutableSet()
                                                 if (isFavorite) newFavorites.remove(idx) else newFavorites.add(idx)

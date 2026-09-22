@@ -269,13 +269,20 @@ class DesktopPlayerViewModel(
                 )
             }
             
+            val c1 = pixelMap[0, 0]
+            val c2 = pixelMap[width - 1, 0]
+            val c3 = pixelMap[0, height - 1]
+            
             return PaletteColors(
                 dominant = dominant,
                 vibrant = vibrant,
                 muted = mixColor(dominant, Color.Gray, 0.4f),
                 darkVibrant = mixColor(vibrant, Color.Black, 0.4f),
                 lightVibrant = mixColor(vibrant, Color.White, 0.4f),
-                darkMuted = mixColor(dominant, Color.Black, 0.6f)
+                darkMuted = mixColor(dominant, Color.Black, 0.6f),
+                extra1 = Color(c1.red, c1.green, c1.blue, c1.alpha),
+                extra2 = Color(c2.red, c2.green, c2.blue, c2.alpha),
+                extra3 = Color(c3.red, c3.green, c3.blue, c3.alpha)
             )
         } catch (e: Exception) {
             e.printStackTrace()

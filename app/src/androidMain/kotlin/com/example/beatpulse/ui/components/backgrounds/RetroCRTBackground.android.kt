@@ -148,13 +148,19 @@ actual fun RetroCRTBackground(
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val runtimeShader = remember {
-                try {
-                    RuntimeShader(RETRO_CRT_AGSL)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    null
+            var runtimeShader by remember { mutableStateOf<RuntimeShader?>(null) }
+            LaunchedEffect(isPlayerScreen) {
+                if (!isPlayerScreen) kotlinx.coroutines.delay(100L)
+                val shader = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    try {
+                        val shaderCode = if (isPlayerScreen) RETRO_CRT_AGSL else RETRO_CRT_AGSL.replace("const int iter = 4;", "const int iter = 1;")
+                        RuntimeShader(shaderCode)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
                 }
+                runtimeShader = shader
             }
 
             val shaderBrush = remember(runtimeShader) {
@@ -167,11 +173,11 @@ actual fun RetroCRTBackground(
                     val effectiveTime = time
                     val effectiveEnergy = if (isPlayerScreen) smoothedEnergy * 0.3f else 0f
                     
-                    runtimeShader.setFloatUniform("u_resolution", size.width, size.height)
-                    runtimeShader.setFloatUniform("u_time", effectiveTime)
-                    runtimeShader.setFloatUniform("u_energy", effectiveEnergy)
-                    runtimeShader.setFloatUniform("u_dominant", dominantColor.red, dominantColor.green, dominantColor.blue, dominantColor.alpha)
-                    runtimeShader.setFloatUniform("u_vibrant", vibrantColor.red, vibrantColor.green, vibrantColor.blue, vibrantColor.alpha)
+                    runtimeShader?.setFloatUniform("u_resolution", size.width, size.height)
+                    runtimeShader?.setFloatUniform("u_time", effectiveTime)
+                    runtimeShader?.setFloatUniform("u_energy", effectiveEnergy)
+                    runtimeShader?.setFloatUniform("u_dominant", dominantColor.red, dominantColor.green, dominantColor.blue, dominantColor.alpha)
+                    runtimeShader?.setFloatUniform("u_vibrant", vibrantColor.red, vibrantColor.green, vibrantColor.blue, vibrantColor.alpha)
                     
                     drawRect(brush = shaderBrush)
                 }

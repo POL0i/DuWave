@@ -20,10 +20,15 @@ private const val WIND_WAKER_SKSL = """
     uniform vec2 u_resolution;
     uniform float u_time;
     uniform float u_energy;
-    uniform vec4 u_water1;
-    uniform vec4 u_water2;
-    uniform vec4 u_foam;
-    uniform vec4 u_sky;
+    uniform vec4 u_color1;
+    uniform vec4 u_color2;
+    uniform vec4 u_color3;
+    uniform vec4 u_color4;
+    uniform vec4 u_color5;
+    uniform vec4 u_color6;
+    uniform vec4 u_color7;
+    uniform vec4 u_color8;
+    uniform vec4 u_color9;
 
     const float M_2PI = 6.283185307;
     const float M_6PI = 18.84955592;
@@ -86,8 +91,20 @@ private const val WIND_WAKER_SKSL = """
         
         dist += vec2(u_energy * 0.1, u_energy * 0.1);
 
-        vec3 ret = mix(u_water1.rgb, u_water2.rgb, waterlayer(uv + dist.xy));
-        ret = mix(ret, u_foam.rgb, waterlayer(vec2(0.1 * u_time, 1.0) - uv - dist.yx));
+        float w1 = waterlayer(uv + dist.xy);
+        float w2 = waterlayer(uv * 1.5 - dist.yx + vec2(u_time * 0.02));
+        float foam = waterlayer(vec2(0.1 * u_time, 1.0) - uv - dist.yx);
+        
+        vec3 baseWater = mix(u_color1.rgb, u_color3.rgb, w1);
+        vec3 baseWater2 = mix(u_color7.rgb, u_color8.rgb, w1);
+        baseWater = mix(baseWater, baseWater2, sin(u_time * 0.3) * 0.5 + 0.5);
+        
+        vec3 midColor = mix(u_color2.rgb, u_color4.rgb, sin((uv.x + uv.y) * 4.0 + u_time) * 0.5 + 0.5);
+        vec3 ret = mix(baseWater, midColor, w2 * 0.85);
+        
+        vec3 foamColor = mix(u_color5.rgb, u_color9.rgb, cos(uv.x * 8.0 - u_time * 1.5) * 0.5 + 0.5);
+        ret = mix(ret, foamColor, foam);
+        
         return ret;
     }
 
@@ -129,13 +146,14 @@ private const val WIND_WAKER_SKSL = """
         vec3 pos = cpos + dist * cdir;
 
         vec3 pix;
-        vec3 fogCol = mix(u_sky.rgb, vec3(1.0), 0.3); 
+        vec3 skyColor = u_color6.rgb;
+        vec3 fogCol = mix(skyColor, vec3(1.0), 0.3); 
 
         if(dist > 0.0 && dist < 100.0) {
             vec3 wat = water(pos.xz, cdir);
             pix = mix(wat, fogCol, min(dist * 0.01, 1.0));
         } else {
-            pix = mix(fogCol, u_sky.rgb, min(cdir.y * 4.0, 1.0));
+            pix = mix(fogCol, skyColor, min(cdir.y * 4.0, 1.0));
         }
         
         return vec4(clamp(pix, 0.0, 1.0), 1.0);
@@ -192,22 +210,29 @@ actual fun WindWakerOceanBackground(
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val dom = paletteColors.dominant ?: Color.DarkGray
                 val vib = paletteColors.vibrant ?: dom
-                val light = paletteColors.lightVibrant ?: Color.White
+                val mut = paletteColors.muted ?: dom
+                val dvib = paletteColors.darkVibrant ?: vib
+                val lvib = paletteColors.lightVibrant ?: Color.White
+                val dmut = paletteColors.darkMuted ?: Color.Black
+                val ext1 = paletteColors.extra1 ?: dom
+                val ext2 = paletteColors.extra2 ?: vib
+                val ext3 = paletteColors.extra3 ?: mut
 
-                val uniformsBuffer = ByteBuffer.allocate(4 * 20).apply {
+                val uniformsBuffer = ByteBuffer.allocate(4 * 40).apply {
                     order(ByteOrder.LITTLE_ENDIAN)
                     putFloat(size.width)
                     putFloat(size.height)
                     putFloat(time)
                     putFloat(dynamicEnergy)
-                    // water1 (dominant)
                     putFloat(dom.red); putFloat(dom.green); putFloat(dom.blue); putFloat(1f)
-                    // water2 (vibrant)
                     putFloat(vib.red); putFloat(vib.green); putFloat(vib.blue); putFloat(1f)
-                    // foam (lightest color)
-                    putFloat(light.red); putFloat(light.green); putFloat(light.blue); putFloat(1f)
-                    // sky (dominant tinted)
-                    putFloat(dom.red); putFloat(dom.green); putFloat(dom.blue); putFloat(1f)
+                    putFloat(mut.red); putFloat(mut.green); putFloat(mut.blue); putFloat(1f)
+                    putFloat(dvib.red); putFloat(dvib.green); putFloat(dvib.blue); putFloat(1f)
+                    putFloat(lvib.red); putFloat(lvib.green); putFloat(lvib.blue); putFloat(1f)
+                    putFloat(dmut.red); putFloat(dmut.green); putFloat(dmut.blue); putFloat(1f)
+                    putFloat(ext1.red); putFloat(ext1.green); putFloat(ext1.blue); putFloat(1f)
+                    putFloat(ext2.red); putFloat(ext2.green); putFloat(ext2.blue); putFloat(1f)
+                    putFloat(ext3.red); putFloat(ext3.green); putFloat(ext3.blue); putFloat(1f)
                 }
                 
                 val currentShader = effect.makeShader(

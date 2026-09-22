@@ -108,7 +108,10 @@ class DummyAppPreferences : AppPreferences {
     override var showFps = false
     override var showRemainingTime = false
     override val favoriteBackgroundStylesFlow: StateFlow<Set<Int>> = MutableStateFlow(emptySet())
-    override var favoriteBackgroundStyles: Set<Int> = emptySet()
+    override var favoriteBackgroundStyles: Set<Int>
+    override var designSettingsPagerPage: Int = 0
+    override var designSettingsFilterFavorites: Boolean = false
+ = emptySet()
     override val favoriteVisualizerStylesFlow: kotlinx.coroutines.flow.StateFlow<Set<String>> = kotlinx.coroutines.flow.MutableStateFlow(emptySet())
     override var favoriteVisualizerStyles: Set<String> = emptySet()
 

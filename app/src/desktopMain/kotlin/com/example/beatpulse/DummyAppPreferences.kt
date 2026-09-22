@@ -107,6 +107,10 @@ class DummyAppPreferences : AppPreferences, IPreferencesManager {
     private val _favoriteBackgroundStylesFlow = MutableStateFlow<Set<Int>>(emptySet())
     override val favoriteBackgroundStylesFlow: StateFlow<Set<Int>> = _favoriteBackgroundStylesFlow
     override var favoriteBackgroundStyles: Set<Int>
+
+    override var designSettingsPagerPage: Int = 0
+    override var designSettingsFilterFavorites: Boolean = false
+
         get() = _favoriteBackgroundStylesFlow.value
         set(value) { _favoriteBackgroundStylesFlow.value = value }
 

@@ -203,7 +203,7 @@ android {
 
 dependencies {
     ksp("androidx.room:room-compiler:2.7.0-alpha13")
-
+    debugImplementation("com.squareup.leakcanary:leakcanary-android:2.14")
 }
 
 

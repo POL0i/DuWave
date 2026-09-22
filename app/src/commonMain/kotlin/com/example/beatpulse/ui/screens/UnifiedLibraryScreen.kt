@@ -4,6 +4,7 @@ import com.example.beatpulse.core.focus.animatedFocusBorder
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.*
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -23,6 +24,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.border
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
@@ -212,26 +214,20 @@ fun UnifiedLibraryScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         // Animated sparkle star — simple pulse
-                        var sparkleTarget by remember { mutableStateOf(true) }
-                        LaunchedEffect(Unit) {
-                            while (true) {
-                                kotlinx.coroutines.delay(1200)
-                                sparkleTarget = !sparkleTarget
-                            }
-                        }
-                        val sparkleScale by androidx.compose.animation.core.animateFloatAsState(
-                            targetValue = if (sparkleTarget) 1.2f else 0.7f,
-                            animationSpec = androidx.compose.animation.core.tween(1200, easing = FastOutSlowInEasing),
+                        val infiniteTransition = rememberInfiniteTransition(label = "sparkle_transition")
+                        val sparkleScale by infiniteTransition.animateFloat(
+                            initialValue = 0.7f, targetValue = 1.2f,
+                            animationSpec = infiniteRepeatable(animation = androidx.compose.animation.core.tween(1200, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
                             label = "sparkle_scale"
                         )
-                        val sparkleAlpha by androidx.compose.animation.core.animateFloatAsState(
-                            targetValue = if (sparkleTarget) 1.0f else 0.4f,
-                            animationSpec = androidx.compose.animation.core.tween(1200, easing = FastOutSlowInEasing),
+                        val sparkleAlpha by infiniteTransition.animateFloat(
+                            initialValue = 0.4f, targetValue = 1.0f,
+                            animationSpec = infiniteRepeatable(animation = androidx.compose.animation.core.tween(1200, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
                             label = "sparkle_alpha"
                         )
-                        val sparkleRotation by androidx.compose.animation.core.animateFloatAsState(
-                            targetValue = if (sparkleTarget) 15f else -15f,
-                            animationSpec = androidx.compose.animation.core.tween(1800, easing = FastOutSlowInEasing),
+                        val sparkleRotation by infiniteTransition.animateFloat(
+                            initialValue = -15f, targetValue = 15f,
+                            animationSpec = infiniteRepeatable(animation = androidx.compose.animation.core.tween(1800, easing = FastOutSlowInEasing), repeatMode = RepeatMode.Reverse),
                             label = "sparkle_rotation"
                         )
                         Text(
@@ -253,34 +249,90 @@ fun UnifiedLibraryScreen(
                         if (showLanguageDialog) {
                             androidx.compose.material3.AlertDialog(
                                 onDismissRequest = { showLanguageDialog = false },
-                                title = { Text(getLocalizedString("select_language")) },
+                                title = { 
+                                    Text(
+                                        text = getLocalizedString("select_language"),
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 22.sp,
+                                        color = if (paletteColors.dominant.luminance() > 0.5f) Color(0xFF121212) else Color.White
+                                    ) 
+                                },
                                 text = {
-                                    Column {
-                                        listOf("es" to "🇪🇸 Español", "en" to "🇺🇸 English", "pt" to "🇧🇷 Português").forEach { (code, name) ->
-                                            Text(
-                                                text = name,
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .clickable {
-                                                        if (prefs.appLanguage == code) return@clickable
-                                                        prefs.appLanguage = code
-                                                        showLanguageDialog = false
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        val dialogTextColor = if (paletteColors.dominant.luminance() > 0.5f) Color(0xFF121212) else Color.White
+                                        
+                                        Text(
+                                            text = "Choose the language for your application",
+                                            fontSize = 14.sp,
+                                            color = dialogTextColor.copy(alpha = 0.7f),
+                                            modifier = Modifier.padding(bottom = 8.dp)
+                                        )
+                                        
+                                        val supportedLanguages = listOf(
+                                            "es" to "🇪🇸 Español",
+                                            "en" to "🇺🇸 English",
+                                            "pt" to "🇧🇷 Português"
+                                        )
+                                        
+                                        androidx.compose.foundation.lazy.LazyColumn(
+                                            modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp),
+                                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            items(supportedLanguages) { (code, name) ->
+                                                val isSelected = prefs.appLanguage == code
+                                                val itemBgColor = if (isSelected) dialogTextColor else Color.Transparent
+                                                val itemTextColor = if (isSelected) paletteColors.dominant else dialogTextColor
+                                                
+                                                androidx.compose.material3.Surface(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clip(RoundedCornerShape(12.dp))
+                                                        .clickable {
+                                                            if (!isSelected) {
+                                                                prefs.appLanguage = code
+                                                                showLanguageDialog = false
+                                                            }
+                                                        }
+                                                        .border(
+                                                            width = if (isSelected) 2.dp else 1.dp,
+                                                            color = if (isSelected) dialogTextColor else dialogTextColor.copy(alpha = 0.3f),
+                                                            shape = RoundedCornerShape(12.dp)
+                                                        ),
+                                                    color = itemBgColor,
+                                                    contentColor = itemTextColor
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(vertical = 14.dp, horizontal = 16.dp),
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        horizontalArrangement = Arrangement.SpaceBetween
+                                                    ) {
+                                                        Text(
+                                                            text = name,
+                                                            fontSize = 17.sp,
+                                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                            color = itemTextColor
+                                                        )
+                                                        if (isSelected) {
+                                                            androidx.compose.material3.Icon(
+                                                                imageVector = Icons.Default.Check,
+                                                                contentDescription = "Selected",
+                                                                tint = itemTextColor
+                                                            )
+                                                        }
                                                     }
-                                                    .padding(16.dp),
-                                                fontSize = 18.sp,
-                                                color = if (prefs.appLanguage == code) paletteColors.vibrant else dynamicTextColor
-                                            )
+                                                }
+                                            }
                                         }
                                     }
                                 },
                                 confirmButton = {
                                     TextButton(onClick = { showLanguageDialog = false }) {
-                                        Text(getLocalizedString("cancel"))
+                                        Text(getLocalizedString("cancel"), color = if (paletteColors.dominant.luminance() > 0.5f) Color(0xFF121212) else Color.White)
                                     }
                                 },
                                 containerColor = paletteColors.dominant,
-                                titleContentColor = dynamicTextColor,
-                                textContentColor = dynamicTextColor
+                                titleContentColor = if (paletteColors.dominant.luminance() > 0.5f) Color(0xFF121212) else Color.White,
+                                textContentColor = if (paletteColors.dominant.luminance() > 0.5f) Color(0xFF121212) else Color.White
                             )
                         }
 
@@ -387,7 +439,6 @@ fun UnifiedLibraryScreen(
                             DesignSettingsDialog(
                                 prefs = prefs,
                                 paletteColors = paletteColors,
-                                dynamicTextColor = dynamicTextColor,
                                 currentShapeIdx = shapeIdx,
                                 currentBgStyle = bgStyle,
                                 onDismiss = { showDesignSettings = false }
@@ -757,6 +808,29 @@ fun UnifiedLibraryScreen(
                     }
                 }
                 
+                val localDialogBg = paletteColors.dominant.copy(alpha = 0.95f)
+                val localDynamicTextColor = if (paletteColors.dominant.luminance() < 0.5f) Color.White else Color.Black
+                val localAdjustedVibrant = androidx.compose.runtime.remember(paletteColors.vibrant, paletteColors.dominant) {
+                    val contrast = kotlin.math.abs(paletteColors.vibrant.luminance() - paletteColors.dominant.luminance())
+                    if (contrast < 0.25f) {
+                        if (paletteColors.dominant.luminance() < 0.5f) {
+                            paletteColors.vibrant.copy(
+                                red = paletteColors.vibrant.red + (1f - paletteColors.vibrant.red) * 0.6f,
+                                green = paletteColors.vibrant.green + (1f - paletteColors.vibrant.green) * 0.6f,
+                                blue = paletteColors.vibrant.blue + (1f - paletteColors.vibrant.blue) * 0.6f
+                            )
+                        } else {
+                            paletteColors.vibrant.copy(
+                                red = paletteColors.vibrant.red * 0.4f,
+                                green = paletteColors.vibrant.green * 0.4f,
+                                blue = paletteColors.vibrant.blue * 0.4f
+                            )
+                        }
+                    } else {
+                        paletteColors.vibrant
+                    }
+                }
+
                 trackPendingTrim?.let { track ->
                     com.example.beatpulse.ui.components.library.AudioTrimmerDialog(
                         track = track,
@@ -764,9 +838,9 @@ fun UnifiedLibraryScreen(
                         onTrimSuccess = { newPath ->
                             viewModel.copyMetadataForTrimmedTrack(track, newPath)
                         },
-                        colorVibrant = paletteColors.vibrant,
-                        colorSurface = paletteColors.dominant.copy(alpha = 0.95f),
-                        colorText = dynamicTextColor,
+                        colorVibrant = localAdjustedVibrant,
+                        colorSurface = localDialogBg,
+                        colorText = localDynamicTextColor,
                         onPausePlayback = onPausePlayback
                     )
                 }
@@ -788,10 +862,10 @@ fun UnifiedLibraryScreen(
                 trackToAddToPlaylist?.let { trackToAdd ->
                     AlertDialog(
                         onDismissRequest = { trackToAddToPlaylist = null },
-                        title = { Text(getLocalizedString("add_to_playlist")) },
+                        title = { Text(getLocalizedString("add_to_playlist"), color = localDynamicTextColor) },
                         text = {
                             if (playlists.isEmpty()) {
-                                Text(getLocalizedString("no_playlists_created"))
+                                Text(getLocalizedString("no_playlists_created"), color = localDynamicTextColor)
                             } else {
                                 LazyColumn {
                                     items(playlists) { pl ->
@@ -805,7 +879,7 @@ fun UnifiedLibraryScreen(
                                                     trackToAddToPlaylist = null
                                                 }
                                                 .padding(16.dp),
-                                            color = dynamicTextColor
+                                            color = localDynamicTextColor
                                         )
                                     }
                                 }
@@ -813,18 +887,18 @@ fun UnifiedLibraryScreen(
                         },
                         confirmButton = {
                             TextButton(onClick = { trackToAddToPlaylist = null }) {
-                                Text("Cerrar", color = paletteColors.vibrant)
+                                Text("Cerrar", color = localAdjustedVibrant)
                             }
                         },
-                        containerColor = paletteColors.dominant
+                        containerColor = localDialogBg
                     )
                 }
 
                 trackPendingConfirmation?.let { track ->
                     AlertDialog(
                         onDismissRequest = { trackPendingConfirmation = null },
-                        title = { Text(getLocalizedString("delete_track_title"), color = dynamicTextColor) },
-                        text = { Text(getLocalizedString("delete_track_desc", track.title), color = dynamicTextColor) },
+                        title = { Text(getLocalizedString("delete_track_title"), color = localDynamicTextColor) },
+                        text = { Text(getLocalizedString("delete_track_desc", track.title), color = localDynamicTextColor) },
                         confirmButton = {
                             TextButton(onClick = {
                                 val t = track
@@ -845,10 +919,10 @@ fun UnifiedLibraryScreen(
                         },
                         dismissButton = {
                             TextButton(onClick = { trackPendingConfirmation = null }) {
-                                Text(getLocalizedString("cancel"), color = paletteColors.vibrant)
+                                Text(getLocalizedString("cancel"), color = localAdjustedVibrant)
                             }
                         },
-                        containerColor = paletteColors.dominant
+                        containerColor = localDialogBg
                     )
                 }
             }

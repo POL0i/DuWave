@@ -119,13 +119,16 @@ private const val TALE_LEGEND_SHADER_SRC = """
         
         // Brighter dominant for the box
         half3 bColor = colorDominant.rgb * 1.5;
-        finalColor = mix(finalColor, bColor, boxLine);
+        float boxOpacity = isPlayer > 0.5 ? 1.0 : 0.3;
+        finalColor = mix(finalColor, bColor, boxLine * boxOpacity);
         
-        // Bullets are white hearts
-        finalColor = mix(finalColor, half3(1.0, 1.0, 1.0), bulletMask);
+        // Bullets are white hearts, semi-transparent in Library
+        float bulletOpacity = isPlayer > 0.5 ? 1.0 : 0.2;
+        finalColor = mix(finalColor, half3(1.0, 1.0, 1.0), bulletMask * bulletOpacity);
         
-        // SOUL is vibrant red/color
-        finalColor = mix(finalColor, colorVibrant.rgb * (1.0 + iEnergy), soulMask);
+        // SOUL is vibrant red/color, semi-transparent in Library
+        float soulOpacity = isPlayer > 0.5 ? 1.0 : 0.4;
+        finalColor = mix(finalColor, colorVibrant.rgb * (1.0 + iEnergy), soulMask * soulOpacity);
         
         // Very subtle scanline retro effect
         float scanline = sin(fragCoord.y * 0.5) * 0.05;

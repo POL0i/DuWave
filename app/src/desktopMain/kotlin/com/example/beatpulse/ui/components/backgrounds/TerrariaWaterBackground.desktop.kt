@@ -19,6 +19,7 @@ uniform float u_time;
 uniform vec4 u_dominant;
 uniform vec4 u_vibrant;
 uniform float u_energy;
+uniform float u_is_player;
 
 float myMod(float x, float y) {
     return x - y * floor(x / y);
@@ -126,6 +127,7 @@ actual fun TerrariaWaterBackground(
                     builder.uniform("u_resolution", size.width, size.height)
                     builder.uniform("u_time", effectiveTime)
                     builder.uniform("u_energy", effectiveEnergy)
+                    builder.uniform("u_is_player", if (isPlayerScreen) 1f else 0f)
                     builder.uniform("u_dominant", paletteColors.dominant.red, paletteColors.dominant.green, paletteColors.dominant.blue, paletteColors.dominant.alpha)
                     builder.uniform("u_vibrant", paletteColors.vibrant.red, paletteColors.vibrant.green, paletteColors.vibrant.blue, paletteColors.vibrant.alpha)
                     return builder.makeShader()

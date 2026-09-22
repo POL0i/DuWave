@@ -126,7 +126,7 @@ fun AlbumsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Inicio",
+                        text = getLocalizedString("home_title"),
                         style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.Bold),
                         color = dynamicTextColor
                     )
@@ -137,28 +137,42 @@ fun AlbumsScreen(
                         var showKeyboardSettings by remember { mutableStateOf(false) }
                         Box {
                             IconButton(onClick = { showSettingsMenu = true }) {
-                                Icon(Icons.Default.Settings, contentDescription = "Ajustes", tint = paletteColors.vibrant)
+                                Icon(Icons.Default.Settings, contentDescription = getLocalizedString("settings"), tint = paletteColors.vibrant)
                             }
-                            DropdownMenu(
-                                expanded = showSettingsMenu,
-                                onDismissRequest = { showSettingsMenu = false }
-                            ) {
-                                val filterWhatsApp = prefs.filterWhatsAppShorts
-                                DropdownMenuItem(
-                                    text = { Text(if (filterWhatsApp) "Mostrar audios WhatsApp" else "Ocultar audios WhatsApp") },
-                                    onClick = {
-                                        prefs.filterWhatsAppShorts = !filterWhatsApp
-                                        showSettingsMenu = false
-                                        viewModel.scanMediaStore()
-                                    }
+                            androidx.compose.material3.MaterialTheme(
+                                colorScheme = androidx.compose.material3.MaterialTheme.colorScheme.copy(
+                                    surface = Color(0xFF1A1A1A),
+                                    surfaceContainer = Color(0xFF1A1A1A),
+                                    surfaceContainerHigh = Color(0xFF1A1A1A),
+                                    surfaceContainerHighest = Color(0xFF1A1A1A),
+                                    surfaceContainerLow = Color(0xFF1A1A1A),
+                                    surfaceContainerLowest = Color(0xFF1A1A1A),
+                                    onSurface = Color.White,
+                                    onSurfaceVariant = Color.White
                                 )
+                            ) {
+                                DropdownMenu(
+                                    expanded = showSettingsMenu,
+                                    onDismissRequest = { showSettingsMenu = false },
+                                    modifier = Modifier.background(Color(0xFF1A1A1A))
+                                ) {
+                                    val filterWhatsApp = prefs.filterWhatsAppShorts
+                                    DropdownMenuItem(
+                                        text = { Text(if (filterWhatsApp) getLocalizedString("show_whatsapp_audio") else getLocalizedString("hide_whatsapp_audio")) },
+                                        onClick = {
+                                            prefs.filterWhatsAppShorts = !filterWhatsApp
+                                            showSettingsMenu = false
+                                            viewModel.scanMediaStore()
+                                        }
+                                    )
+                                }
                             }
                         }
                         
                         IconButton(onClick = { showDesignSettings = true }) {
                             Icon(
                                 imageVector = Icons.Default.Palette,
-                                contentDescription = "Ajustes de Diseño",
+                                contentDescription = getLocalizedString("design_settings"),
                                 tint = paletteColors.vibrant
                             )
                         }
@@ -185,7 +199,6 @@ fun AlbumsScreen(
                             DesignSettingsDialog(
                                 prefs = prefs,
                                 paletteColors = paletteColors,
-                                dynamicTextColor = dynamicTextColor,
                                 currentShapeIdx = shapeIdx,
                                 currentBgStyle = bgStyle,
                                 onDismiss = { showDesignSettings = false }
@@ -200,7 +213,7 @@ fun AlbumsScreen(
                 ) {
                     item {
                         Text(
-                            text = "Listas de Reproducción",
+                            text = getLocalizedString("playlists_title"),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                             color = dynamicTextColor,
                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
@@ -209,42 +222,45 @@ fun AlbumsScreen(
                     
                     if (recentTracks.isNotEmpty()) {
                         item {
+                            val title = getLocalizedString("last_20_plays")
                             PlaylistFolderItem(
-                                title = "20 Últimas Reproducciones",
+                                title = title,
                                 count = recentTracks.take(20).size,
                                 thumbnailShapeIdx = shapeIdx,
                                 icon = Icons.Default.History,
                                 tint = paletteColors.vibrant,
                                 textColor = dynamicTextColor,
-                                onClick = { selectedPlaylist = PlaylistViewData("20 Últimas Reproducciones", recentTracks.take(20)) }
+                                onClick = { selectedPlaylist = PlaylistViewData(title, recentTracks.take(20)) }
                             )
                         }
                     }
                     
                     if (topTracks.isNotEmpty()) {
                         item {
+                            val title = getLocalizedString("top_tracks")
                             PlaylistFolderItem(
-                                title = "Mejores Reproducciones",
+                                title = title,
                                 count = topTracks.size,
                                 thumbnailShapeIdx = shapeIdx,
                                 icon = Icons.Default.Star,
                                 tint = paletteColors.vibrant,
                                 textColor = dynamicTextColor,
-                                onClick = { selectedPlaylist = PlaylistViewData("Mejores Reproducciones", topTracks) }
+                                onClick = { selectedPlaylist = PlaylistViewData(title, topTracks) }
                             )
                         }
                     }
                     
                     if (recentlyAdded.isNotEmpty()) {
                         item {
+                            val title = getLocalizedString("recently_added")
                             PlaylistFolderItem(
-                                title = "Últimos Agregados",
+                                title = title,
                                 count = recentlyAdded.size,
                                 thumbnailShapeIdx = shapeIdx,
                                 icon = Icons.Default.NewReleases,
                                 tint = paletteColors.vibrant,
                                 textColor = dynamicTextColor,
-                                onClick = { selectedPlaylist = PlaylistViewData("Últimos Agregados", recentlyAdded) }
+                                onClick = { selectedPlaylist = PlaylistViewData(title, recentlyAdded) }
                             )
                         }
                     }
@@ -252,12 +268,22 @@ fun AlbumsScreen(
                     if (playlists.isNotEmpty()) {
                         item {
                             Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Mis Listas",
-                                style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
-                                color = dynamicTextColor,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
-                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = getLocalizedString("my_lists"),
+                                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+                                    color = dynamicTextColor
+                                )
+                                IconButton(onClick = { isCreatingPlaylist = true }) {
+                                    Icon(Icons.Default.Add, contentDescription = getLocalizedString("create_playlist"), tint = dynamicTextColor)
+                                }
+                            }
                         }
                         items(playlists, key = { "pl_${it.playlistId}" }) { pl ->
                             val trackCount by viewModel.getPlaylistTrackCountFlow(pl.playlistId).collectAsState(initial = 0)
@@ -272,24 +298,11 @@ fun AlbumsScreen(
                             )
                         }
                     }
-
-                    item {
-                        Spacer(modifier = Modifier.height(16.dp))
-                        Button(
-                            onClick = { isCreatingPlaylist = true },
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = null)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(getLocalizedString("create_playlist"))
-                        }
-                    }
                     
                     item {
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Carpetas",
+                            text = getLocalizedString("folders_category"),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold),
                             color = dynamicTextColor,
                             modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
@@ -641,7 +654,7 @@ fun AddTracksScreen(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = paletteColors.vibrant)
             ) {
-                Text(if (selectedTracks.values.any { it }) "Añadir" else getLocalizedString("cancel"))
+                Text(if (selectedTracks.values.any { it }) getLocalizedString("add") else getLocalizedString("cancel"))
             }
         }
 

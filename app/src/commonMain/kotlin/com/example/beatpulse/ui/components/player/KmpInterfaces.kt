@@ -80,6 +80,8 @@ interface IPreferencesManager {
 
     val favoriteBackgroundStylesFlow: StateFlow<Set<Int>>
     var favoriteBackgroundStyles: Set<Int>
+    var designSettingsPagerPage: Int
+    var designSettingsFilterFavorites: Boolean
     val favoriteVisualizerStylesFlow: StateFlow<Set<String>>
     var favoriteVisualizerStyles: Set<String>
     

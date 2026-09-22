@@ -664,13 +664,30 @@ class PlayerViewModel(
                 if (imageBitmap != null) {
                     val palette = Palette.from(imageBitmap).generate()
                     val dominantRaw = (palette.getDominantColor(android.graphics.Color.DKGRAY))
+                    val vR = palette.getVibrantColor(dominantRaw)
+                    val mR = palette.getMutedColor(dominantRaw)
+                    val dvR = palette.getDarkVibrantColor(dominantRaw)
+                    val lvR = palette.getLightVibrantColor(dominantRaw)
+                    val dmR = palette.getDarkMutedColor(dominantRaw)
+                    
+                    val swatches = palette.swatches.sortedByDescending { it.population }
+                    val distinctColors = swatches.map { it.rgb }.distinct().filter { 
+                        it != dominantRaw && it != vR && it != mR && it != dvR && it != lvR && it != dmR 
+                    }
+                    val e1 = distinctColors.getOrNull(0) ?: dominantRaw
+                    val e2 = distinctColors.getOrNull(1) ?: e1
+                    val e3 = distinctColors.getOrNull(2) ?: e2
+                    
                     val colors = PaletteColors(
                         dominant = Color(dominantRaw),
-                        vibrant = Color((palette.getVibrantColor(dominantRaw))),
-                        muted = Color((palette.getMutedColor(dominantRaw))),
-                        darkVibrant = Color((palette.getDarkVibrantColor(dominantRaw))),
-                        lightVibrant = Color((palette.getLightVibrantColor(dominantRaw))),
-                        darkMuted = Color((palette.getDarkMutedColor(dominantRaw)))
+                        vibrant = Color(vR),
+                        muted = Color(mR),
+                        darkVibrant = Color(dvR),
+                        lightVibrant = Color(lvR),
+                        darkMuted = Color(dmR),
+                        extra1 = Color(e1),
+                        extra2 = Color(e2),
+                        extra3 = Color(e3)
                     )
                     PaletteCache.put(fingerprint, colors)
                     _paletteColors.value = colors
@@ -697,13 +714,30 @@ class PlayerViewModel(
                 if (bitmap != null) {
                     val palette = Palette.from(bitmap.asImageBitmap()).generate()
                     val dominantRaw = (palette.dominantSwatch?.rgb ?: android.graphics.Color.DKGRAY)
+                    val vR = palette.vibrantSwatch?.rgb ?: dominantRaw
+                    val mR = palette.mutedSwatch?.rgb ?: dominantRaw
+                    val dvR = palette.darkVibrantSwatch?.rgb ?: dominantRaw
+                    val lvR = palette.lightVibrantSwatch?.rgb ?: dominantRaw
+                    val dmR = palette.darkMutedSwatch?.rgb ?: dominantRaw
+                    
+                    val swatches = palette.swatches.sortedByDescending { it.population }
+                    val distinctColors = swatches.map { it.rgb }.distinct().filter { 
+                        it != dominantRaw && it != vR && it != mR && it != dvR && it != lvR && it != dmR 
+                    }
+                    val e1 = distinctColors.getOrNull(0) ?: dominantRaw
+                    val e2 = distinctColors.getOrNull(1) ?: e1
+                    val e3 = distinctColors.getOrNull(2) ?: e2
+                    
                     val colors = PaletteColors(
                         dominant = Color(dominantRaw),
-                        vibrant = Color((palette.vibrantSwatch?.rgb ?: dominantRaw)),
-                        muted = Color((palette.mutedSwatch?.rgb ?: dominantRaw)),
-                        darkVibrant = Color((palette.darkVibrantSwatch?.rgb ?: dominantRaw)),
-                        lightVibrant = Color((palette.lightVibrantSwatch?.rgb ?: dominantRaw)),
-                        darkMuted = Color((palette.darkMutedSwatch?.rgb ?: dominantRaw))
+                        vibrant = Color(vR),
+                        muted = Color(mR),
+                        darkVibrant = Color(dvR),
+                        lightVibrant = Color(lvR),
+                        darkMuted = Color(dmR),
+                        extra1 = Color(e1),
+                        extra2 = Color(e2),
+                        extra3 = Color(e3)
                     )
                     _paletteColors.value = colors
                 }

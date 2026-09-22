@@ -92,13 +92,19 @@ actual fun ProceduralCRTCdc3rxBackground(
             }
         }
 
-        val runtimeEffect = remember {
-            try {
-                RuntimeShader(PROCEDURAL_CRT_SHADER)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
+        var runtimeEffect by remember { mutableStateOf<RuntimeShader?>(null) }
+        LaunchedEffect(isPlayerScreen) {
+            if (!isPlayerScreen) kotlinx.coroutines.delay(100L)
+            val shader = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                try {
+                    val shaderCode = if (isPlayerScreen) PROCEDURAL_CRT_SHADER else PROCEDURAL_CRT_SHADER.replace("for (int i = 0; i < 30; ++i)", "for (int i = 0; i < 5; ++i)")
+                    RuntimeShader(shaderCode)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
+                }
             }
+            runtimeEffect = shader
         }
 
         val shaderBrush = remember(runtimeEffect) {

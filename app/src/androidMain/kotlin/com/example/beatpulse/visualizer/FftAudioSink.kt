@@ -18,6 +18,9 @@ class FftAudioSink(private val listener: (FloatArray) -> Unit) : TeeAudioProcess
     @Volatile
     var isMicModeActive = false
 
+    @Volatile
+    var isEnabled = true
+
     private val cosTable = FloatArray(FFT_SIZE / 2)
     private val sinTable = FloatArray(FFT_SIZE / 2)
     private val window = FloatArray(FFT_SIZE)
@@ -41,6 +44,7 @@ class FftAudioSink(private val listener: (FloatArray) -> Unit) : TeeAudioProcess
     var ignoreUntil = 0L
 
     override fun handleBuffer(buffer: ByteBuffer) {
+        if (!isEnabled) return
         if (isMicModeActive) return // Ignore ExoPlayer buffers when mic is active
         if (System.currentTimeMillis() < ignoreUntil) return
         processBuffer(buffer)
@@ -51,6 +55,7 @@ class FftAudioSink(private val listener: (FloatArray) -> Unit) : TeeAudioProcess
     }
 
     fun handleMicBuffer(buffer: ByteBuffer) {
+        if (!isEnabled) return
         if (!isMicModeActive) return
         processBuffer(buffer)
     }

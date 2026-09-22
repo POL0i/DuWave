@@ -284,6 +284,29 @@ fun PlayerEditorDialog(
 ) {
     if (!showEditorDialog || currentTrack == null) return
     com.example.beatpulse.utils.SystemBackHandler { onDismissRequest() }
+    
+    val dynamicTextColor = if (colorDominant.luminance() < 0.5f) Color.White else Color.Black
+    val adjustedVibrant = androidx.compose.runtime.remember(colorVibrant, colorDominant) {
+        val contrast = kotlin.math.abs(colorVibrant.luminance() - colorDominant.luminance())
+        if (contrast < 0.25f) {
+            if (colorDominant.luminance() < 0.5f) {
+                colorVibrant.copy(
+                    red = colorVibrant.red + (1f - colorVibrant.red) * 0.6f,
+                    green = colorVibrant.green + (1f - colorVibrant.green) * 0.6f,
+                    blue = colorVibrant.blue + (1f - colorVibrant.blue) * 0.6f
+                )
+            } else {
+                colorVibrant.copy(
+                    red = colorVibrant.red * 0.4f,
+                    green = colorVibrant.green * 0.4f,
+                    blue = colorVibrant.blue * 0.4f
+                )
+            }
+        } else {
+            colorVibrant
+        }
+    }
+
     var editTitle by remember { mutableStateOf(currentTrack.customTitle ?: currentTrack.title) }
     var editArtist by remember { mutableStateOf(currentTrack.customArtist ?: currentTrack.artist) }
     var editAlbum by remember { mutableStateOf(currentTrack.customAlbum ?: currentTrack.album) }
@@ -305,40 +328,40 @@ fun PlayerEditorDialog(
     
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text(getLocalizedString("edit_tag"), color = colorVibrant) },
+        title = { Text(getLocalizedString("edit_tag"), color = adjustedVibrant) },
         text = {
             Column {
                 OutlinedTextField(
                     value = editTitle,
                     onValueChange = { editTitle = it },
-                    label = { Text(getLocalizedString("title"), color = Color.Gray) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = colorVibrant, cursorColor = colorVibrant)
+                    label = { Text(getLocalizedString("title"), color = dynamicTextColor.copy(alpha=0.7f)) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = dynamicTextColor, unfocusedTextColor = dynamicTextColor, focusedBorderColor = adjustedVibrant, cursorColor = adjustedVibrant)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = editArtist,
                     onValueChange = { editArtist = it },
-                    label = { Text(getLocalizedString("artist"), color = Color.Gray) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = colorVibrant, cursorColor = colorVibrant)
+                    label = { Text(getLocalizedString("artist"), color = dynamicTextColor.copy(alpha=0.7f)) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = dynamicTextColor, unfocusedTextColor = dynamicTextColor, focusedBorderColor = adjustedVibrant, cursorColor = adjustedVibrant)
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
                     value = editAlbum,
                     onValueChange = { editAlbum = it },
-                    label = { Text("Álbum", color = Color.Gray) },
-                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White, focusedBorderColor = colorVibrant, cursorColor = colorVibrant)
+                    label = { Text("Álbum", color = dynamicTextColor.copy(alpha=0.7f)) },
+                    colors = OutlinedTextFieldDefaults.colors(focusedTextColor = dynamicTextColor, unfocusedTextColor = dynamicTextColor, focusedBorderColor = adjustedVibrant, cursorColor = adjustedVibrant)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Button(
                     onClick = { 
                         showCoverPicker = true
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = colorVibrant)
+                    colors = ButtonDefaults.buttonColors(containerColor = adjustedVibrant)
                 ) {
-                    Text(getLocalizedString("choose_cover"))
+                    Text(getLocalizedString("choose_cover"), color = dynamicTextColor)
                 }
                 if (editCoverPath != null) {
-                    Text(getLocalizedString("custom_cover_selected"), color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                    Text(getLocalizedString("custom_cover_selected"), color = dynamicTextColor.copy(alpha=0.7f), style = MaterialTheme.typography.bodySmall)
                 }
             }
         },
@@ -346,10 +369,10 @@ fun PlayerEditorDialog(
             TextButton(onClick = {
                 onUpdateTrackMetadata(currentTrack.id, editTitle, editArtist, editAlbum, editCoverPath)
                 onDismissRequest()
-            }) { Text(getLocalizedString("save"), color = colorVibrant) }
+            }) { Text(getLocalizedString("save"), color = adjustedVibrant) }
         },
         dismissButton = {
-            TextButton(onClick = onDismissRequest) { Text(getLocalizedString("cancel"), color = Color.Gray) }
+            TextButton(onClick = onDismissRequest) { Text(getLocalizedString("cancel"), color = dynamicTextColor.copy(alpha=0.7f)) }
         },
         containerColor = colorDominant.copy(alpha = 0.95f)
     )

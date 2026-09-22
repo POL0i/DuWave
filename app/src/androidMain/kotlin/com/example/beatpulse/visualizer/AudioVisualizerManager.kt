@@ -222,7 +222,11 @@ class AudioVisualizerManager(private val prefs: AppPreferences) : AppVisualizerM
         }
     }
 
-    override var isEnabled = true
+    override var isEnabled: Boolean = true
+        set(value) {
+            field = value
+            fftSink.isEnabled = value
+        }
 
     private fun rebuildLookupTables(numMagnitudes: Int) {
         if (numMagnitudes == cachedMagnitudeSize) return

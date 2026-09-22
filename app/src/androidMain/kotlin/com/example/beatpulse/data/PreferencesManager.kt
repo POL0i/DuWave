@@ -372,6 +372,14 @@ class PreferencesManager private constructor(context: Context) : AppPreferences 
             _favoriteBackgroundStylesFlow.value = value
         }
 
+    override var designSettingsPagerPage: Int
+        get() = prefs.getInt("design_settings_pager_page", 0)
+        set(value) = prefs.edit().putInt("design_settings_pager_page", value).apply()
+
+    override var designSettingsFilterFavorites: Boolean
+        get() = prefs.getBoolean("design_settings_filter_favs", false)
+        set(value) = prefs.edit().putBoolean("design_settings_filter_favs", value).apply()
+
     private val _favoriteVisualizerStylesFlow = MutableStateFlow(
         prefs.getStringSet("favoriteVisualizerStyles", emptySet()) ?: emptySet()
     )

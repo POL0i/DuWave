@@ -268,15 +268,22 @@ fun TrackItem(
                 ) {
                     Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = Color.Gray, modifier = Modifier.size(iconSize))
                 }
+                val isBgDark = paletteColors.dominant.luminance() <= 0.5f
+                val menuTextColor = if (isBgDark) androidx.compose.ui.graphics.Color.White else androidx.compose.ui.graphics.Color.Black
                 androidx.compose.material3.MaterialTheme(
                     colorScheme = androidx.compose.material3.MaterialTheme.colorScheme.copy(
                         surface = paletteColors.dominant,
-                        onSurface = textColor
+                        surfaceVariant = paletteColors.dominant,
+                        background = paletteColors.dominant,
+                        onSurface = menuTextColor,
+                        onSurfaceVariant = menuTextColor,
+                        onBackground = menuTextColor
                     )
                 ) {
                     DropdownMenu(
                         expanded = isMenuExpanded,
-                        onDismissRequest = { isMenuExpanded = false }
+                        onDismissRequest = { isMenuExpanded = false },
+                        modifier = Modifier.background(paletteColors.dominant)
                     ) {
                         if (onAddToPlaylist != null) {
                             DropdownMenuItem(
@@ -351,20 +358,43 @@ fun ChangeCoverDialog(
     val searchResults by viewModel.changeCoverSearchResults.collectAsState()
     val isLoading by viewModel.isChangeCoverLoading.collectAsState()
 
+    val dialogBg = paletteColors.dominant
+    val dynamicTextColor = if (dialogBg.luminance() < 0.5f) Color.White else Color.Black
+    val adjustedVibrant = androidx.compose.runtime.remember(paletteColors.vibrant, dialogBg) {
+        val contrast = kotlin.math.abs(paletteColors.vibrant.luminance() - dialogBg.luminance())
+        if (contrast < 0.25f) {
+            if (dialogBg.luminance() < 0.5f) {
+                paletteColors.vibrant.copy(
+                    red = paletteColors.vibrant.red + (1f - paletteColors.vibrant.red) * 0.6f,
+                    green = paletteColors.vibrant.green + (1f - paletteColors.vibrant.green) * 0.6f,
+                    blue = paletteColors.vibrant.blue + (1f - paletteColors.vibrant.blue) * 0.6f
+                )
+            } else {
+                paletteColors.vibrant.copy(
+                    red = paletteColors.vibrant.red * 0.4f,
+                    green = paletteColors.vibrant.green * 0.4f,
+                    blue = paletteColors.vibrant.blue * 0.4f
+                )
+            }
+        } else {
+            paletteColors.vibrant
+        }
+    }
+
     LaunchedEffect(track) {
         viewModel.searchCoversForTrack(track)
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(getLocalizedString("change_cover_title"), color = paletteColors.vibrant) },
+        title = { Text(getLocalizedString("change_cover_title"), color = adjustedVibrant) },
         text = {
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxWidth().height(150.dp), contentAlignment = Alignment.Center) {
-                    androidx.compose.material3.CircularProgressIndicator(color = paletteColors.vibrant)
+                    androidx.compose.material3.CircularProgressIndicator(color = adjustedVibrant)
                 }
             } else if (searchResults.isEmpty()) {
-                Text("No se encontraron portadas.", color = paletteColors.dominant)
+                Text("No se encontraron portadas.", color = dynamicTextColor)
             } else {
                 androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(2),
@@ -392,7 +422,7 @@ fun ChangeCoverDialog(
                                     )
                                 } else {
                                     Box(modifier = Modifier.fillMaxSize().background(Color.DarkGray), contentAlignment = Alignment.Center) {
-                                        androidx.compose.material3.CircularProgressIndicator(color = paletteColors.vibrant)
+                                        androidx.compose.material3.CircularProgressIndicator(color = adjustedVibrant)
                                     }
                                     }
                             }
@@ -403,10 +433,10 @@ fun ChangeCoverDialog(
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cerrar", color = paletteColors.vibrant)
+                Text("Cerrar", color = adjustedVibrant)
             }
         },
-        containerColor = paletteColors.dominant
+        containerColor = dialogBg
     )
 }
 

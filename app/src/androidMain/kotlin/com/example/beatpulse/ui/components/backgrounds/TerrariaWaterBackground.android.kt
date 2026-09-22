@@ -19,6 +19,7 @@ uniform float u_time;
 uniform vec4 u_dominant;
 uniform vec4 u_vibrant;
 uniform float u_energy;
+uniform float u_is_player;
 
 float myMod(float x, float y) {
     return x - y * floor(x / y);
@@ -63,7 +64,6 @@ vec4 main(vec2 fragCoord) {
 	vec2 UV = 2.0*(fragCoord.xy - u_resolution.xy/2.0) / min(u_resolution.x, u_resolution.y);
 	vec3 Color = mix(u_dominant.rgb * 0.2, u_vibrant.rgb * 0.4, clamp(UV.y, 0.0, 1.0));
 	
-    // Reduce loop from 3 to 2 for performance, it looks similar
 	for(int i = 0; i < 2; i++) {
         float J = float(i) * 0.5; // 0.0 to 0.5
 		float Lt = u_time*(0.5 + 2.0*J)*(1.0 + 0.1*sin(226.0*J)) + 17.0*J;
@@ -140,6 +140,7 @@ actual fun TerrariaWaterBackground(
                     runtimeShader.setFloatUniform("u_resolution", size.width, size.height)
                     runtimeShader.setFloatUniform("u_time", effectiveTime)
                     runtimeShader.setFloatUniform("u_energy", effectiveEnergy)
+                    runtimeShader.setFloatUniform("u_is_player", if (isPlayerScreen) 1f else 0f)
                     runtimeShader.setFloatUniform("u_dominant", paletteColors.dominant.red, paletteColors.dominant.green, paletteColors.dominant.blue, paletteColors.dominant.alpha)
                     runtimeShader.setFloatUniform("u_vibrant", paletteColors.vibrant.red, paletteColors.vibrant.green, paletteColors.vibrant.blue, paletteColors.vibrant.alpha)
                     

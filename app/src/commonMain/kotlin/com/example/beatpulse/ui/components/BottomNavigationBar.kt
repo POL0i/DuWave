@@ -1,9 +1,7 @@
 package com.example.beatpulse.ui.components
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.*
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -216,18 +214,15 @@ fun DotsIndicator(
         }
 
         if (showPlayHint && !prefs.hasUsedPlaylistSwipeGesture) {
-            var playAlpha by remember { mutableFloatStateOf(0.1f) }
-            LaunchedEffect(Unit) {
-                while (true) {
-                    playAlpha = 0.8f
-                    delay(800)
-                    playAlpha = 0.1f
-                    delay(800)
-                }
-            }
-            val animatedPlayAlpha by animateFloatAsState(
-                targetValue = playAlpha,
-                animationSpec = tween(800), label = "alpha"
+            val infiniteTransition = rememberInfiniteTransition(label = "play_hint_transition")
+            val animatedPlayAlpha by infiniteTransition.animateFloat(
+                initialValue = 0.1f,
+                targetValue = 0.8f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(800),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "play_hint_alpha"
             )
             Icon(
                 imageVector = Icons.Default.PlayArrow,

@@ -14,6 +14,7 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.sqrt
+import androidx.compose.ui.graphics.drawscope.withTransform
 
 // ==================================================================================
 // Pre-allocated buffers for 60 FPS rendering without GC thrashing.
@@ -105,6 +106,10 @@ fun PlayerTerrainBackground(
 ) {
     with(scope) {
         val w = size.width; val h = size.height
+        val isPortrait = h > w * 1.2f // Add some threshold
+        val drawW = if (isPortrait) h else w
+        val drawH = if (isPortrait) w else h
+        
         val bassOpacity = (0.3f + bassMult * 0.4f + reactivity * 0.2f).coerceIn(0f, 1f)
         val midOpacity = (0.4f + midMult * 0.3f + reactivity * 0.2f).coerceIn(0f, 1f)
         val highOpacity = (0.5f + trebleMult * 0.2f + reactivity * 0.2f).coerceIn(0f, 1f)
@@ -185,8 +190,9 @@ fun PlayerTerrainBackground(
                             highVal * highWeight + midVal * midWeight + bassVal * bassWeight
                         }
                         
-                        elevation = blended * (distanceFromCenter * distanceFromCenter)
-                        if (elevation < 0.05f) elevation = 0f // Threshold noise
+                        // REDUCED SENSITIVITY: Mutiply blended by 0.5
+                        elevation = blended * 0.5f * (distanceFromCenter * distanceFromCenter)
+                        if (elevation < 0.08f) elevation = 0f // Increased threshold noise
                     }
                     terrainState.history[xi] = elevation
                 }
@@ -195,25 +201,31 @@ fun PlayerTerrainBackground(
             }
         }
 
+        withTransform({
+            if (isPortrait) {
+                rotate(90f, Offset(w / 2f, h / 2f))
+                translate(w / 2f - drawW / 2f, h / 2f - drawH / 2f)
+            }
+        }) {
            fun drawTerrainLayer(color: Color, isTop: Boolean, opacityMult: Float, pulseMult: Float) {
             val ampMult = if (isTop) 2.5f else 5.0f
 
             fun project(x: Float, y: Float, z: Float): Offset {
-                val scale = h * 1.4f / z // Perspectiva incrementada (antes 0.9f)
-                val px = w / 2f + x * scale
-                val horizonOffset = h * 0.12f // Separación del horizonte
+                val scale = drawH * 1.4f / z // Perspectiva incrementada (antes 0.9f)
+                val px = drawW / 2f + x * scale
+                val horizonOffset = drawH * 0.12f // Separación del horizonte
                 val cameraY = 1.0f // Cámara un poco más baja para acentuar profundidad
                 
                 // Pulse the Y height dynamically with the music! 
-                // Increased global bounce multiplier (1.5x) for more reaction
-                val pulsedY = y * pulseMult * 1.5f
+                // Reduced global bounce multiplier to 1.0x (from 1.5x) for lower sensitivity
+                val pulsedY = y * pulseMult * 1.0f
                 
                 // Floor (+Y goes down on screen). Ceiling (-Y goes up).
                 val screenY = if (isTop) {
-                    val baseScreenY = h / 2f - horizonOffset
+                    val baseScreenY = drawH / 2f - horizonOffset
                     baseScreenY - cameraY * scale + pulsedY * ampMult * scale
                 } else {
-                    val baseScreenY = h / 2f + horizonOffset
+                    val baseScreenY = drawH / 2f + horizonOffset
                     baseScreenY + cameraY * scale - pulsedY * ampMult * scale
                 }
                 return Offset(px, screenY)
@@ -387,6 +399,7 @@ fun PlayerTerrainBackground(
             // Siempre forzar colores vibrantes para la malla de modo ahorro de recursos
             drawTerrainLayer(paletteColors.vibrant, false, bassOpacity, 1f)
             drawTerrainLayer(paletteColors.vibrant, true, highOpacity, 1f)
+        }
         }
     }
 }

@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.toArgb
 import com.example.beatpulse.theme.PaletteColors
 import com.example.beatpulse.ui.components.player.IAudioVisualizerManager
 
@@ -23,91 +24,98 @@ private const val SYNTHWAVE_AGSL = """
     uniform half4 u_vibrant;
     uniform half4 u_muted;
 
-    const float speed = 2.0;
+    const float speed = 1.0;
     const float audio_vibration_amplitude = 0.125;
 
     float amp(float2 p){
-        return smoothstep(1.0, 8.0, abs(p.x));   
+        float ax = abs(p.x);
+        return ax > 8.0 ? 1.0 : (ax < 1.0 ? 0.0 : (ax - 1.0) / 7.0);
     }
 
     float pow1d5(float a){
         return a * sqrt(a);
     }
 
-    float pow512(float a){
+    float pow16(float a){
         a *= a; a *= a; a *= a; a *= a;
-        a *= a; a *= a; a *= a; a *= a;
-        return a * a;
+        return a;
     }
 
-    float hash21(float2 co){
-        return fract(sin(dot(co.xy, float2(1.9898, 7.233))) * 45758.5433);
+    float hash21(float2 p){
+        vec3 p3  = fract(vec3(p.xyx) * 0.1031);
+        p3 += dot(p3, p3.yzx + 33.33);
+        return fract((p3.x + p3.y) * p3.z);
     }
 
-    float hash(float2 uv, float jTime){
+    float hash(float2 uv){
         float a = amp(uv);
-        float w = a > 0.0 ? (1.0 - 0.4 * pow512(0.51 + 0.49 * sin((0.02 * (uv.y + 0.5 * uv.x) - jTime) * 2.0))) : 0.0;
-        float heightScale = 1.0 + u_energy * 0.8;
-        float audioReactivity = u_energy * audio_vibration_amplitude;
-        return (a > 0.0 ? a * pow1d5(hash21(uv)) * w * heightScale : 0.0) - audioReactivity;
+        if (a <= 0.0) return -u_energy * audio_vibration_amplitude;
+        
+        float h = hash21(uv);
+        return a * (h * h) * (1.0 + u_energy * 0.8) - (u_energy * audio_vibration_amplitude);
     }
 
-    float edgeMin(float dx, float2 da, float2 db, float2 uv){
-        uv.x += 5.0;
-        vec3 c = fract(floor(vec3(uv, uv.x + uv.y) + 0.5) * (vec3(0.0, 1.0, 2.0) + 0.61803398875));
-        float a1 = (hash21(float2(c.y, 0.0)) * u_energy) > 0.6 ? 0.15 : 1.0;
-        float a2 = (hash21(float2(c.x, 0.0)) * u_energy) > 0.6 ? 0.15 : 1.0;
-        float a3 = (hash21(float2(c.z, 0.0)) * u_energy) > 0.6 ? 0.15 : 1.0;
-        return min(min((1.0 - dx) * db.y * a3, da.x * a2), da.y * a1);
+    float edgeMin(float dx, float2 da, float2 db){
+        return min(min((1.0 - dx) * db.y, da.x), da.y);
     }
 
-    float2 trinoise(float2 uv, float jTime){
+    float trinoiseHeight(float2 uv){
         const float sq = 1.22474487; 
         uv.x *= sq;
         uv.y -= 0.5 * uv.x;
         float2 d = fract(uv);
         uv -= d;
-
         bool c = dot(d, float2(1.0)) > 1.0;
-
         float2 dd = 1.0 - d;
         float2 da = c ? dd : d;
         float2 db = c ? d : dd;
-        
-        float nn = hash(uv + float(c), jTime);
-        float n2 = hash(uv + float2(1.0, 0.0), jTime);
-        float n3 = hash(uv + float2(0.0, 1.0), jTime);
-        
+        float nn = hash(uv + float(c));
+        float n2 = hash(uv + float2(1.0, 0.0));
+        float n3 = hash(uv + float2(0.0, 1.0));
         float nmid = mix(n2, n3, d.y);
         float ns = mix(nn, c ? n2 : n3, da.y);
         float dx = da.x / max(db.y, 0.0001);
-        return float2(mix(ns, nmid, dx), edgeMin(dx, da, db, uv + d));
+        return mix(ns, nmid, dx);
+    }
+    
+    float trinoiseEdge(float2 uv){
+        const float sq = 1.22474487; 
+        uv.x *= sq;
+        uv.y -= 0.5 * uv.x;
+        float2 d = fract(uv);
+        uv -= d;
+        bool c = dot(d, float2(1.0)) > 1.0;
+        float2 dd = 1.0 - d;
+        float2 da = c ? dd : d;
+        float2 db = c ? d : dd;
+        float dx = da.x / max(db.y, 0.0001);
+        return edgeMin(dx, da, db);
     }
 
-    float2 map(vec3 p, float jTime){
-        float2 n = trinoise(p.xz, jTime);
-        return float2(p.y - 2.0 * n.x, n.y);
+    float map(vec3 p){
+        float a = amp(p.xz);
+        if (a <= 0.0) return p.y - 2.0 * (-u_energy * audio_vibration_amplitude);
+        return p.y - 2.0 * trinoiseHeight(p.xz);
     }
 
-    vec3 grad(vec3 p, float jTime){
+    vec3 grad(vec3 p){
         const float2 e = float2(0.005, 0.0);
-        float a = map(p, jTime).x;
-        return vec3(map(p + e.xyy, jTime).x - a,
-                    map(p + e.yxy, jTime).x - a,
-                    map(p + e.yyx, jTime).x - a) / e.x;
+        float a = map(p);
+        return vec3(map(p + e.xyy) - a,
+                    map(p + e.yxy) - a,
+                    map(p + e.yyx) - a) / e.x;
     }
 
-    float2 intersect(vec3 ro, vec3 rd, float jTime){
+    float intersect(vec3 ro, vec3 rd){
         float d = 0.0, h = 0.0;
-        for(int i = 0; i < 70; i++){
+        for(int i = 0; i < MAX_STEPS; i++){
             vec3 p = ro + d * rd;
-            float2 s = map(p, jTime);
-            h = s.x;
-            d += h * 0.35;
-            if(abs(h) < 0.003 * d) return float2(d, s.y);
-            if(d > 120.0 || p.y > 2.0) break;
+            h = map(p);
+            d += h; // step 1.0
+            if(abs(h) < 0.005 * d) return d;
+            if(d > MAX_DIST || p.y > 2.0) return -1.0;
         }
-        return float2(-1.0);
+        return d; 
     }
 
     void addsun(vec3 rd, vec3 ld, inout vec3 col){
@@ -122,20 +130,10 @@ private const val SYNTHWAVE_AGSL = """
     }
 
     float starnoise(vec3 rd){
-        float c = 0.0;
         vec3 p = normalize(rd) * 300.0;
-        for (float i = 0.0; i < 3.0; i++){
-            vec3 q = fract(p) - 0.5;
-            vec3 id = floor(p);
-            float c2 = smoothstep(0.5, 0.0, length(q));
-            c2 *= step(hash21(id.xz / max(abs(id.y), 0.001)), 0.06 - i * i * 0.005);
-            c += c2;
-            p = p * 0.6 + 0.5 * p * mat3(0.6, 0.0, 0.8, 0.0, 1.0, 0.0, -0.8, 0.0, 0.6);
-        }
-        c *= c;
-        float g = dot(sin(rd * 10.512), cos(rd.yzx * 10.512));
-        c *= smoothstep(-3.14, -0.9, g) * 0.5 + 0.5 * smoothstep(-0.3, 1.0, g);
-        return c * c;
+        vec3 id = floor(p);
+        float c = smoothstep(0.5, 0.0, length(fract(p) - 0.5));
+        return c * step(hash21(id.xz), 0.01);
     }
 
     vec3 gsky(vec3 rd, vec3 ld, bool mask){
@@ -150,41 +148,40 @@ private const val SYNTHWAVE_AGSL = """
     }
 
     half4 main(float2 fragCoord) {
-        float2 uv = (2.0 * fragCoord - u_resolution.xy) / u_resolution.y;
+        float2 uv = (2.0 * fragCoord - u_resolution.xy) / min(u_resolution.x, u_resolution.y);
         uv.y = -uv.y; // Fix inverted Y
         
-        float dt = fract(hash21(fragCoord) + u_time) * 0.25;
-        float jTime = mod(u_time - dt * 0.016, 4000.0);
+        float jTime = mod(u_time, 4000.0);
         vec3 ro = vec3(0.0, 1.0, (-20000.0 + jTime * speed));
         
         vec3 rd = normalize(vec3(uv, 1.3333333));
         
-        float2 i = intersect(ro, rd, jTime);
-        float d = i.x;
+        RAYMARCH_CALL
         
         vec3 ld = normalize(vec3(0.0, 0.125 + 0.05 * sin(0.1 * jTime), 1.0));
-
-        vec3 fog = d > 0.0 ? exp2(-d * vec3(0.14, 0.1, 0.28)) : vec3(0.0);
-        vec3 sky = gsky(rd, ld, d < 0.0);
+        vec3 col = vec3(0.0);
         
-        vec3 p = ro + d * rd;
-        vec3 n = normalize(grad(p, jTime));
+        if (d < 0.0) {
+            col = gsky(rd, ld, true);
+        } else {
+            vec3 p = ro + d * rd;
+            
+            // Simplified Retro Shading: no normals, no reflections, just flat dark terrain and glowing grid
+            vec3 terrainCol = mix(vec3(u_dominant.rgb), vec3(u_muted.rgb), 0.6) * 0.15;
+            vec3 fog = exp2(-d * vec3(0.14, 0.1, 0.28));
+            
+            // Only calculate glowing edges if it's close enough (not completely hidden by fog)
+            if (fog.y > 0.05) {
+                float edge = trinoiseEdge(p.xz);
+                float glow = smoothstep(0.08, 0.0, edge) + smoothstep(0.02, 0.0, edge) * 0.8;
+                terrainCol = mix(terrainCol, vec3(u_vibrant.rgb), min(glow, 1.0));
+            }
+            
+            vec3 fogColor = mix(vec3(u_dominant.rgb) * 0.1, vec3(u_muted.rgb), exp2(-5.0 * abs(rd.y)));
+            col = mix(fogColor, terrainCol, fog);
+        }
         
-        float diff = dot(n, ld) + 0.1 * n.y;
-        vec3 col = mix(vec3(u_dominant.rgb), vec3(u_muted.rgb), 0.6) * diff;
-        
-        vec3 rfd = reflect(rd, n); 
-        vec3 rfcol = gsky(rfd, ld, true);
-        
-        col = mix(col, rfcol, 0.05 + 0.95 * pow(max(1.0 + dot(rd, n), 0.0), 5.0));
-        
-        col = mix(col, vec3(u_vibrant.rgb), smoothstep(0.05, 0.0, i.y));
-        col = mix(sky, col, fog);
         col = sqrt(max(col, 0.0));
-        
-        if(d < 0.0) d = 1e6;
-        d = min(d, 10.0);
-        
         vec3 finalColor = clamp(col, 0.0, 1.0);
         return half4(half3(finalColor), 1.0); 
     }
@@ -230,7 +227,7 @@ actual fun SynthwaveBackground(
                 val speedBoost = smoothEnergy * 2.5f
                 time += dt * (if (currentIsPlayerScreen) 1.5f + speedBoost else 0.5f + speedBoost * 0.3f)
             }
-            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(24L)
+            if (!currentIsPlayerScreen) kotlinx.coroutines.delay(120L) else kotlinx.coroutines.delay(24L)
         }
     }
 
@@ -240,33 +237,42 @@ actual fun SynthwaveBackground(
             .background(dominantColorState.value)
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            val runtimeShader = remember {
-                try {
-                    RuntimeShader(SYNTHWAVE_AGSL)
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    null
+            var runtimeShader by remember { mutableStateOf<RuntimeShader?>(null) }
+            LaunchedEffect(isPlayerScreen) {
+                if (!isPlayerScreen) kotlinx.coroutines.delay(100L)
+                val shader = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                    try {
+                        var shaderCode = SYNTHWAVE_AGSL
+                            .replace("MAX_STEPS", if (isPlayerScreen) "15" else "0")
+                            .replace("MAX_DIST", if (isPlayerScreen) "45.0" else "0.0")
+                            .replace("RAYMARCH_CALL", if (isPlayerScreen) "float d = intersect(ro, rd);" else "float d = -1.0;")
+                        
+                        if (!isPlayerScreen) {
+                            shaderCode = shaderCode.replace("float st = mask ? (starnoise(rd)) * (1.0 - min(haze, 1.0)) : 0.0;", "float st = 0.0;")
+                        }
+                        RuntimeShader(shaderCode)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        null
+                    }
                 }
+                runtimeShader = shader
             }
 
-            val shaderBrush = remember(runtimeShader) {
+            val brush = remember(runtimeShader) {
                 runtimeShader?.let { ShaderBrush(it) }
             }
 
-            if (shaderBrush != null && runtimeShader != null) {
-                val dom = dominantColorState.value
-                val vib = vibrantColorState.value
-                val mut = mutedColorState.value
-                
+            if (brush != null && runtimeShader != null) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    runtimeShader.setFloatUniform("u_resolution", size.width, size.height)
-                    runtimeShader.setFloatUniform("u_time", time)
-                    runtimeShader.setFloatUniform("u_energy", dynamicEnergy)
-                    runtimeShader.setFloatUniform("u_dominant", dom.red, dom.green, dom.blue, dom.alpha)
-                    runtimeShader.setFloatUniform("u_vibrant", vib.red, vib.green, vib.blue, vib.alpha)
-                    runtimeShader.setFloatUniform("u_muted", mut.red, mut.green, mut.blue, mut.alpha)
+                    runtimeShader?.setFloatUniform("u_resolution", size.width, size.height)
+                    runtimeShader?.setFloatUniform("u_time", time)
+                    runtimeShader?.setFloatUniform("u_energy", dynamicEnergy)
+                    runtimeShader?.setFloatUniform("u_dominant", dominantColorState.value.red, dominantColorState.value.green, dominantColorState.value.blue, dominantColorState.value.alpha)
+                    runtimeShader?.setFloatUniform("u_vibrant", vibrantColorState.value.red, vibrantColorState.value.green, vibrantColorState.value.blue, vibrantColorState.value.alpha)
+                    runtimeShader?.setFloatUniform("u_muted", mutedColorState.value.red, mutedColorState.value.green, mutedColorState.value.blue, mutedColorState.value.alpha)
                     
-                    drawRect(brush = shaderBrush, size = size)
+                    drawRect(brush = brush, size = size)
                 }
             }
         }

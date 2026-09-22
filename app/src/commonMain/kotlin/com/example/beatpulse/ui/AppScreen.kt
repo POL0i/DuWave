@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -67,88 +68,85 @@ fun AppScreen(
     playerViewModel: IPlayerViewModel,
     statsViewModel: com.example.beatpulse.ui.screens.StatsViewModel
 ) {
-    val exoPlayer by playerViewModel.playerState.collectAsState()
-    val isPlaying by playerViewModel.isPlaying.collectAsState()
-    val currentTrack by playerViewModel.currentTrack.collectAsState()
-    val currentQueue by playerViewModel.currentQueue.collectAsState()
-    val paletteColorsFlow by playerViewModel.paletteColors.collectAsState()
-    val cleanUiMode = playerViewModel.cleanUiMode.collectAsState().value
-    val dynamicColorsPlus = playerViewModel.dynamicColorsPlus.collectAsState().value
-    val dynamicColorsInterval = playerViewModel.dynamicColorsInterval.collectAsState().value
+    val exoPlayer by playerViewModel.playerState.collectAsStateWithLifecycle()
+    val isPlaying by playerViewModel.isPlaying.collectAsStateWithLifecycle()
+    val currentTrack by playerViewModel.currentTrack.collectAsStateWithLifecycle()
+    val currentQueue by playerViewModel.currentQueue.collectAsStateWithLifecycle()
+    val paletteColorsFlow by playerViewModel.paletteColors.collectAsStateWithLifecycle()
+    val cleanUiMode = playerViewModel.cleanUiMode.collectAsStateWithLifecycle().value
+    val dynamicColorsPlus = playerViewModel.dynamicColorsPlus.collectAsStateWithLifecycle().value
+    val dynamicColorsInterval = playerViewModel.dynamicColorsInterval.collectAsStateWithLifecycle().value
     
-    var activeDynamicColor by remember { mutableStateOf<Color?>(null) }
+    var colorOffset by remember { mutableIntStateOf(0) }
     
     LaunchedEffect(Unit) {
     }
     
-    LaunchedEffect(dynamicColorsPlus, dynamicColorsInterval, paletteColorsFlow) {
+    LaunchedEffect(dynamicColorsPlus, dynamicColorsInterval) {
         if (!dynamicColorsPlus) {
-            activeDynamicColor = null
+            colorOffset = 0
             return@LaunchedEffect
         }
-        val colors = listOf(
-            paletteColorsFlow.dominant,
-            paletteColorsFlow.vibrant,
-            paletteColorsFlow.lightVibrant,
-            paletteColorsFlow.darkVibrant,
-            paletteColorsFlow.muted,
-            paletteColorsFlow.darkMuted
-        ).distinct().filter { it != Color.Black && it != Color.White && it != Color.Transparent }
-        
-        if (colors.isEmpty()) {
-            activeDynamicColor = null
-            return@LaunchedEffect
-        }
-        
-        val recentColors = mutableListOf<Color>()
         while (true) {
-            val availableColors = colors.filter { it !in recentColors }
-            val nextColor = if (availableColors.isNotEmpty()) {
-                availableColors.random()
-            } else {
-                colors.random()
-            }
-            
-            activeDynamicColor = nextColor
-            recentColors.add(nextColor)
-            if (recentColors.size >= colors.size / 2 && recentColors.size > 0) {
-                recentColors.removeAt(0)
-            }
-            
             kotlinx.coroutines.delay(dynamicColorsInterval * 1000L)
+            colorOffset++
         }
     }
     
-    val animatedDominantColor by animateColorAsState(
-        targetValue = activeDynamicColor ?: paletteColorsFlow.dominant, 
-        animationSpec = tween(3000)
+    val baseColors = listOf(
+        paletteColorsFlow.dominant,
+        paletteColorsFlow.vibrant,
+        paletteColorsFlow.lightVibrant,
+        paletteColorsFlow.darkVibrant,
+        paletteColorsFlow.muted,
+        paletteColorsFlow.darkMuted,
+        paletteColorsFlow.extra1,
+        paletteColorsFlow.extra2,
+        paletteColorsFlow.extra3
     )
     
-    val paletteColors = if (dynamicColorsPlus && activeDynamicColor != null) {
-        paletteColorsFlow.copy(
-            dominant = animatedDominantColor,
-            vibrant = animatedDominantColor,
-            lightVibrant = animatedDominantColor,
-            darkVibrant = animatedDominantColor,
-            muted = animatedDominantColor,
-            darkMuted = animatedDominantColor
-        )
+    val shiftedColors = if (dynamicColorsPlus) {
+        baseColors.indices.map { i -> baseColors[(i + colorOffset) % baseColors.size] }
     } else {
-        paletteColorsFlow
+        baseColors
     }
-    val repeatModeState by playerViewModel.repeatMode.collectAsState()
-    val shuffleModeState by playerViewModel.shuffleModeEnabled.collectAsState()
-    val playbackSpeed by playerViewModel.playbackSpeed.collectAsState()
-    val playbackPitch by playerViewModel.playbackPitch.collectAsState()
-    val reverbEnabled by playerViewModel.reverbEnabled.collectAsState()
-    val effectsPreset by playerViewModel.effectsPreset.collectAsState()
-    val currentPosition by playerViewModel.currentPosition.collectAsState()
-    val duration by playerViewModel.duration.collectAsState()
-    val coverDragEnabled by playerViewModel.coverDragEnabled.collectAsState()
     
-    val isMicModeActive by playerViewModel.isMicModeActive.collectAsState()
-    val streamConfigEffectsVisible by playerViewModel.streamConfigEffectsVisible.collectAsState()
-    val bgStyle by libraryViewModel.prefs.backgroundStyleFlow.collectAsState()
+    val animatedDominant by animateColorAsState(targetValue = shiftedColors[0], animationSpec = tween(3000))
+    val animatedVibrant by animateColorAsState(targetValue = shiftedColors[1], animationSpec = tween(3000))
+    val animatedLightVibrant by animateColorAsState(targetValue = shiftedColors[2], animationSpec = tween(3000))
+    val animatedDarkVibrant by animateColorAsState(targetValue = shiftedColors[3], animationSpec = tween(3000))
+    val animatedMuted by animateColorAsState(targetValue = shiftedColors[4], animationSpec = tween(3000))
+    val animatedDarkMuted by animateColorAsState(targetValue = shiftedColors[5], animationSpec = tween(3000))
+    val animatedExtra1 by animateColorAsState(targetValue = shiftedColors[6], animationSpec = tween(3000))
+    val animatedExtra2 by animateColorAsState(targetValue = shiftedColors[7], animationSpec = tween(3000))
+    val animatedExtra3 by animateColorAsState(targetValue = shiftedColors[8], animationSpec = tween(3000))
+
+    val activeDynamicColor = if (dynamicColorsPlus) animatedDominant else null
+
+    val paletteColors = paletteColorsFlow.copy(
+        dominant = animatedDominant,
+        vibrant = animatedVibrant,
+        lightVibrant = animatedLightVibrant,
+        darkVibrant = animatedDarkVibrant,
+        muted = animatedMuted,
+        darkMuted = animatedDarkMuted,
+        extra1 = animatedExtra1,
+        extra2 = animatedExtra2,
+        extra3 = animatedExtra3
+    )
+    val repeatModeState by playerViewModel.repeatMode.collectAsStateWithLifecycle()
+    val shuffleModeState by playerViewModel.shuffleModeEnabled.collectAsStateWithLifecycle()
+    val playbackSpeed by playerViewModel.playbackSpeed.collectAsStateWithLifecycle()
+    val playbackPitch by playerViewModel.playbackPitch.collectAsStateWithLifecycle()
+    val reverbEnabled by playerViewModel.reverbEnabled.collectAsStateWithLifecycle()
+    val effectsPreset by playerViewModel.effectsPreset.collectAsStateWithLifecycle()
+    val currentPosition by playerViewModel.currentPosition.collectAsStateWithLifecycle()
+    val duration by playerViewModel.duration.collectAsStateWithLifecycle()
+    val coverDragEnabled by playerViewModel.coverDragEnabled.collectAsStateWithLifecycle()
+    
+    val isMicModeActive by playerViewModel.isMicModeActive.collectAsStateWithLifecycle()
+    val streamConfigEffectsVisible by playerViewModel.streamConfigEffectsVisible.collectAsStateWithLifecycle()
+    val bgStyle by libraryViewModel.prefs.backgroundStyleFlow.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
 
     var globalToastMessage by remember { mutableStateOf<String?>(null) }
@@ -171,7 +169,7 @@ fun AppScreen(
 
     var currentPage by remember { mutableIntStateOf(libraryViewModel.prefs.lastMainScreenPage) }
     
-    val pageFlowValue by libraryViewModel.prefs.lastMainScreenPageFlow.collectAsState()
+    val pageFlowValue by libraryViewModel.prefs.lastMainScreenPageFlow.collectAsStateWithLifecycle()
     val initialPage = (Int.MAX_VALUE / 2) - ((Int.MAX_VALUE / 2) % 3) + libraryViewModel.prefs.lastMainScreenPage
     val pagerState = rememberPagerState(initialPage = initialPage, pageCount = { Int.MAX_VALUE })
 
@@ -198,7 +196,7 @@ fun AppScreen(
 
 
     var trackToAddToPlaylist by remember { mutableStateOf<TrackEntity?>(null) }
-    val playlists by libraryViewModel.playlists.collectAsState()
+    val playlists by libraryViewModel.playlists.collectAsStateWithLifecycle()
 
     var sleepTimerSeconds by remember { mutableIntStateOf(0) }
     LaunchedEffect(sleepTimerSeconds > 0) {
@@ -367,7 +365,7 @@ fun AppScreen(
             },
             containerColor = Color.Transparent,
             bottomBar = {
-                val streamConfigUiVisible by playerViewModel.streamConfigUiVisible.collectAsState()
+                val streamConfigUiVisible by playerViewModel.streamConfigUiVisible.collectAsStateWithLifecycle()
                 val hideBottomBar = currentPage == 2 && (cleanUiMode || (isMicModeActive && !streamConfigUiVisible))
 
                 AnimatedVisibility(
@@ -449,12 +447,12 @@ fun AppScreen(
                             activeDynamicColor = activeDynamicColor,
                             dynamicColorsInterval = dynamicColorsInterval,
                             cleanUiMode = cleanUiMode,
-                            coverDragEnabled = playerViewModel.coverDragEnabled.collectAsState().value,
-                            coverVisibilityMode = playerViewModel.coverVisibilityMode.collectAsState().value,
-                            chromaKeyColor = playerViewModel.chromaKeyColor.collectAsState().value,
-                            coverScale = playerViewModel.coverScale.collectAsState().value,
-                            coverOffsetX = playerViewModel.coverOffsetX.collectAsState().value,
-                            coverOffsetY = playerViewModel.coverOffsetY.collectAsState().value,
+                            coverDragEnabled = playerViewModel.coverDragEnabled.collectAsStateWithLifecycle().value,
+                            coverVisibilityMode = playerViewModel.coverVisibilityMode.collectAsStateWithLifecycle().value,
+                            chromaKeyColor = playerViewModel.chromaKeyColor.collectAsStateWithLifecycle().value,
+                            coverScale = playerViewModel.coverScale.collectAsStateWithLifecycle().value,
+                            coverOffsetX = playerViewModel.coverOffsetX.collectAsStateWithLifecycle().value,
+                            coverOffsetY = playerViewModel.coverOffsetY.collectAsStateWithLifecycle().value,
                             visualizerManager = visualizerManager,
                             equalizerManager = equalizerManager,
                             state = PlayerScreenState(
@@ -492,8 +490,8 @@ fun AppScreen(
 
     val effectiveBgStyle = if (isMicModeActive && !streamConfigEffectsVisible) 0 else bgStyle
     
-    val coverOffsetX by playerViewModel.coverOffsetX.collectAsState()
-    val coverOffsetY by playerViewModel.coverOffsetY.collectAsState()
+    val coverOffsetX by playerViewModel.coverOffsetX.collectAsStateWithLifecycle()
+    val coverOffsetY by playerViewModel.coverOffsetY.collectAsStateWithLifecycle()
     val albumArtCenterY by derivedStateOf { playerViewModel.albumArtCenterY }
     CompositionLocalProvider(
         LocalCoverOffset provides androidx.compose.ui.geometry.Offset(coverOffsetX, coverOffsetY),
@@ -520,12 +518,12 @@ fun AppScreen(
                 13 -> SandsFlowBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
                 14 -> com.example.beatpulse.ui.components.backgrounds.LullabyEyesBackground(paletteColors = paletteColors, visualizerManager = visualizerManager, isPlayerScreen = currentPage == 2) { content() }
                 15 -> {
-                    val amps = visualizerManager.combinedAmplitudes.collectAsState().value
+                    val amps = visualizerManager.combinedAmplitudes.collectAsStateWithLifecycle().value
                     val energy = if (amps.isNotEmpty()) amps.average().toFloat() else 0f
                     com.example.beatpulse.ui.components.backgrounds.RetroCRTBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = energy, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = currentPage == 2) { content() }
                 }
                 16 -> {
-                    val amps = visualizerManager.combinedAmplitudes.collectAsState().value
+                    val amps = visualizerManager.combinedAmplitudes.collectAsStateWithLifecycle().value
                     val energy = if (amps.isNotEmpty()) amps.average().toFloat() else 0f
                     com.example.beatpulse.ui.components.backgrounds.ProceduralCRTCdc3rxBackground(dominantColor = paletteColors.dominant, vibrantColor = paletteColors.vibrant, mutedColor = paletteColors.muted, dynamicEnergy = energy, dynamicOffsetY = 0f, dynamicOffsetX = 0f, isPlayerScreen = currentPage == 2) { content() }
                 }
@@ -575,7 +573,7 @@ fun AppScreen(
 
     var showTutorial by remember { mutableStateOf(!prefs.hasSeenTutorial) }
 
-    val showFps by playerViewModel.showFps.collectAsState()
+    val showFps by playerViewModel.showFps.collectAsStateWithLifecycle()
     var currentFps by remember { mutableStateOf(0) }
     LaunchedEffect(showFps) {
         if (showFps) {
