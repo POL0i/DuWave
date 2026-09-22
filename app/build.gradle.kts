@@ -131,8 +131,8 @@ android {
         applicationId = "com.polonio.duwave"
         minSdk = 24
         targetSdk = 35
-        versionCode = 10
-        versionName = "2.1.0"
+        versionCode = 11
+        versionName = "2.1.1"
         resConfigs("en", "es")
     }
     
