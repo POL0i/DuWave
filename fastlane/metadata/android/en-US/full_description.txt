@@ -1,12 +1,16 @@
-DuWave is a dynamic local and open-source music player, designed to offer the best experience both offline and online.
+**DuWave is a dynamic local and open-source music player, designed to offer the best experience both offline and online.**
 
-Main features:
-* Online search and streaming: Find and listen to music directly from the internet.
-* Music downloading: Save your favorite songs for offline listening.
-* Smooth playback and optimized support via ExoPlayer.
-* Dynamic interface with Palette API that changes and adapts to the album covers of your songs.
-* Real-time audio visualizer.
-* Comprehensive local music library and playlist management.
-* Built-in audio trimmer.
-* Advanced equalizer with multiple profiles and unique visual styles (including Pixel Art style).
-* Advanced customization options for changing album covers based on titles.
+**Main features:**
+* **Online Search & Shazam Integration:** Find and listen to music directly from the internet, and identify songs playing around you using our custom Shazam Node server.
+* **Music Downloading:** Save your favorite songs for offline listening.
+* **Smooth Playback:** Optimized audio support powered by ExoPlayer.
+* **Dynamic Interface:** Utilizing the Palette API, the UI automatically changes and adapts to the colors of your album covers.
+* **Audio Visualizers:** Real-time, highly-customizable audio visualizers (including Pixel Art styles, Procedural CRT, and more).
+* **Built-in Audio Trimmer:** Cut and trim your music files effortlessly.
+* **Library Management:** Comprehensive local music library and playlist handling.
+* **Advanced Equalizer:** Multiple profiles to perfectly tune your audio.
+
+**🌟 What's new in v2.1.1:**
+* **UI Polish:** Fixed critical text legibility and contrast issues across the app (especially in the language selection and dropdown menus) when using dark backgrounds.
+* **New Free Visual Styles:** Procedural CRT and Clouds (Terraria Water) are now completely free for everyone!
+* **More Effects:** Added new 'SineWave' and 'Polygon Unfold' visual effects.
